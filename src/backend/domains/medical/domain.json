@@ -1,0 +1,16 @@
+{
+  "slug": "medical",
+  "name": "Medical",
+  "description": "Evidence-based medical analysis with clinical perspectives. 5 specialized agents cover diagnostics, drug interactions, ethics, and patient advocacy.",
+  "icon": "Stethoscope",
+  "color": "#ef4444",
+  "tier": "pro",
+  "isActive": true,
+  "agents": [
+    { "name": "clinical-evidence", "displayName": "Clinical Evidence", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
+    { "name": "drug-interaction", "displayName": "Drug Interaction", "role": "fact_checker", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "differential-diagnosis", "displayName": "Differential Diagnosis", "role": "respondent", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
+    { "name": "patient-advocacy", "displayName": "Patient Advocacy", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "medical-ethics", "displayName": "Medical Ethics", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
+  ]
+}

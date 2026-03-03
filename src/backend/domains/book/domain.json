@@ -1,0 +1,46 @@
+{
+  "slug": "book",
+  "name": "Book Analysis",
+  "description": "Expert AI analysis panel for books and literary works. 5 specialized agents provide in-depth scholarly analysis across thematic, structural, critical, cultural, and synthetic dimensions.",
+  "icon": "FileText",
+  "color": "#0ea5e9",
+  "tier": "free",
+  "isActive": true,
+  "agents": [
+    {
+      "name": "thematic-analysis",
+      "displayName": "Thematic Analysis",
+      "role": "respondent",
+      "llmProvider": "anthropic",
+      "llmModel": "claude-sonnet-4-6"
+    },
+    {
+      "name": "structural-examination",
+      "displayName": "Structural Examination",
+      "role": "respondent",
+      "llmProvider": "openai",
+      "llmModel": "gpt-4o"
+    },
+    {
+      "name": "critical-theory",
+      "displayName": "Critical Theory",
+      "role": "devil_advocate",
+      "llmProvider": "google",
+      "llmModel": "gemini-2.0-flash"
+    },
+    {
+      "name": "cultural-context",
+      "displayName": "Cultural Context",
+      "role": "fact_checker",
+      "llmProvider": "openai",
+      "llmModel": "gpt-4o"
+    },
+    {
+      "name": "book-synthesis",
+      "displayName": "Analysis Synthesis",
+      "role": "synthesizer",
+      "llmProvider": "anthropic",
+      "llmModel": "claude-sonnet-4-6"
+    }
+  ]
+}

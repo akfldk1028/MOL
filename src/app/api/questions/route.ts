@@ -1,0 +1,47 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { API_BASE, INTERNAL_API_SECRET } from '@/app/api/_config';
+import { verifySessionToken } from '@/lib/auth/google';
+import { prisma } from '@/lib/db';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const params = new URLSearchParams();
+    ['status', 'sort', 'limit', 'offset'].forEach(key => {
+      const value = searchParams.get(key);
+      if (value) params.append(key, value);
+    });
+
+    const response = await fetch(`${API_BASE}/questions?${params}`);
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const payload = await verifySessionToken();
+    if (!payload) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+    }
+
+    const body = await request.json();
+
+    const response = await fetch(`${API_BASE}/questions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-Id': payload.userId,
+        'X-Internal-Secret': INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    return NextResponse.json(data, { status: response.status });
+  } catch (error) {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

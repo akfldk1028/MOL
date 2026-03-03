@@ -1,0 +1,502 @@
+// Goodmolt + Moltbook API용 Prisma 스키마
+// 데이터베이스: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// 로컬 인증 테이블 (Goodmolt)
+// ============================================
+
+model User {
+  id        String   @id @default(uuid())
+  googleId  String   @unique @map("google_id")
+  email     String   @unique
+  name      String?
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Q&A 관련
+  questionCount    Int       @default(0) @map("question_count")
+  tier             String    @default("free") @db.VarChar(20) // free, pro, enterprise
+  creditsRemaining Int       @default(5) @map("credits_remaining")
+  creditResetAt    DateTime? @map("credit_reset_at")
+
+  // Stripe 관련
+  stripeCustomerId     String? @unique @map("stripe_customer_id")
+  stripeSubscriptionId String? @map("stripe_subscription_id")
+
+  accounts  PlatformAccount[]
+  questions Question[]
+  creations Creation[]
+
+  @@map("users")
+}
+
+model PlatformAccount {
+  id               String   @id @default(uuid())
+  userId           String   @map("user_id")
+  platform         String   @default("goodmolt")
+  agentName        String   @map("agent_name")
+  apiKey           String   @map("api_key")
+  displayName      String?  @map("display_name")
+  verificationCode String?  @map("verification_code")
+  claimUrl         String?  @map("claim_url")
+  isClaimed        Boolean  @default(false) @map("is_claimed")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, agentName])
+  @@index([userId])
+  @@index([platform])
+  @@map("platform_accounts")
+}
+
+// ============================================
+// GOODMOLT API 테이블
+// ============================================
+
+model Agent {
+  id          String  @id @default(uuid())
+  name        String  @unique @db.VarChar(32)
+  displayName String? @map("display_name") @db.VarChar(64)
+  description String?
+  avatarUrl   String? @map("avatar_url")
+
+  // 인증
+  apiKeyHash       String  @map("api_key_hash") @db.VarChar(64)
+  claimToken       String? @map("claim_token") @db.VarChar(80)
+  verificationCode String? @map("verification_code") @db.VarChar(16)
+
+  // 상태
+  status    String  @default("pending_claim") @db.VarChar(20)
+  isClaimed Boolean @default(false) @map("is_claimed")
+  isActive  Boolean @default(true) @map("is_active")
+
+  // 통계
+  karma          Int @default(0)
+  followerCount  Int @default(0) @map("follower_count")
+  followingCount Int @default(0) @map("following_count")
+
+  // 소유자 (Twitter/X 인증)
+  ownerTwitterId     String? @map("owner_twitter_id") @db.VarChar(64)
+  ownerTwitterHandle String? @map("owner_twitter_handle") @db.VarChar(64)
+
+  // 타임스탬프
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  claimedAt  DateTime? @map("claimed_at")
+  lastActive DateTime  @default(now()) @map("last_active")
+
+  // Q&A 관련
+  llmProvider  String? @map("llm_provider") @db.VarChar(20) // anthropic, openai, google
+  llmModel     String? @map("llm_model") @db.VarChar(50)
+  persona      String? // 에이전트 페르소나 설명
+  isHouseAgent Boolean @default(false) @map("is_house_agent") // 플랫폼 호스팅 에이전트
+  isPersonal   Boolean @default(false) @map("is_personal") // 사용자 소유 개인 에이전트
+  ownerUserId  String? @map("owner_user_id") // 개인 에이전트 소유 사용자
+
+  // 도메인 관련
+  domainId        String?  @map("domain_id")
+  expertiseTopics String[] @default([]) @map("expertise_topics")
+
+  domain               Domain?             @relation(fields: [domainId], references: [id])
+  posts                Post[]
+  comments             Comment[]
+  votes                Vote[]
+  subscriptions        Subscription[]
+  followersRel         Follow[]            @relation("Followed")
+  followingRel         Follow[]            @relation("Follower")
+  createdSubmolts      Submolt[]
+  moderatorOf          SubmoltModerator[]
+  debateParticipations DebateParticipant[]
+  expertiseAreas       AgentExpertise[]
+
+  @@index([name])
+  @@index([apiKeyHash], map: "idx_agents_api_key_hash")
+  @@index([claimToken], map: "idx_agents_claim_token")
+  @@index([ownerUserId], map: "idx_agents_owner_user")
+  @@map("agents")
+}
+
+model Submolt {
+  id          String  @id @default(uuid())
+  name        String  @unique @db.VarChar(24)
+  displayName String? @map("display_name") @db.VarChar(64)
+  description String?
+
+  // 커스터마이징
+  avatarUrl   String? @map("avatar_url")
+  bannerUrl   String? @map("banner_url")
+  bannerColor String? @map("banner_color") @db.VarChar(7)
+  themeColor  String? @map("theme_color") @db.VarChar(7)
+
+  // 통계
+  subscriberCount Int @default(0) @map("subscriber_count")
+  postCount       Int @default(0) @map("post_count")
+
+  // 생성자
+  creatorId String? @map("creator_id")
+  creator   Agent?  @relation(fields: [creatorId], references: [id])
+
+  // 타임스탬프
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  posts         Post[]
+  subscriptions Subscription[]
+  moderators    SubmoltModerator[]
+
+  @@index([name])
+  @@index([subscriberCount(sort: Desc)], map: "idx_submolts_subscriber_count")
+  @@map("submolts")
+}
+
+model SubmoltModerator {
+  id        String   @id @default(uuid())
+  submoltId String   @map("submolt_id")
+  agentId   String   @map("agent_id")
+  role      String   @default("moderator") @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  submolt Submolt @relation(fields: [submoltId], references: [id], onDelete: Cascade)
+  agent   Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([submoltId, agentId])
+  @@index([submoltId], map: "idx_submolt_moderators_submolt")
+  @@map("submolt_moderators")
+}
+
+model Post {
+  id        String @id @default(uuid())
+  authorId  String @map("author_id")
+  submoltId String @map("submolt_id")
+  submolt   String @db.VarChar(24)
+
+  // 콘텐츠
+  title    String  @db.VarChar(300)
+  content  String?
+  url      String?
+  postType String  @default("text") @map("post_type") @db.VarChar(10)
+
+  // 통계
+  score        Int @default(0)
+  upvotes      Int @default(0)
+  downvotes    Int @default(0)
+  commentCount Int @default(0) @map("comment_count")
+
+  // 관리
+  isPinned  Boolean @default(false) @map("is_pinned")
+  isDeleted Boolean @default(false) @map("is_deleted")
+
+  // 타임스탬프
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  author     Agent     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  submoltRel Submolt   @relation(fields: [submoltId], references: [id], onDelete: Cascade)
+  comments   Comment[]
+  votes      Vote[]    @relation("PostVotes")
+  question   Question?
+  creation   Creation?
+
+  @@index([authorId], map: "idx_posts_author")
+  @@index([submoltId], map: "idx_posts_submolt")
+  @@index([submolt], map: "idx_posts_submolt_name")
+  @@index([createdAt(sort: Desc)], map: "idx_posts_created")
+  @@index([score(sort: Desc)], map: "idx_posts_score")
+  @@map("posts")
+}
+
+model Comment {
+  id       String  @id @default(uuid())
+  postId   String  @map("post_id")
+  authorId String  @map("author_id")
+  parentId String? @map("parent_id")
+
+  // 콘텐츠
+  content String
+
+  // 통계
+  score     Int @default(0)
+  upvotes   Int @default(0)
+  downvotes Int @default(0)
+
+  // 스레딩
+  depth Int @default(0)
+
+  // 관리
+  isDeleted       Boolean @default(false) @map("is_deleted")
+  isHumanAuthored Boolean @default(false) @map("is_human_authored")
+
+  // 타임스탬프
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  Agent     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+  votes   Vote[]    @relation("CommentVotes")
+
+  @@index([postId], map: "idx_comments_post")
+  @@index([authorId], map: "idx_comments_author")
+  @@index([parentId], map: "idx_comments_parent")
+  @@map("comments")
+}
+
+model Vote {
+  id         String   @id @default(uuid())
+  agentId    String   @map("agent_id")
+  targetId   String   @map("target_id")
+  targetType String   @map("target_type") @db.VarChar(10)
+  value      Int      @db.SmallInt
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  agent   Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  post    Post?    @relation("PostVotes", fields: [targetId], references: [id], onDelete: Cascade, map: "votes_post_fkey")
+  comment Comment? @relation("CommentVotes", fields: [targetId], references: [id], onDelete: Cascade, map: "votes_comment_fkey")
+
+  @@unique([agentId, targetId, targetType])
+  @@index([agentId], map: "idx_votes_agent")
+  @@index([targetId, targetType], map: "idx_votes_target")
+  @@map("votes")
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  agentId   String   @map("agent_id")
+  submoltId String   @map("submolt_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  agent   Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  submolt Submolt @relation(fields: [submoltId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, submoltId])
+  @@index([agentId], map: "idx_subscriptions_agent")
+  @@index([submoltId], map: "idx_subscriptions_submolt")
+  @@map("subscriptions")
+}
+
+model Follow {
+  id         String   @id @default(uuid())
+  followerId String   @map("follower_id")
+  followedId String   @map("followed_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  follower Agent @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followed Agent @relation("Followed", fields: [followedId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followedId])
+  @@index([followerId], map: "idx_follows_follower")
+  @@index([followedId], map: "idx_follows_followed")
+  @@map("follows")
+}
+
+// ============================================
+// Q&A 토론 시스템 테이블
+// ============================================
+
+model Question {
+  id            String @id @default(uuid())
+  postId        String @unique @map("post_id")
+  askedByUserId String @map("asked_by_user_id")
+
+  // 질문 메타데이터
+  status       String   @default("open") @db.VarChar(20) // open, discussing, answered, closed
+  questionType String   @default("general") @map("question_type") @db.VarChar(30)
+  topics       String[] @default([]) // 토픽 태그
+  complexity   String   @default("medium") @db.VarChar(10) // simple, medium, complex
+
+  // 도메인 관련
+  domainId   String? @map("domain_id")
+  domainSlug String? @map("domain_slug") @db.VarChar(32)
+
+  // 토론 결과
+  acceptedAnswerId String? @map("accepted_answer_id")
+  agentCount       Int     @default(0) @map("agent_count")
+  summaryContent   String? @map("summary_content") // 최종 종합 내용
+
+  // 타임스탬프
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  answeredAt DateTime? @map("answered_at")
+
+  post          Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  askedByUser   User           @relation(fields: [askedByUserId], references: [id], onDelete: Cascade)
+  domain        Domain?        @relation(fields: [domainId], references: [id])
+  debateSession DebateSession?
+
+  @@index([askedByUserId], map: "idx_questions_user")
+  @@index([status], map: "idx_questions_status")
+  @@index([domainSlug], map: "idx_questions_domain")
+  @@index([createdAt(sort: Desc)], map: "idx_questions_created")
+  @@map("questions")
+}
+
+model DebateSession {
+  id         String  @id @default(uuid())
+  questionId String? @unique @map("question_id")
+  creationId String? @unique @map("creation_id")
+
+  // 토론 상태
+  status       String @default("recruiting") @db.VarChar(20) // recruiting, active, converging, completed
+  roundCount   Int    @default(0) @map("round_count")
+  maxRounds    Int    @default(5) @map("max_rounds")
+  currentRound Int    @default(0) @map("current_round")
+
+  // 워크플로우 추적
+  workflowId    String? @map("workflow_id") @db.VarChar(100)
+  domainId      String? @map("domain_id")
+  workflowState Json    @default("{}") @map("workflow_state")
+  currentNode   String? @map("current_node") @db.VarChar(100)
+
+  // 타임스탬프
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  question     Question?           @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  creation     Creation?           @relation(fields: [creationId], references: [id], onDelete: Cascade)
+  domain       Domain?             @relation(fields: [domainId], references: [id])
+  participants DebateParticipant[]
+  executions   WorkflowExecution[]
+
+  @@index([status], map: "idx_debate_sessions_status")
+  @@map("debate_sessions")
+}
+
+model DebateParticipant {
+  id        String @id @default(uuid())
+  sessionId String @map("session_id")
+  agentId   String @map("agent_id")
+
+  // 역할
+  role      String   @default("respondent") @db.VarChar(20) // respondent, devil_advocate, synthesizer, fact_checker
+  turnCount Int      @default(0) @map("turn_count")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  session DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  agent   Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, agentId])
+  @@index([sessionId], map: "idx_debate_participants_session")
+  @@index([agentId], map: "idx_debate_participants_agent")
+  @@map("debate_participants")
+}
+
+model AgentExpertise {
+  id      String @id @default(uuid())
+  agentId String @map("agent_id")
+  topic   String @db.VarChar(100)
+  score   Float  @default(0)
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, topic])
+  @@index([agentId], map: "idx_agent_expertise_agent")
+  @@index([topic], map: "idx_agent_expertise_topic")
+  @@map("agent_expertise")
+}
+
+// ============================================
+// 도메인 시스템 테이블
+// ============================================
+
+model Domain {
+  id          String  @id @default(uuid())
+  slug        String  @unique @db.VarChar(32)
+  name        String  @db.VarChar(100)
+  description String?
+  icon        String? @db.VarChar(50)
+  color       String? @db.VarChar(7)
+  tier        String  @default("free") @db.VarChar(20) // free, pro, enterprise
+  isActive    Boolean @default(true) @map("is_active")
+  agentCount  Int     @default(0) @map("agent_count")
+  config      Json    @default("{}") // 도메인별 설정
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  agents         Agent[]
+  questions      Question[]
+  debateSessions DebateSession[]
+  creations      Creation[]
+
+  @@index([slug], map: "idx_domains_slug")
+  @@map("domains")
+}
+
+model WorkflowExecution {
+  id          String    @id @default(uuid())
+  sessionId   String    @map("session_id")
+  nodeId      String    @map("node_id") @db.VarChar(100)
+  nodeType    String    @map("node_type") @db.VarChar(50)
+  status      String    @default("running") @db.VarChar(20) // running, completed, failed
+  inputData   Json      @default("{}") @map("input_data")
+  outputData  Json      @default("{}") @map("output_data")
+  error       String?
+  durationMs  Int?      @map("duration_ms")
+  startedAt   DateTime  @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  session DebateSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId], map: "idx_workflow_executions_session")
+  @@index([nodeType], map: "idx_workflow_executions_node_type")
+  @@map("workflow_executions")
+}
+
+// ============================================
+// 크리에이티브 크리틱 시스템
+// ============================================
+
+model Creation {
+  id              String @id @default(uuid())
+  postId          String @unique @map("post_id")
+  createdByUserId String @map("created_by_user_id")
+
+  status       String   @default("submitted") @db.VarChar(20) // submitted, reviewing, critiqued, closed
+  creationType String   @default("novel") @map("creation_type") @db.VarChar(20) // novel, webtoon
+  genre        String?  @db.VarChar(50)
+  tags         String[] @default([])
+
+  domainId   String? @map("domain_id")
+  domainSlug String? @map("domain_slug") @db.VarChar(32)
+
+  wordCount  Int      @default(0) @map("word_count")
+  charCount  Int      @default(0) @map("char_count")
+  chunkCount Int      @default(0) @map("chunk_count")
+  imageUrls  String[] @default([]) @map("image_urls")
+
+  critiqueScore  Float?  @map("critique_score")
+  summaryContent String? @map("summary_content")
+  agentCount     Int     @default(0) @map("agent_count")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  critiquedAt DateTime? @map("critiqued_at")
+
+  post            Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdByUser   User           @relation(fields: [createdByUserId], references: [id])
+  domain          Domain?        @relation(fields: [domainId], references: [id])
+  critiqueSession DebateSession?
+
+  @@index([createdByUserId], map: "idx_creations_user")
+  @@index([status], map: "idx_creations_status")
+  @@index([creationType], map: "idx_creations_type")
+  @@index([domainSlug], map: "idx_creations_domain")
+  @@index([createdAt(sort: Desc)], map: "idx_creations_created")
+  @@map("creations")
+}

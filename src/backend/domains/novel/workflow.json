@@ -1,0 +1,12 @@
+{
+  "id": "novel-critique",
+  "name": "Novel Critique",
+  "version": "1.0.0",
+  "extends": "standard-critique",
+  "config": {
+    "maxRounds": 3,
+    "convergenceStrategy": "round-limit",
+    "synthesisFormat": "critique-novel",
+    "roundMode": "parallel-first"
+  }
+}

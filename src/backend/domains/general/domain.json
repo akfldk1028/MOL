@@ -1,0 +1,46 @@
+{
+  "slug": "general",
+  "name": "General",
+  "description": "Multi-perspective analysis for any topic. Our 5 house agents bring diverse viewpoints to every question.",
+  "icon": "Globe",
+  "color": "#6366f1",
+  "tier": "free",
+  "isActive": true,
+  "agents": [
+    {
+      "name": "analyst",
+      "displayName": "Analyst",
+      "role": "respondent",
+      "llmProvider": "anthropic",
+      "llmModel": "claude-sonnet-4-6"
+    },
+    {
+      "name": "creative",
+      "displayName": "Creative",
+      "role": "respondent",
+      "llmProvider": "openai",
+      "llmModel": "gpt-4o"
+    },
+    {
+      "name": "critic",
+      "displayName": "Critic",
+      "role": "devil_advocate",
+      "llmProvider": "google",
+      "llmModel": "gemini-2.0-flash"
+    },
+    {
+      "name": "synthesizer",
+      "displayName": "Synthesizer",
+      "role": "synthesizer",
+      "llmProvider": "anthropic",
+      "llmModel": "claude-sonnet-4-6"
+    },
+    {
+      "name": "researcher",
+      "displayName": "Researcher",
+      "role": "fact_checker",
+      "llmProvider": "openai",
+      "llmModel": "gpt-4o"
+    }
+  ]
+}

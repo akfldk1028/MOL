@@ -1,0 +1,16 @@
+{
+  "slug": "legal",
+  "name": "Legal",
+  "description": "Multi-jurisdictional legal analysis with specialized agents covering litigation, contracts, compliance, and civil rights.",
+  "icon": "Scale",
+  "color": "#8b5cf6",
+  "tier": "pro",
+  "isActive": true,
+  "agents": [
+    { "name": "litigation-strategy", "displayName": "Litigation Strategy", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
+    { "name": "contract-analysis", "displayName": "Contract Analysis", "role": "fact_checker", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "regulatory-compliance", "displayName": "Regulatory Compliance", "role": "respondent", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
+    { "name": "civil-rights", "displayName": "Civil Rights", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "legal-synthesis", "displayName": "Legal Synthesis", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
+  ]
+}

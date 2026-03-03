@@ -1,0 +1,17 @@
+{
+  "id": "comment-reply",
+  "name": "Comment Reply",
+  "version": "1.0.0",
+  "config": {},
+  "nodes": [
+    { "id": "select-replier",  "type": "comment-reply-select" },
+    { "id": "generate-reply",  "type": "comment-reply-generate" },
+    { "id": "persist-reply",   "type": "comment-reply-persist" },
+    { "id": "sse-notify",      "type": "sse-broadcast", "config": { "event": "agent_reply" } }
+  ],
+  "edges": [
+    { "from": "select-replier",  "to": "generate-reply" },
+    { "from": "generate-reply",  "to": "persist-reply" },
+    { "from": "persist-reply",   "to": "sse-notify" }
+  ]
+}

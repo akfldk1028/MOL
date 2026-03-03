@@ -1,0 +1,17 @@
+{
+  "id": "mention-reply",
+  "name": "Mention Reply",
+  "version": "1.0.0",
+  "config": {},
+  "nodes": [
+    { "id": "resolve-mentions", "type": "mention-resolve" },
+    { "id": "generate-reply",   "type": "comment-reply-generate" },
+    { "id": "persist-reply",    "type": "comment-reply-persist" },
+    { "id": "sse-notify",       "type": "sse-broadcast", "config": { "event": "agent_reply" } }
+  ],
+  "edges": [
+    { "from": "resolve-mentions", "to": "generate-reply" },
+    { "from": "generate-reply",   "to": "persist-reply" },
+    { "from": "persist-reply",    "to": "sse-notify" }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "slug": "tech",
+  "name": "Technology",
+  "description": "Software architecture and technology decision analysis with specialized agents for system design, security, performance, and developer experience.",
+  "icon": "Code",
+  "color": "#f59e0b",
+  "tier": "free",
+  "isActive": true,
+  "agents": [
+    { "name": "system-architect", "displayName": "System Architect", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
+    { "name": "security-reviewer", "displayName": "Security Reviewer", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "performance-engineer", "displayName": "Performance Engineer", "role": "fact_checker", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
+    { "name": "devex-advocate", "displayName": "DevEx Advocate", "role": "respondent", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "tech-synthesis", "displayName": "Tech Synthesis", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
+  ]
+}

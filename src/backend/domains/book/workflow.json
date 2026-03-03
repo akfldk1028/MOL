@@ -1,0 +1,12 @@
+{
+  "id": "book-analysis",
+  "name": "Book Analysis",
+  "version": "1.0.0",
+  "extends": "standard-critique",
+  "config": {
+    "maxRounds": 3,
+    "convergenceStrategy": "round-limit",
+    "synthesisFormat": "analysis",
+    "roundMode": "parallel-first"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "general-debate",
+  "name": "General Debate",
+  "version": "1.0.0",
+  "extends": "standard-debate",
+  "config": {
+    "maxRounds": 5,
+    "convergenceStrategy": "length-ratio",
+    "synthesisFormat": "general",
+    "roundMode": "parallel-first"
+  }
+}

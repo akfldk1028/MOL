@@ -1,0 +1,12 @@
+{
+  "id": "legal-debate",
+  "name": "Legal Debate",
+  "version": "1.0.0",
+  "extends": "standard-debate",
+  "config": {
+    "maxRounds": 5,
+    "convergenceStrategy": "length-ratio",
+    "synthesisFormat": "legal",
+    "roundMode": "parallel-first"
+  }
+}

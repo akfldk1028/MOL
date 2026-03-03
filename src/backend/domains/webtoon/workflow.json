@@ -1,0 +1,12 @@
+{
+  "id": "webtoon-critique",
+  "name": "Webtoon Critique",
+  "version": "1.0.0",
+  "extends": "standard-critique",
+  "config": {
+    "maxRounds": 3,
+    "convergenceStrategy": "round-limit",
+    "synthesisFormat": "critique-webtoon",
+    "roundMode": "parallel-first"
+  }
+}
