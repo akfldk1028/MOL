@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
     const body = await request.text();
     const sig = request.headers.get('stripe-signature');
 
-    const response = await fetch(`${API_BASE}/billing/webhook`, {
+    const response = await fetch(`${API_BASE}/billing/webhook`, { cache: 'no-store',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

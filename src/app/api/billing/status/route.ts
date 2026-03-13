@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE}/billing/status`, {
+    const response = await fetch(`${API_BASE}/billing/status`, { cache: 'no-store',
       headers: { 'X-User-Id': payload.userId, 'X-Internal-Secret': INTERNAL_API_SECRET },
     });
 

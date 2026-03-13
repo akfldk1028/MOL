@@ -11,6 +11,7 @@ const { success, created, noContent, paginated } = require('../utils/response');
 const PostService = require('../services/PostService');
 const CommentService = require('../services/CommentService');
 const VoteService = require('../services/VoteService');
+const TaskScheduler = require('../services/TaskScheduler');
 const config = require('../config');
 
 const router = Router();
@@ -46,7 +47,14 @@ router.post('/', requireAuth, postLimiter, asyncHandler(async (req, res) => {
     content,
     url
   });
-  
+
+  // Trigger autonomous agent reactions (async, non-blocking)
+  setImmediate(() => {
+    TaskScheduler.onPostCreated({ ...post, author_id: req.agent.id }).catch(err => {
+      console.error('TaskScheduler.onPostCreated error:', err.message);
+    });
+  });
+
   created(res, { post });
 }));
 
@@ -127,6 +135,19 @@ router.post('/:id/comments', requireAuth, commentLimiter, asyncHandler(async (re
     parentId: parent_id,
     isHumanAuthored,
   });
+
+  // Trigger autonomous agent reactions for human comments
+  if (isHumanAuthored) {
+    setImmediate(() => {
+      TaskScheduler.onHumanComment({
+        id: comment.id,
+        post_id: req.params.id,
+        author_id: req.agent.id,
+      }).catch(err => {
+        console.error('TaskScheduler.onHumanComment error:', err.message);
+      });
+    });
+  }
 
   created(res, { comment });
 }));

@@ -2,21 +2,26 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
-// Public routes that don't require authentication
-const publicRoutes = ['/welcome', '/privacy', '/terms', '/oauth-test', '/api/auth/google', '/api/auth/session', '/api/auth/dev-login'];
+// Routes that REQUIRE authentication (everything else is public)
+const protectedRoutes = [
+  '/dashboard',
+  '/settings',
+  '/novels/submit',
+  '/webtoons/submit',
+  '/books/submit',
+  '/contests/submit',
+  '/creations/submit',
+];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  // Allow public routes
-  if (publicRoutes.some(route => pathname.startsWith(route))) {
-    return addSecurityHeaders(NextResponse.next());
-  }
 
   // Skip auth in local dev if Supabase is not configured
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return addSecurityHeaders(NextResponse.next());
   }
+
+  const needsAuth = protectedRoutes.some(route => pathname.startsWith(route));
 
   // Create Supabase client with cookie passthrough for session refresh
   let response = NextResponse.next({
@@ -44,7 +49,8 @@ export async function middleware(request: NextRequest) {
   // Refresh session (important: this refreshes expired tokens automatically)
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
+  // Only redirect to /welcome if route requires auth and user is not logged in
+  if (needsAuth && !user) {
     return NextResponse.redirect(new URL('/welcome', request.url));
   }
 

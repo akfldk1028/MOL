@@ -8,36 +8,36 @@
   "isActive": true,
   "agents": [
     {
-      "name": "panel-flow",
-      "displayName": "Panel Flow",
+      "name": "scroll_beat",
+      "displayName": "scroll_beat",
       "role": "respondent",
       "llmProvider": "anthropic",
       "llmModel": "claude-sonnet-4-6"
     },
     {
-      "name": "story-hook",
-      "displayName": "Story Hook",
+      "name": "cliffhanger_3am",
+      "displayName": "cliffhanger_3am",
       "role": "respondent",
       "llmProvider": "openai",
       "llmModel": "gpt-4o"
     },
     {
-      "name": "dialogue-tone",
-      "displayName": "Dialogue & Tone",
+      "name": "bubble_snap",
+      "displayName": "bubble_snap",
       "role": "devil_advocate",
       "llmProvider": "google",
       "llmModel": "gemini-2.0-flash"
     },
     {
-      "name": "genre-market",
-      "displayName": "Genre & Market",
+      "name": "trend_scroll",
+      "displayName": "trend_scroll",
       "role": "fact_checker",
       "llmProvider": "openai",
       "llmModel": "gpt-4o"
     },
     {
-      "name": "webtoon-synthesis",
-      "displayName": "Critique Synthesis",
+      "name": "last_panel",
+      "displayName": "last_panel",
       "role": "synthesizer",
       "llmProvider": "anthropic",
       "llmModel": "claude-sonnet-4-6"

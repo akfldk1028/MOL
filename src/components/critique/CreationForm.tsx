@@ -12,6 +12,9 @@ const GENRE_OPTIONS: Record<CreationType, string[]> = {
   webtoon: ['Romance', 'Action', 'Fantasy', 'Slice of Life', 'Thriller', 'Comedy', 'Drama', 'Horror', 'Other'],
   book: ['Fiction', 'Non-Fiction', 'Philosophy', 'History', 'Science', 'Poetry', 'Essay', 'Literary Criticism', 'Other'],
   contest: ['Fantasy', 'Sci-Fi', 'Romance', 'Mystery', 'Thriller', 'Literary Fiction', 'Horror', 'Historical', 'Other'],
+  music: ['Pop', 'Rock', 'Hip-Hop', 'R&B', 'Jazz', 'Classical', 'Electronic', 'Indie', 'Other'],
+  illustration: ['Digital Art', 'Traditional', 'Concept Art', 'Character Design', 'Landscape', 'Abstract', 'Comic', 'Other'],
+  screenplay: ['Drama', 'Comedy', 'Thriller', 'Horror', 'Sci-Fi', 'Romance', 'Action', 'Documentary', 'Other'],
 };
 
 export default function CreationForm() {
@@ -146,6 +149,7 @@ export default function CreationForm() {
       // Create the critique
       const domainMap: Record<CreationType, string> = {
         novel: 'novel', webtoon: 'webtoon', book: 'book', contest: 'novel',
+        music: 'novel', illustration: 'novel', screenplay: 'novel',
       };
       const res = await fetch('/api/creations', {
         method: 'POST',
@@ -347,9 +351,9 @@ export default function CreationForm() {
       <div className="p-4 rounded-lg bg-muted/50 text-sm text-muted-foreground">
         <p className="font-medium text-foreground mb-1">What happens next?</p>
         {creationType === 'book' || creationType === 'contest' ? (
-          <p>5 specialized AI agents will conduct an in-depth analysis (고찰) of your {creationType === 'book' ? 'book' : 'submission'} — exploring themes, structure, critical theory, cultural context, and more. They&apos;ll discuss in 3 rounds before producing a comprehensive scholarly assessment.</p>
+          <p>5 community members will conduct an in-depth analysis of your {creationType === 'book' ? 'book' : 'submission'} — exploring themes, structure, critical theory, cultural context, and more. They&apos;ll discuss in 3 rounds before producing a comprehensive scholarly assessment.</p>
         ) : (
-          <p>5 specialized AI agents will analyze your {creationType === 'webtoon' ? 'webtoon' : 'work'} across multiple dimensions — structure, characters, style, consistency, and more. They&apos;ll discuss their critiques in 3 rounds before producing a comprehensive editorial review.</p>
+          <p>5 community members will analyze your {creationType === 'webtoon' ? 'webtoon' : 'work'} across multiple dimensions — structure, characters, style, consistency, and more. They&apos;ll discuss their critiques in 3 rounds before producing a comprehensive editorial review.</p>
         )}
       </div>
 

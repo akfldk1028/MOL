@@ -36,8 +36,8 @@ export function Header() {
             </Button>
           )}
           <Link href="/" className="flex items-center gap-2 font-bold text-xl">
-            <img src="/goodmolt-mascot.png" alt="Goodmolt mascot" className="h-8 w-8 rounded-lg" />
-            {!isMobile && <span className="gradient-text">goodmolt</span>}
+            <img src="/goodmolt-mascot.png" alt="clickaround mascot" className="h-8 w-8 rounded-lg" />
+            {!isMobile && <span className="gradient-text">clickaround</span>}
           </Link>
         </div>
         
@@ -46,7 +46,7 @@ export function Header() {
           <div className="flex-1 max-w-md">
             <button onClick={openSearch} className="w-full flex items-center gap-2 px-3 py-2 rounded-md border bg-muted/50 text-muted-foreground text-sm hover:bg-muted transition-colors">
               <Search className="h-4 w-4" />
-              <span>goodmolt 검색...</span>
+              <span>Search clickaround...</span>
               <kbd className="ml-auto text-xs bg-background px-1.5 py-0.5 rounded border">⌘K</kbd>
             </button>
           </div>
@@ -73,7 +73,7 @@ export function Header() {
               
               <Button onClick={openCreatePost} size="sm" className="gap-1">
                 <Plus className="h-4 w-4" />
-                {!isMobile && '글쓰기'}
+                {!isMobile && 'Create'}
               </Button>
               
               <div className="relative">
@@ -92,16 +92,16 @@ export function Header() {
                       <p className="text-xs text-muted-foreground">u/{userName}</p>
                     </div>
                     <Link href={`/u/${userName}`} className="flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-muted" onClick={() => setShowUserMenu(false)}>
-                      <User className="h-4 w-4" /> 프로필
+                      <User className="h-4 w-4" /> Profile
                     </Link>
                     <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-muted" onClick={() => setShowUserMenu(false)}>
-                      <UserCog className="h-4 w-4" /> 계정 관리
+                      <UserCog className="h-4 w-4" /> Account
                     </Link>
                     <Link href="/settings" className="flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-muted" onClick={() => setShowUserMenu(false)}>
-                      <Settings className="h-4 w-4" /> 설정
+                      <Settings className="h-4 w-4" /> Settings
                     </Link>
                     <button onClick={() => { logout(); setShowUserMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-muted text-destructive">
-                      <LogOut className="h-4 w-4" /> 로그아웃
+                      <LogOut className="h-4 w-4" /> Log Out
                     </button>
                   </div>
                 )}
@@ -110,10 +110,10 @@ export function Header() {
           ) : (
             <div className="flex items-center gap-2">
               <Link href="/auth/login">
-                <Button variant="ghost" size="sm">로그인</Button>
+                <Button variant="ghost" size="sm">Log In</Button>
               </Link>
               <Link href="/auth/register">
-                <Button size="sm">회원가입</Button>
+                <Button size="sm">Sign Up</Button>
               </Link>
             </div>
           )}
@@ -130,19 +130,19 @@ export function Sidebar() {
   const { isAuthenticated } = useAuth();
   
   const mainLinks = [
-    { href: '/', label: '홈', icon: Home },
-    { href: '/?sort=hot', label: '인기', icon: Flame },
-    { href: '/?sort=new', label: '최신', icon: Clock },
-    { href: '/?sort=rising', label: '떠오르는', icon: TrendingUp },
-    { href: '/?sort=top', label: '상위', icon: Zap },
+    { href: '/', label: 'Home', icon: Home },
+    { href: '/?sort=hot', label: 'Hot', icon: Flame },
+    { href: '/?sort=new', label: 'New', icon: Clock },
+    { href: '/?sort=rising', label: 'Rising', icon: TrendingUp },
+    { href: '/?sort=top', label: 'Top', icon: Zap },
   ];
   
   const popularSubmolts = [
-    { name: 'general', displayName: '일반' },
-    { name: 'announcements', displayName: '공지사항' },
-    { name: 'showcase', displayName: '쇼케이스' },
-    { name: 'help', displayName: '도움말' },
-    { name: 'meta', displayName: '메타' },
+    { name: 'general', displayName: 'General' },
+    { name: 'announcements', displayName: 'Announcements' },
+    { name: 'showcase', displayName: 'Showcase' },
+    { name: 'help', displayName: 'Help' },
+    { name: 'meta', displayName: 'Meta' },
   ];
   
   if (!sidebarOpen) return null;
@@ -166,7 +166,7 @@ export function Sidebar() {
         
         {/* Popular Submolts */}
         <div>
-          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">인기 커뮤니티</h3>
+          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Popular Communities</h3>
           <div className="space-y-1">
             {popularSubmolts.map(submolt => (
               <Link key={submolt.name} href={`/m/${submolt.name}`} className={cn('flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors', pathname === `/m/${submolt.name}` ? 'bg-muted font-medium' : 'hover:bg-muted')}>
@@ -179,15 +179,15 @@ export function Sidebar() {
         
         {/* Explore */}
         <div>
-          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">탐색</h3>
+          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Explore</h3>
           <div className="space-y-1">
             <Link href="/submolts" className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors">
               <Hash className="h-4 w-4" />
-              모든 커뮤니티
+              All Communities
             </Link>
             <Link href="/agents" className="flex items-center gap-3 px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors">
               <Users className="h-4 w-4" />
-              에이전트
+              Agents
             </Link>
           </div>
         </div>
@@ -226,10 +226,10 @@ export function MobileMenu() {
           
           <div className="space-y-1">
             <Link href="/" onClick={toggleMobileMenu} className={cn('flex items-center gap-3 px-3 py-2 rounded-md', pathname === '/' && 'bg-muted font-medium')}>
-              <Home className="h-4 w-4" /> 홈
+              <Home className="h-4 w-4" /> Home
             </Link>
             <Link href="/search" onClick={toggleMobileMenu} className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-muted">
-              <Search className="h-4 w-4" /> 검색
+              <Search className="h-4 w-4" /> Search
             </Link>
           </div>
         </nav>
@@ -248,12 +248,12 @@ export function Footer() {
             <div className="h-6 w-6 rounded bg-gradient-to-br from-primary to-goodmolt-400 flex items-center justify-center">
               <span className="text-white text-xs font-bold">M</span>
             </div>
-            <span className="text-sm text-muted-foreground">© 2025 Goodmolt. AI 에이전트를 위한 소셜 네트워크.</span>
+            <span className="text-sm text-muted-foreground">© 2025 clickaround. A community for ideas.</span>
           </div>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <Link href="/about" className="hover:text-foreground transition-colors">소개</Link>
-            <Link href="/terms" className="hover:text-foreground transition-colors">이용약관</Link>
-            <Link href="/privacy" className="hover:text-foreground transition-colors">개인정보</Link>
+            <Link href="/about" className="hover:text-foreground transition-colors">About</Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
             <Link href="/api" className="hover:text-foreground transition-colors">API</Link>
           </div>
         </div>

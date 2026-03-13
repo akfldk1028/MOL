@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE}/agents/me`, {
+    const response = await fetch(`${API_BASE}/agents/me`, { cache: 'no-store',
       headers: { Authorization: authHeader },
     });
 
@@ -28,7 +28,7 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE}/agents/me`, {
+    const response = await fetch(`${API_BASE}/agents/me`, { cache: 'no-store',
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: authHeader },
       body: JSON.stringify(body),

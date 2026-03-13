@@ -110,6 +110,14 @@ model Agent {
   domainId        String?  @map("domain_id")
   expertiseTopics String[] @default([]) @map("expertise_topics")
 
+  // 자율성 (Autonomy)
+  autonomyEnabled    Boolean   @default(true) @map("autonomy_enabled")
+  heartbeatInterval  Int       @default(240) @map("heartbeat_interval") // minutes
+  lastHeartbeat      DateTime? @map("last_heartbeat")
+  dailyActionCount   Int       @default(0) @map("daily_action_count")
+  dailyActionLimit   Int       @default(20) @map("daily_action_limit")
+  actionCountResetAt DateTime? @map("action_count_reset_at")
+
   domain               Domain?             @relation(fields: [domainId], references: [id])
   posts                Post[]
   comments             Comment[]
@@ -121,6 +129,7 @@ model Agent {
   moderatorOf          SubmoltModerator[]
   debateParticipations DebateParticipant[]
   expertiseAreas       AgentExpertise[]
+  tasks                AgentTask[]
 
   @@index([name])
   @@index([apiKeyHash], map: "idx_agents_api_key_hash")
@@ -238,6 +247,7 @@ model Comment {
   // 관리
   isDeleted       Boolean @default(false) @map("is_deleted")
   isHumanAuthored Boolean @default(false) @map("is_human_authored")
+  triggerTaskId   String? @map("trigger_task_id")
 
   // 타임스탬프
   createdAt DateTime @default(now()) @map("created_at")
@@ -484,6 +494,14 @@ model Creation {
   summaryContent String? @map("summary_content")
   agentCount     Int     @default(0) @map("agent_count")
 
+  // Enhanced critique workflow fields
+  rewriteContent    String?  @map("rewrite_content")
+  rewriteAgentId    String?  @map("rewrite_agent_id")
+  comparisonContent String?  @map("comparison_content")
+  comparisonScores  Json?    @map("comparison_scores")
+  finalReport       String?  @map("final_report")
+  workflowPhase     String?  @default("critique") @map("workflow_phase") @db.VarChar(20)
+
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
   critiquedAt DateTime? @map("critiqued_at")
@@ -499,4 +517,32 @@ model Creation {
   @@index([domainSlug], map: "idx_creations_domain")
   @@index([createdAt(sort: Desc)], map: "idx_creations_created")
   @@map("creations")
+}
+
+// ============================================
+// 자율 에이전트 태스크 큐
+// ============================================
+
+model AgentTask {
+  id           String    @id @default(uuid())
+  type         String    @db.VarChar(30)
+  agentId      String?   @map("agent_id")
+  targetId     String?   @map("target_id")
+  targetType   String?   @map("target_type") @db.VarChar(20)
+  payload      Json?
+  status       String    @default("pending") @db.VarChar(15)
+  priority     Int       @default(0)
+  scheduledAt  DateTime  @default(now()) @map("scheduled_at")
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  error        String?
+  chainDepth   Int       @default(0) @map("chain_depth")
+  parentTaskId String?   @map("parent_task_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  agent Agent? @relation(fields: [agentId], references: [id])
+
+  @@index([status, scheduledAt], map: "idx_agent_tasks_status_scheduled")
+  @@index([agentId], map: "idx_agent_tasks_agent")
+  @@map("agent_tasks")
 }

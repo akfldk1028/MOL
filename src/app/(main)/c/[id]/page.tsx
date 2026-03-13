@@ -2,17 +2,22 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, BookOpen, Image, FileText, Trophy } from 'lucide-react';
-import DebateStatusBar from '@/components/qa/DebateStatusBar';
-import DebateThread from '@/components/qa/DebateThread';
-import CritiqueSynthesisCard from '@/components/critique/CritiqueSynthesisCard';
-import type { Creation, DebateResponse, DebateStatus } from '@/types';
+import { BookOpen, Image, FileText, Trophy } from 'lucide-react';
+import { PageBreadcrumb } from '@/common/components/page-header';
+import DebateStatusBar from '@/features/qa/components/debate-status-bar';
+import DebateThread from '@/features/qa/components/debate-thread';
+import CritiqueSynthesisCard from '@/features/creations/components/critique-synthesis-card';
+import WorkflowPhaseIndicator from '@/features/creations/components/workflow-phase-indicator';
+import RewriteCard from '@/features/creations/components/rewrite-card';
+import ComparisonCard from '@/features/creations/components/comparison-card';
+import FinalReportCard from '@/features/creations/components/final-report-card';
+import type { Creation, DebateResponse, WorkflowPhase, ComparisonScores } from '@/types';
 
-const TYPE_CONFIG: Record<string, { icon: typeof BookOpen; color: string; label: string }> = {
-  novel: { icon: BookOpen, color: '#8b5cf6', label: 'Novel' },
-  webtoon: { icon: Image, color: '#ec4899', label: 'Webtoon' },
-  book: { icon: FileText, color: '#0ea5e9', label: 'Book Analysis' },
-  contest: { icon: Trophy, color: '#f59e0b', label: 'Contest Submission' },
+const TYPE_CONFIG: Record<string, { icon: typeof BookOpen; color: string; label: string; listHref: string; listLabel: string }> = {
+  novel: { icon: BookOpen, color: '#8b5cf6', label: 'Novel', listHref: '/novels', listLabel: 'Novels' },
+  webtoon: { icon: Image, color: '#ec4899', label: 'Webtoon', listHref: '/webtoons', listLabel: 'Webtoons' },
+  book: { icon: FileText, color: '#0ea5e9', label: 'Book Analysis', listHref: '/books', listLabel: 'Books' },
+  contest: { icon: Trophy, color: '#f59e0b', label: 'Contest Submission', listHref: '/contests', listLabel: 'Contests' },
 };
 
 export default function CritiqueDetailPage({ params }: { params: { id: string } }) {
@@ -20,9 +25,7 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
   const [creation, setCreation] = useState<Creation | null>(null);
   const [responses, setResponses] = useState<DebateResponse[]>([]);
   const [synthesis, setSynthesis] = useState<string | null>(null);
-  const [debateStatus, setDebateStatus] = useState<DebateStatus>('recruiting');
-  const [currentRound, setCurrentRound] = useState(0);
-  const [maxRounds, setMaxRounds] = useState(3);
+  const [debateStatus, setDebateStatus] = useState<string>('recruiting');
   const [participantCount, setParticipantCount] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [newResponseIds, setNewResponseIds] = useState<Set<string>>(new Set());
@@ -30,6 +33,13 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
   const [error, setError] = useState('');
   const eventSourceRef = useRef<EventSource | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+
+  // Enhanced workflow state
+  const [workflowPhase, setWorkflowPhase] = useState<WorkflowPhase>('critique');
+  const [rewriteContent, setRewriteContent] = useState<string | null>(null);
+  const [comparisonContent, setComparisonContent] = useState<string | null>(null);
+  const [comparisonScores, setComparisonScores] = useState<ComparisonScores | null>(null);
+  const [finalReport, setFinalReport] = useState<string | null>(null);
 
   useEffect(() => {
     loadCreation();
@@ -47,9 +57,15 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
       const c = data.creation;
       setCreation(c);
       setDebateStatus(c.debate_status || c.debateStatus || 'recruiting');
-      setCurrentRound(c.current_round || c.currentRound || 0);
-      setMaxRounds(c.max_rounds || c.maxRounds || 3);
       setParticipantCount(c.participants?.length || c.participant_count || 0);
+
+      // Load enhanced workflow data
+      const phase = c.workflow_phase || c.workflowPhase || 'critique';
+      setWorkflowPhase(phase);
+      if (c.rewrite_content || c.rewriteContent) setRewriteContent(c.rewrite_content || c.rewriteContent);
+      if (c.comparison_content || c.comparisonContent) setComparisonContent(c.comparison_content || c.comparisonContent);
+      if (c.comparison_scores || c.comparisonScores) setComparisonScores(c.comparison_scores || c.comparisonScores);
+      if (c.final_report || c.finalReport) setFinalReport(c.final_report || c.finalReport);
 
       // Load existing responses
       if (data.responses && data.responses.length > 0) {
@@ -57,10 +73,8 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
           agentName: r.agent_name || r.agentName,
           role: r.debate_role || r.role || 'respondent',
           content: r.content,
-          round: (r.depth || 0) + 1,
+          round: 0,
           commentId: r.id,
-          llmProvider: r.llm_provider || r.llmProvider,
-          llmModel: r.llm_model || r.llmModel,
         }));
         setResponses(mapped);
 
@@ -92,18 +106,11 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
       const data = JSON.parse(e.data);
       setDebateStatus(data.status);
       if (data.message) setStatusMessage(data.message);
-      if (data.currentRound) setCurrentRound(data.currentRound);
     });
 
     es.addEventListener('agents_selected', (e) => {
       const data = JSON.parse(e.data);
       setParticipantCount(data.agents.length);
-    });
-
-    es.addEventListener('round_start', (e) => {
-      const data = JSON.parse(e.data);
-      setCurrentRound(data.round);
-      setMaxRounds(data.maxRounds);
     });
 
     es.addEventListener('agent_thinking', (e) => {
@@ -127,8 +134,35 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
       setSynthesis(data.content);
     });
 
+    // Enhanced workflow SSE events
+    es.addEventListener('phase_change', (e) => {
+      const data = JSON.parse(e.data);
+      setWorkflowPhase(data.phase);
+      setStatusMessage('');
+    });
+
+    es.addEventListener('rewrite_complete', (e) => {
+      const data = JSON.parse(e.data);
+      setRewriteContent(data.content);
+      setStatusMessage('');
+    });
+
+    es.addEventListener('comparison_complete', (e) => {
+      const data = JSON.parse(e.data);
+      setComparisonContent(data.content);
+      if (data.scores) setComparisonScores(data.scores);
+      setStatusMessage('');
+    });
+
+    es.addEventListener('final_report', (e) => {
+      const data = JSON.parse(e.data);
+      setFinalReport(data.content);
+      setStatusMessage('');
+    });
+
     es.addEventListener('debate_complete', () => {
       setDebateStatus('completed');
+      setWorkflowPhase('complete');
       setStatusMessage('');
       es.close();
     });
@@ -157,14 +191,13 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
 
   const typeConfig = TYPE_CONFIG[(creation as any).creation_type || creation.creationType] || TYPE_CONFIG.novel;
   const TypeIcon = typeConfig.icon;
+  const hasEnhancedWorkflow = !!(rewriteContent || comparisonContent || finalReport || workflowPhase !== 'critique');
 
   return (
     <div className="max-w-3xl mx-auto py-6 px-4">
       {/* Header */}
       <div className="mb-6">
-        <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Link>
+        <PageBreadcrumb items={[{ label: typeConfig.listLabel, href: typeConfig.listHref }, { label: creation.title }]} />
         <div className="flex items-center gap-2 mb-2">
           <span
             className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -197,12 +230,17 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
         </div>
       </div>
 
+      {/* Workflow Phase Indicator */}
+      {hasEnhancedWorkflow && (
+        <div className="mb-6 p-4 rounded-lg bg-muted/30">
+          <WorkflowPhaseIndicator currentPhase={workflowPhase} />
+        </div>
+      )}
+
       {/* Status Bar */}
       <div className="mb-6">
         <DebateStatusBar
-          status={debateStatus}
-          currentRound={currentRound}
-          maxRounds={maxRounds}
+          status={debateStatus as any}
           participantCount={participantCount}
           message={statusMessage}
         />
@@ -232,6 +270,31 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
           </div>
         )}
       </div>
+
+      {/* Enhanced Workflow Results */}
+      {rewriteContent && (
+        <div className="mt-6">
+          <RewriteCard
+            rewriteContent={rewriteContent}
+            originalContent={creation.content}
+          />
+        </div>
+      )}
+
+      {comparisonContent && (
+        <div className="mt-6">
+          <ComparisonCard
+            content={comparisonContent}
+            scores={comparisonScores}
+          />
+        </div>
+      )}
+
+      {finalReport && (
+        <div className="mt-6">
+          <FinalReportCard content={finalReport} />
+        </div>
+      )}
     </div>
   );
 }

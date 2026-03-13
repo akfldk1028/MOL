@@ -3,12 +3,16 @@
 import { useState } from 'react';
 import { useParams, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { usePost, useComments, usePostVote, useAuth } from '@/hooks';
-import { PageContainer } from '@/components/layout';
-import { CommentList, CommentForm, CommentSort } from '@/components/comment';
-import { Button, Card, Avatar, AvatarImage, AvatarFallback, Skeleton, Separator } from '@/components/ui';
-import { ArrowBigUp, ArrowBigDown, MessageSquare, Share2, Bookmark, MoreHorizontal, ExternalLink, ArrowLeft } from 'lucide-react';
-import { cn, formatScore, formatRelativeTime, formatDateTime, extractDomain, getInitials, getSubmoltUrl, getAgentUrl } from '@/lib/utils';
+import MarkdownContent from '@/common/components/markdown-content';
+import { usePost, useComments } from '@/features/community/queries';
+import { usePostVote } from '@/features/community/mutations';
+import { useAuth } from '@/features/auth/queries';
+import { PageContainer } from '@/common/components/page-container';
+import { CommentList, CommentForm, CommentSort } from '@/features/community/components/comment-list';
+import { Button, Card, Avatar, AvatarImage, AvatarFallback, Skeleton, Separator } from '@/common/ui';
+import { ArrowBigUp, ArrowBigDown, MessageSquare, Share2, Bookmark, MoreHorizontal, ExternalLink } from 'lucide-react';
+import { cn, formatScore, formatRelativeTime, formatDateTime, extractDomain, getInitials, getSubmoltUrl, getAgentUrl } from '@/common/lib/utils';
+import { PageBreadcrumb } from '@/common/components/page-header';
 import type { CommentSort as CommentSortType, Comment } from '@/types';
 
 export default function PostPage() {
@@ -41,11 +45,11 @@ export default function PostPage() {
   return (
     <PageContainer>
       <div className="max-w-4xl mx-auto">
-        {/* Back button */}
-        <Link href={post?.submolt ? getSubmoltUrl(post.submolt) : '/'} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
-          <ArrowLeft className="h-4 w-4" />
-          {post?.submolt ? `m/${typeof post.submolt === 'string' ? post.submolt : post.submolt.name}` : '피드'}(으)로 돌아가기
-        </Link>
+        {/* Breadcrumb */}
+        <PageBreadcrumb items={[
+          ...(post?.submolt ? [{ label: `m/${typeof post.submolt === 'string' ? post.submolt : post.submolt.name}`, href: getSubmoltUrl(post.submolt) }] : []),
+          { label: post?.title || 'Post' },
+        ]} />
         
         {/* Post */}
         <Card className="p-4 mb-4">
@@ -83,8 +87,8 @@ export default function PostPage() {
               
               {/* Content */}
               {post.content && (
-                <div className="prose-goodmolt mb-4">
-                  {post.content}
+                <div className="mb-4">
+                  <MarkdownContent content={post.content} />
                 </div>
               )}
               
@@ -116,18 +120,18 @@ export default function PostPage() {
                 
                 <div className="flex items-center gap-1 text-muted-foreground">
                   <MessageSquare className="h-5 w-5" />
-                  <span className="text-sm">{post.commentCount} 댓글</span>
+                  <span className="text-sm">{post.commentCount} Comments</span>
                 </div>
                 
                 <button className="flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground hover:bg-muted rounded transition-colors ml-auto">
                   <Share2 className="h-4 w-4" />
-                  공유
+                  Share
                 </button>
                 
                 {isAuthenticated && (
                   <button className={cn('flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground hover:bg-muted rounded transition-colors', post.isSaved && 'text-primary')}>
                     <Bookmark className={cn('h-4 w-4', post.isSaved && 'fill-current')} />
-                    {post.isSaved ? '저장됨' : '저장'}
+                    {post.isSaved ? 'Saved' : 'Save'}
                   </button>
                 )}
                 
@@ -150,7 +154,7 @@ export default function PostPage() {
           
           {/* Comment sort */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold">댓글 ({comments?.length || 0})</h2>
+            <h2 className="font-semibold">Comments ({comments?.length || 0})</h2>
             <CommentSort value={commentSort} onChange={(v) => setCommentSort(v as CommentSortType)} />
           </div>
           

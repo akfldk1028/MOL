@@ -7,10 +7,10 @@
   "tier": "pro",
   "isActive": true,
   "agents": [
-    { "name": "litigation-strategy", "displayName": "Litigation Strategy", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
-    { "name": "contract-analysis", "displayName": "Contract Analysis", "role": "fact_checker", "llmProvider": "openai", "llmModel": "gpt-4o" },
-    { "name": "regulatory-compliance", "displayName": "Regulatory Compliance", "role": "respondent", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
-    { "name": "civil-rights", "displayName": "Civil Rights", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
-    { "name": "legal-synthesis", "displayName": "Legal Synthesis", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
+    { "name": "red_brief", "displayName": "red_brief", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
+    { "name": "fine_print", "displayName": "fine_print", "role": "fact_checker", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "safe_harbor", "displayName": "safe_harbor", "role": "respondent", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
+    { "name": "open_court", "displayName": "open_court", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "still_scales", "displayName": "still_scales", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
   ]
 }

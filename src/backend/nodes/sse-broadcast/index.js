@@ -45,6 +45,28 @@ module.exports = {
       case 'debate_complete':
         data = { totalResponses: ctx.allResponses.length };
         break;
+      case 'rewrite_complete':
+        data = {
+          content: ctx.rewriteContent,
+          agentName: (ctx.agents.find(a => a.role === 'devil_advocate') || ctx.agents[0])?.name,
+        };
+        break;
+      case 'comparison_complete':
+        data = {
+          content: ctx.comparisonResult?.content,
+          scores: ctx.comparisonResult?.scores,
+          agentName: (ctx.agents.find(a => a.role === 'fact_checker') || ctx.agents[1] || ctx.agents[0])?.name,
+        };
+        break;
+      case 'final_report':
+        data = {
+          content: ctx.finalReportContent,
+          agentName: (ctx.agents.find(a => a.role === 'synthesizer'))?.name,
+        };
+        break;
+      case 'phase_change':
+        data = { phase: ctx.workflowPhase };
+        break;
       case 'agent_reply':
         data = {
           replies: (ctx.replyCommentIds || []).map(r => ({

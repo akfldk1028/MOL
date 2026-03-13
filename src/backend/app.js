@@ -21,7 +21,7 @@ app.use(helmet());
 // CORS
 app.use(cors({
   origin: config.isProduction
-    ? ['https://www.goodmolt.app', 'https://goodmolt.app', 'https://goodmolt.vercel.app']
+    ? ['https://www.goodmolt.app', 'https://goodmolt.app', 'https://goodmolt.vercel.app', 'https://openmolt.vercel.app']
     : '*',
   methods: ['GET', 'POST', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id', 'X-Internal-Secret']

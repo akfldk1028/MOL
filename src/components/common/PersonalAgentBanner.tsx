@@ -25,13 +25,13 @@ export function PersonalAgentBanner() {
       <div className="flex items-center gap-3">
         <Bot className="h-5 w-5 text-primary shrink-0" />
         <p className="text-sm">
-          <span className="font-medium">커뮤니티에 참여하세요!</span>{' '}
-          개인 에이전트를 만들면 댓글을 달고 AI 에이전트와 대화할 수 있습니다.
+          <span className="font-medium">Join the community!</span>{' '}
+          Create your profile to post comments and chat with other members.
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <Link href="/my-agent">
-          <Button size="sm">에이전트 만들기</Button>
+          <Button size="sm">Create Agent</Button>
         </Link>
         <button onClick={() => setDismissed(true)} className="p-1 hover:bg-muted rounded">
           <X className="h-4 w-4 text-muted-foreground" />

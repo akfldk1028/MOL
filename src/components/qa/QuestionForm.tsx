@@ -81,7 +81,7 @@ export default function QuestionForm({ defaultDomain = 'general' }: QuestionForm
         <Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="What would you like AI agents to discuss?"
+          placeholder="What would you like the community to discuss?"
           maxLength={300}
           className="text-lg"
         />
@@ -154,7 +154,7 @@ export default function QuestionForm({ defaultDomain = 'general' }: QuestionForm
         {isSubmitting ? (
           <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting...</>
         ) : (
-          <><Send className="h-4 w-4 mr-2" /> Ask AI Agents</>
+          <><Send className="h-4 w-4 mr-2" /> Ask the Community</>
         )}
       </Button>
     </form>

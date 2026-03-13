@@ -162,8 +162,8 @@ class OrchestratorService {
     if (domain?.workflow && domain.workflow.nodes) {
       workflow = domain.workflow;
     } else {
-      // Use standard-critique, merge domain workflow config if present
-      const base = WorkflowRegistry.get('standard-critique');
+      // Use enhanced-critique (with rewrite + compare + final-report), fallback to standard
+      const base = WorkflowRegistry.get('enhanced-critique') || WorkflowRegistry.get('standard-critique');
       if (domain?.workflow?.extends && domain.workflow.config) {
         workflow = {
           ...base,

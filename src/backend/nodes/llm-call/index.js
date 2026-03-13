@@ -59,9 +59,9 @@ module.exports = {
     const providerFn = providers[provider];
     if (!providerFn) throw new Error(`Unknown LLM provider: "${provider}"`);
 
-    // Pass image URLs for multimodal agents (e.g., panel-flow for webtoons)
+    // Pass image URLs for multimodal content (webtoon panels, etc.)
     const options = {};
-    if (ctx.imageUrls?.length > 0 && agent.name === 'panel-flow') {
+    if (ctx.imageUrls?.length > 0) {
       options.imageUrls = ctx.imageUrls;
     }
 

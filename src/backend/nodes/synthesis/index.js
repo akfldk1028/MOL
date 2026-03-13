@@ -12,6 +12,7 @@ const critiqueFormat = require('./formats/critique');
 const critiqueNovelFormat = require('./formats/critique-novel');
 const critiqueWebtoonFormat = require('./formats/critique-webtoon');
 const analysisFormat = require('./formats/analysis');
+const finalReportFormat = require('./formats/final-report');
 const llmCallNode = require('../llm-call');
 const OrchestratorService = require('../../services/OrchestratorService');
 
@@ -25,6 +26,7 @@ const formats = {
   'critique-novel': critiqueNovelFormat,
   'critique-webtoon': critiqueWebtoonFormat,
   analysis: analysisFormat,
+  'final-report': finalReportFormat,
 };
 
 module.exports = {
@@ -59,10 +61,20 @@ module.exports = {
       userPrompt,
     });
 
-    const prefix = formatName === 'analysis' ? '## Analysis' : '## Synthesis';
-    ctx.synthesisContent = `${prefix}\n\n${content}`;
+    const prefix = formatName === 'analysis' ? '## Analysis'
+      : formatName === 'final-report' ? '## Final Report'
+      : '## Synthesis';
+    const fullContent = `${prefix}\n\n${content}`;
 
-    return { content: ctx.synthesisContent };
+    if (formatName === 'final-report') {
+      ctx.finalReportContent = fullContent;
+      ctx.workflowPhase = 'report';
+      OrchestratorService.emit(channelId, 'phase_change', { phase: 'report' });
+    } else {
+      ctx.synthesisContent = fullContent;
+    }
+
+    return { content: fullContent };
   },
 
   registerFormat(name, format) {

@@ -52,6 +52,31 @@ module.exports = {
       return { commentId: comment.id };
     }
 
+    // Persist a specific field (e.g., final_report)
+    if (config.field && ctx.creationId) {
+      const allowedFields = ['final_report', 'rewrite_content', 'comparison_content'];
+      if (!allowedFields.includes(config.field)) {
+        console.warn(`persist-response: unknown field "${config.field}"`);
+        return { persisted: false };
+      }
+
+      const content = config.field === 'final_report'
+        ? (ctx.finalReportContent || ctx.synthesisContent)
+        : ctx[config.field];
+
+      if (content) {
+        await queryOne(
+          `UPDATE creations SET ${config.field} = $1, workflow_phase = 'report', updated_at = NOW() WHERE id = $2`,
+          [content, ctx.creationId]
+        );
+        // Also store in context for downstream use
+        if (config.field === 'final_report') {
+          ctx.finalReportContent = content;
+        }
+      }
+      return { persisted: true };
+    }
+
     // Non-synthesis persistence (round responses are already persisted in _shared.js)
     return { persisted: true };
   },

@@ -13,7 +13,8 @@ const { initializePool, healthCheck } = require('./config/database');
 const DomainRegistry = require('./domains');
 const WorkflowRegistry = require('./workflows');
 require('./nodes'); // Registers all node types
-const AgentAutonomyService = require('./services/AgentAutonomyService');
+const TaskWorker = require('./services/TaskWorker');
+const TaskScheduler = require('./services/TaskScheduler'); // used in routes
 
 async function start() {
   console.log('Starting Goodmolt API...');
@@ -39,10 +40,16 @@ async function start() {
   console.log('Loading workflows...');
   WorkflowRegistry.loadAll();
 
-  // Start agent autonomy if enabled
+  // Start event-driven agent autonomy system
   if (config.autonomy.enabled) {
-    AgentAutonomyService.start(config.autonomy.intervalMs);
-    console.log('Agent Autonomy enabled');
+    await TaskWorker.start(); // recover pending tasks + start catalyst
+    // Reset daily action counters every hour
+    setInterval(() => {
+      TaskScheduler.resetDailyCounters().catch(err => {
+        console.error('TaskScheduler.resetDailyCounters error:', err.message);
+      });
+    }, 3_600_000);
+    console.log('Agent Autonomy enabled (event-driven, no polling)');
   }
 
   // Start server
@@ -82,7 +89,7 @@ process.on('unhandledRejection', (reason, promise) => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down...');
-  AgentAutonomyService.stop();
+  TaskWorker.stop();
   const { close } = require('./config/database');
   await close();
   process.exit(0);

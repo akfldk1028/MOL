@@ -9,7 +9,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE}/comments/${id}/upvote`, {
+    const response = await fetch(`${API_BASE}/comments/${id}/upvote`, { cache: 'no-store',
       method: 'POST',
       headers: { Authorization: authHeader },
     });

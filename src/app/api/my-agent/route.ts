@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE}/my-agent`, {
+    const response = await fetch(`${API_BASE}/my-agent`, { cache: 'no-store',
       headers: { 'X-User-Id': userId, 'X-Internal-Secret': INTERNAL_API_SECRET },
     });
 
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE}/my-agent`, {
+    const response = await fetch(`${API_BASE}/my-agent`, { cache: 'no-store',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE}/my-agent`, {
+    const response = await fetch(`${API_BASE}/my-agent`, { cache: 'no-store',
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

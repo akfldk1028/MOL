@@ -28,28 +28,28 @@ export function StatsBar() {
   return (
     <div className="flex justify-center gap-6 sm:gap-8 mb-8 text-center flex-wrap">
       <div>
-        <div className="text-2xl font-bold text-red-600">
+        <div className="text-2xl font-bold text-destructive">
           {stats.totalPosts.toLocaleString()}
         </div>
-        <div className="text-xs text-gray-500">게시글</div>
+        <div className="text-xs text-muted-foreground">Posts</div>
       </div>
       <div>
-        <div className="text-2xl font-bold text-teal-400">
+        <div className="text-2xl font-bold text-primary">
           {stats.totalAgents.toLocaleString()}
         </div>
-        <div className="text-xs text-gray-500">AI 에이전트</div>
+        <div className="text-xs text-muted-foreground">Members</div>
       </div>
       <div>
         <div className="text-2xl font-bold text-blue-500">
           {stats.totalComments.toLocaleString()}
         </div>
-        <div className="text-xs text-gray-500">댓글</div>
+        <div className="text-xs text-muted-foreground">Comments</div>
       </div>
       <div>
         <div className="text-2xl font-bold text-yellow-500">
           {stats.totalVotes.toLocaleString()}
         </div>
-        <div className="text-xs text-gray-500">투표</div>
+        <div className="text-xs text-muted-foreground">Votes</div>
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { useUserStore, usePersonalAgentStore } from '@/store';
-import { Button, Input, Textarea, Avatar, AvatarFallback } from '@/components/ui';
+import { useUserStore, usePersonalAgentStore } from '@/features/auth/store';
+import { Button, Input, Textarea, Avatar, AvatarFallback } from '@/common/ui';
 import { Bot, Key, Copy, Check, Pencil } from 'lucide-react';
-import { getInitials } from '@/lib/utils';
+import { getInitials } from '@/common/lib/utils';
 import Link from 'next/link';
 
 export default function MyAgentPage() {
@@ -19,12 +19,12 @@ export default function MyAgentPage() {
     return (
       <div className="max-w-lg mx-auto py-16 text-center">
         <Bot className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-bold mb-2">내 에이전트</h1>
+        <h1 className="text-2xl font-bold mb-2">My Agent</h1>
         <p className="text-muted-foreground mb-6">
-          개인 에이전트를 만들려면 Google 로그인이 필요합니다.
+          Sign in with Google to create a personal agent.
         </p>
         <Link href="/auth/login">
-          <Button>Google 로그인</Button>
+          <Button>Sign in with Google</Button>
         </Link>
       </div>
     );
@@ -34,7 +34,7 @@ export default function MyAgentPage() {
     return (
       <div className="max-w-lg mx-auto py-16 text-center">
         <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-        <p className="text-muted-foreground mt-4">로딩 중...</p>
+        <p className="text-muted-foreground mt-4">Loading...</p>
       </div>
     );
   }
@@ -69,13 +69,13 @@ function CreateAgentForm({ onCreated }: { onCreated: (agent: any, apiKey: string
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || '에이전트 생성에 실패했습니다');
+        setError(data.error || 'Failed to create agent');
         return;
       }
 
       onCreated(data.agent, data.apiKey);
     } catch {
-      setError('네트워크 오류가 발생했습니다');
+      setError('A network error occurred');
     } finally {
       setIsSubmitting(false);
     }
@@ -85,26 +85,26 @@ function CreateAgentForm({ onCreated }: { onCreated: (agent: any, apiKey: string
     <div className="max-w-lg mx-auto py-12">
       <div className="text-center mb-8">
         <Bot className="h-16 w-16 mx-auto text-primary mb-4" />
-        <h1 className="text-2xl font-bold mb-2">에이전트 만들기</h1>
+        <h1 className="text-2xl font-bold mb-2">Create Agent</h1>
         <p className="text-muted-foreground">
-          커뮤니티에서 활동할 개인 에이전트를 만드세요. 댓글을 달고, AI 에이전트와 대화할 수 있습니다.
+          Create your profile to participate in the community. Post comments and chat with other members.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">에이전트 이름 *</label>
+          <label className="block text-sm font-medium mb-1">Agent Name *</label>
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="my_agent (영문, 숫자, _ 만 가능)"
+            placeholder="my_agent (letters, numbers, _ only)"
             maxLength={32}
           />
-          <p className="text-xs text-muted-foreground mt-1">2-32자, 영문 소문자/숫자/밑줄만 가능</p>
+          <p className="text-xs text-muted-foreground mt-1">2-32 characters, lowercase letters/numbers/underscores only</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">표시 이름</label>
+          <label className="block text-sm font-medium mb-1">Display Name</label>
           <Input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
@@ -114,11 +114,11 @@ function CreateAgentForm({ onCreated }: { onCreated: (agent: any, apiKey: string
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">설명</label>
+          <label className="block text-sm font-medium mb-1">Description</label>
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="에이전트에 대한 간단한 소개"
+            placeholder="A brief introduction for your agent"
             className="min-h-[80px]"
           />
         </div>
@@ -128,7 +128,7 @@ function CreateAgentForm({ onCreated }: { onCreated: (agent: any, apiKey: string
         )}
 
         <Button type="submit" className="w-full" disabled={!name.trim() || isSubmitting} isLoading={isSubmitting}>
-          에이전트 만들기
+          Create Agent
         </Button>
       </form>
     </div>
@@ -168,7 +168,7 @@ function AgentProfile({ agent, apiKey }: { agent: any; apiKey: string | null }) 
 
   return (
     <div className="max-w-lg mx-auto py-12">
-      <h1 className="text-2xl font-bold mb-6">내 에이전트</h1>
+      <h1 className="text-2xl font-bold mb-6">My Agent</h1>
 
       <div className="border rounded-lg p-6 space-y-4">
         <div className="flex items-center gap-4">
@@ -190,20 +190,20 @@ function AgentProfile({ agent, apiKey }: { agent: any; apiKey: string | null }) 
         {isEditing ? (
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium mb-1">표시 이름</label>
+              <label className="block text-sm font-medium mb-1">Display Name</label>
               <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">설명</label>
+              <label className="block text-sm font-medium mb-1">Description</label>
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleSave} disabled={isSaving} isLoading={isSaving}>저장</Button>
-              <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>취소</Button>
+              <Button size="sm" onClick={handleSave} disabled={isSaving} isLoading={isSaving}>Save</Button>
+              <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>Cancel</Button>
             </div>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">{agent.description || '설명 없음'}</p>
+          <p className="text-sm text-muted-foreground">{agent.description || 'No description'}</p>
         )}
 
         {apiKey && (
@@ -220,22 +220,22 @@ function AgentProfile({ agent, apiKey }: { agent: any; apiKey: string | null }) 
                 {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">이 키는 다시 표시되지 않습니다. 안전하게 보관하세요.</p>
+            <p className="text-xs text-muted-foreground mt-1">This key will not be shown again. Store it securely.</p>
           </div>
         )}
 
         <div className="border-t pt-4 grid grid-cols-3 gap-4 text-center">
           <div>
             <div className="text-lg font-bold">{agent.karma || 0}</div>
-            <div className="text-xs text-muted-foreground">카르마</div>
+            <div className="text-xs text-muted-foreground">Karma</div>
           </div>
           <div>
             <div className="text-lg font-bold">{agent.follower_count || 0}</div>
-            <div className="text-xs text-muted-foreground">팔로워</div>
+            <div className="text-xs text-muted-foreground">Followers</div>
           </div>
           <div>
             <div className="text-lg font-bold">{agent.following_count || 0}</div>
-            <div className="text-xs text-muted-foreground">팔로잉</div>
+            <div className="text-xs text-muted-foreground">Following</div>
           </div>
         </div>
       </div>

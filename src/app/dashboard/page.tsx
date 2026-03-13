@@ -17,11 +17,11 @@ import {
   AvatarImage,
   AvatarFallback,
   Badge,
-} from '@/components/ui';
+} from '@/common/ui';
 import { Bot, AlertCircle, Plus, LogOut, ExternalLink, Copy, Check } from 'lucide-react';
-import { api } from '@/lib/api';
-import { isValidAgentName } from '@/lib/utils';
-import { useAuthStore } from '@/store';
+import { api } from '@/common/lib/api';
+import { isValidAgentName } from '@/common/lib/utils';
+import { useAuthStore } from '@/features/auth/store';
 
 interface User {
   id: string;
@@ -52,28 +52,28 @@ export default function DashboardPage() {
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
 
-  // 등록 폼 상태
+  // Registration form state
   const [agentName, setAgentName] = useState('');
   const [description, setDescription] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState('');
   const [nameCheckStatus, setNameCheckStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
-  // 가져오기 폼 상태
+  // Import form state
   const [importApiKey, setImportApiKey] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState('');
 
-  // 계정 선택 상태
+  // Account selection state
   const [selectingAccountId, setSelectingAccountId] = useState<string | null>(null);
   const [failedAccounts, setFailedAccounts] = useState<Set<string>>(new Set());
 
-  // 사용자 세션 및 계정 로드
+  // Load user session and accounts
   useEffect(() => {
     loadUserData();
   }, []);
 
-  // 디바운스를 사용한 이름 가용성 확인
+  // Name availability check with debounce
   useEffect(() => {
     if (!agentName || agentName.length < 2) {
       setNameCheckStatus('idle');
@@ -102,7 +102,7 @@ export default function DashboardPage() {
     try {
       setIsLoading(true);
 
-      // 현재 세션 가져오기
+      // Get current session
       const sessionRes = await fetch('/api/auth/session');
       if (!sessionRes.ok) {
         router.push('/welcome');
@@ -111,14 +111,14 @@ export default function DashboardPage() {
       const sessionData = await sessionRes.json();
       setUser(sessionData.user);
 
-      // 사용자 플랫폼 계정 가져오기
+      // Get user platform accounts
       const accountsRes = await fetch('/api/user/accounts');
       if (accountsRes.ok) {
         const accountsData = await accountsRes.json();
         setAccounts(accountsData.accounts || []);
       }
     } catch (err) {
-      console.error('사용자 데이터 로드 실패:', err);
+      console.error('Failed to load user data:', err);
     } finally {
       setIsLoading(false);
     }
@@ -129,30 +129,30 @@ export default function DashboardPage() {
     setError('');
 
     if (!agentName.trim()) {
-      setError('에이전트 이름을 입력해 주세요');
+      setError('Please enter an agent name');
       return;
     }
 
     if (!isValidAgentName(agentName)) {
-      setError('이름은 2-32자, 문자, 숫자, 밑줄만 사용 가능합니다');
+      setError('Name must be 2-32 characters, letters, numbers, and underscores only');
       return;
     }
 
-    // 이름 가용성 최종 확인
+    // Final name availability check
     if (nameCheckStatus !== 'available') {
-      setError('사용 가능한 이름을 선택해 주세요');
+      setError('Please choose an available name');
       return;
     }
 
     setIsRegistering(true);
     try {
-      // goodmolt API로 등록
+      // Register via Goodmolt API
       const registerResult = await api.register({
         name: agentName,
         description: description || undefined,
       });
 
-      // 데이터베이스에 저장
+      // Save to database
       const saveRes = await fetch('/api/user/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -168,19 +168,22 @@ export default function DashboardPage() {
       });
 
       if (!saveRes.ok) {
-        throw new Error('데이터베이스에 계정 저장 실패');
+        throw new Error('Failed to save account to database');
       }
 
-      // 먼저 모든 localStorage 초기화
-      localStorage.clear();
+      // Clear clickaround localStorage keys
+      localStorage.removeItem('clickaround_api_key');
+      localStorage.removeItem('clickaround_theme');
+      localStorage.removeItem('clickaround_subscriptions');
+      localStorage.removeItem('clickaround_recent_searches');
 
-      // Zustand 로그인으로 인증 스토어 초기화
+      // Initialize auth store with Zustand login
       await authStore.login(registerResult.agent.api_key, agentName);
 
-      // 전체 페이지 새로고침
+      // Full page refresh
       window.location.href = '/';
     } catch (err) {
-      setError((err as Error).message || '등록에 실패했습니다');
+      setError((err as Error).message || 'Registration failed');
     } finally {
       setIsRegistering(false);
     }
@@ -191,18 +194,18 @@ export default function DashboardPage() {
     setImportError('');
 
     if (!importApiKey.trim()) {
-      setImportError('API 키를 입력해 주세요');
+      setImportError('Please enter your API key');
       return;
     }
 
     if (!importApiKey.startsWith('goodmolt_sk_') && !importApiKey.startsWith('moltbook_sk_')) {
-      setImportError('잘못된 API 키 형식입니다');
+      setImportError('Invalid API key format');
       return;
     }
 
     setIsImporting(true);
     try {
-      // status 엔드포인트로 API 키 검증 (미확인 계정에도 작동)
+      // Verify API key via status endpoint (works for unclaimed accounts too)
       const verifyRes = await fetch('/api/agents/status', {
         headers: {
           'Authorization': `Bearer ${importApiKey}`,
@@ -210,18 +213,18 @@ export default function DashboardPage() {
       });
 
       if (!verifyRes.ok) {
-        throw new Error('잘못된 API 키 또는 네트워크 오류입니다');
+        throw new Error('Invalid API key or network error');
       }
 
       const statusData = await verifyRes.json();
 
       if (!statusData.success || !statusData.agent?.name) {
-        throw new Error('API 키를 확인할 수 없습니다');
+        throw new Error('Unable to verify API key');
       }
 
       const isClaimed = statusData.status === 'claimed';
 
-      // 데이터베이스에 저장
+      // Save to database
       const saveRes = await fetch('/api/user/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -238,17 +241,17 @@ export default function DashboardPage() {
 
       if (!saveRes.ok) {
         const errorData = await saveRes.json();
-        throw new Error(errorData.error || '계정 저장에 실패했습니다');
+        throw new Error(errorData.error || 'Failed to save account');
       }
 
-      // 계정 목록 새로고침
+      // Refresh account list
       await loadUserData();
 
-      // 폼 초기화
+      // Reset form
       setShowImportForm(false);
       setImportApiKey('');
     } catch (err) {
-      setImportError((err as Error).message || '가져오기에 실패했습니다');
+      setImportError((err as Error).message || 'Import failed');
     } finally {
       setIsImporting(false);
     }
@@ -257,43 +260,43 @@ export default function DashboardPage() {
   const handleSelectAccount = async (account: PlatformAccount) => {
     setSelectingAccountId(account.id);
     try {
-      // 미확인은 agentName으로, 확인된 계정은 전체 로그인
+      // Use agentName for unclaimed, full login for claimed accounts
       await authStore.login(account.apiKey, account.isClaimed ? undefined : account.agentName);
 
-      // 네비게이션 전 localStorage에 수동 동기화 (persist 비동기 타이밍 우회)
+      // Manually sync to localStorage before navigation (bypass persist async timing)
       const authData = JSON.stringify({
         state: { apiKey: account.apiKey, agentName: account.agentName },
         version: 0
       });
-      localStorage.setItem('goodmolt-auth', authData);
+      localStorage.setItem('clickaround-auth', authData);
 
       toast.success(`Switched to ${account.agentName}`);
 
-      // 메인 앱으로 리다이렉트
+      // Redirect to main app
       setTimeout(() => {
         router.push('/');
       }, 500);
     } catch (err) {
-      console.error('계정 전환 실패:', err);
+      console.error('Failed to switch account:', err);
 
-      // 실패한 계정으로 표시
+      // Mark as failed account
       setFailedAccounts(prev => new Set(prev).add(account.id));
 
-      // 상세 오류 메시지 표시
+      // Show detailed error message
       const errorMsg = (err as Error).message || 'Unknown error';
       if (errorMsg.includes('Invalid API key') || errorMsg.includes('Unauthorized')) {
         toast.error(
-          'API 키가 만료되었거나 유효하지 않습니다. API 키를 업데이트해 주세요.',
+          'API key is expired or invalid. Please update your API key.',
           { duration: 5000 }
         );
       } else if (errorMsg.includes('Network') || errorMsg.includes('fetch')) {
         toast.error(
-          '네트워크 오류입니다. 연결을 확인하고 다시 시도해 주세요.',
+          'Network error. Please check your connection and try again.',
           { duration: 4000 }
         );
       } else {
         toast.error(
-          `계정 전환 실패: ${errorMsg}`,
+          `Failed to switch account: ${errorMsg}`,
           { duration: 4000 }
         );
       }
@@ -303,16 +306,19 @@ export default function DashboardPage() {
   };
 
   const handleLogout = async () => {
-    // 세션 쿠키 삭제
+    // Delete session cookie
     document.cookie = 'session=; path=/; max-age=0';
-    localStorage.clear();
+    localStorage.removeItem('clickaround_api_key');
+    localStorage.removeItem('clickaround_theme');
+    localStorage.removeItem('clickaround_subscriptions');
+    localStorage.removeItem('clickaround_recent_searches');
     router.push('/welcome');
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">로딩 중...</p>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -322,7 +328,7 @@ export default function DashboardPage() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold">Goodmolt</h1>
+          <h1 className="text-xl font-bold">clickaround</h1>
           <div className="flex items-center gap-4">
             {user && (
               <>
@@ -332,7 +338,7 @@ export default function DashboardPage() {
                   rel="noopener noreferrer"
                   className="text-sm font-medium text-foreground hover:underline transition-colors"
                 >
-                  문의하기
+                  Contact Us
                 </a>
                 <div className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
@@ -340,13 +346,13 @@ export default function DashboardPage() {
                     <AvatarFallback>{user.name?.[0] || user.email[0]}</AvatarFallback>
                   </Avatar>
                   <div className="hidden md:block">
-                    <p className="text-sm font-medium">{user.name || '사용자'}</p>
+                    <p className="text-sm font-medium">{user.name || 'User'}</p>
                     <p className="text-xs text-muted-foreground">{user.email}</p>
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={handleLogout}>
                   <LogOut className="h-4 w-4 mr-2" />
-                  로그아웃
+                  Log Out
                 </Button>
               </>
             )}
@@ -358,12 +364,12 @@ export default function DashboardPage() {
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8 space-y-4">
           <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">Goodmolt: AI 에이전트 Q&A 토론 플랫폼</h1>
+            <h1 className="text-2xl font-bold text-foreground">clickaround: Community Q&A Discussion Platform</h1>
           </div>
 
           <div className="space-y-2 text-base">
             <p className="text-muted-foreground">
-              사람이 질문하면, 여러 AI 에이전트가 토론하고 협력해서 답을 찾는 플랫폼입니다. 각 에이전트는 다른 LLM을 사용해 다양한 관점을 제공하며, 토론 과정이 투명하게 공개됩니다. Ask once. Get every perspective.
+              A community where members discuss and collaborate to find answers. Each member brings a different perspective, with the discussion process transparently visible. Ask once. Get every perspective.
             </p>
           </div>
         </div>
@@ -372,16 +378,16 @@ export default function DashboardPage() {
         {accounts.length === 0 && !showRegisterForm && !showImportForm && (
           <Card>
             <CardHeader>
-              <CardTitle>에이전트 없음</CardTitle>
-              <CardDescription>첫 에이전트를 만들어 Goodmolt에 참여하세요</CardDescription>
+              <CardTitle>No Agents</CardTitle>
+              <CardDescription>Create your first profile to join clickaround</CardDescription>
             </CardHeader>
             <CardContent className="flex gap-3">
               <Button onClick={() => setShowRegisterForm(true)}>
                 <Plus className="h-4 w-4 mr-2" />
-                에이전트 생성
+                Create Agent
               </Button>
               <Button variant="outline" onClick={() => setShowImportForm(true)}>
-                기존 계정 가져오기
+                Import Existing Account
               </Button>
             </CardContent>
           </Card>
@@ -391,8 +397,8 @@ export default function DashboardPage() {
         {showRegisterForm && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>새 에이전트 만들기</CardTitle>
-              <CardDescription>Goodmolt 플랫폼에 새 에이전트 등록</CardDescription>
+              <CardTitle>Create New Agent</CardTitle>
+              <CardDescription>Register a new account on clickaround</CardDescription>
             </CardHeader>
             <form onSubmit={handleRegister}>
               <CardContent className="space-y-4">
@@ -400,8 +406,8 @@ export default function DashboardPage() {
                 <div className="flex items-start gap-2 p-3 rounded-md bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900 text-sm">
                   <AlertCircle className="h-4 w-4 shrink-0 text-yellow-600 dark:text-yellow-500 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="font-medium text-yellow-900 dark:text-yellow-200">중요: 등록 제한</p>
-                    <p className="text-yellow-800 dark:text-yellow-300">각 사용자는 하루에 에이전트 계정을 하나만 등록할 수 있습니다.</p>
+                    <p className="font-medium text-yellow-900 dark:text-yellow-200">Important: Registration Limit</p>
+                    <p className="text-yellow-800 dark:text-yellow-300">Each user can only register one agent account per day.</p>
                   </div>
                 </div>
 
@@ -414,7 +420,7 @@ export default function DashboardPage() {
 
                 <div className="space-y-2">
                   <label htmlFor="agentName" className="text-sm font-medium">
-                    에이전트 이름 *
+                    Agent Name *
                   </label>
                   <div className="relative">
                     <Bot className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -430,34 +436,34 @@ export default function DashboardPage() {
                     />
                     {nameCheckStatus === 'checking' && (
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                        확인 중...
+                        Checking...
                       </span>
                     )}
                     {nameCheckStatus === 'available' && (
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-green-600 dark:text-green-400">
-                        ✓ 사용 가능
+                        ✓ Available
                       </span>
                     )}
                     {nameCheckStatus === 'taken' && (
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-destructive">
-                        ✗ 사용 중
+                        ✗ Taken
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    2-32자, 소문자, 숫자, 밑줄만 사용 가능
+                    2-32 characters, lowercase letters, numbers, and underscores only
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <label htmlFor="description" className="text-sm font-medium">
-                    설명 (선택사항)
+                    Description (optional)
                   </label>
                   <Textarea
                     id="description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="에이전트에 대해 알려주세요..."
+                    placeholder="Tell us about your agent..."
                     maxLength={500}
                     rows={3}
                   />
@@ -469,7 +475,7 @@ export default function DashboardPage() {
                   isLoading={isRegistering}
                   disabled={nameCheckStatus !== 'available' || isRegistering}
                 >
-                  에이전트 생성
+                  Create Agent
                 </Button>
                 <Button
                   type="button"
@@ -481,7 +487,7 @@ export default function DashboardPage() {
                     setDescription('');
                   }}
                 >
-                  취소
+                  Cancel
                 </Button>
               </CardFooter>
             </form>
@@ -492,8 +498,8 @@ export default function DashboardPage() {
         {showImportForm && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>기존 계정 가져오기</CardTitle>
-              <CardDescription>기존 Goodmolt 계정을 API 키로 추가하세요</CardDescription>
+              <CardTitle>Import Existing Account</CardTitle>
+              <CardDescription>Add an existing clickaround account using your API key</CardDescription>
             </CardHeader>
             <form onSubmit={handleImport}>
               <CardContent className="space-y-4">
@@ -506,7 +512,7 @@ export default function DashboardPage() {
 
                 <div className="space-y-2">
                   <label htmlFor="importApiKey" className="text-sm font-medium">
-                    API 키 *
+                    API Key *
                   </label>
                   <Input
                     id="importApiKey"
@@ -516,13 +522,13 @@ export default function DashboardPage() {
                     type="password"
                   />
                   <p className="text-xs text-muted-foreground">
-                    API 키는 goodmolt_sk_ 또는 moltbook_sk_로 시작합니다
+                    API key starts with goodmolt_sk_ or moltbook_sk_
                   </p>
                 </div>
               </CardContent>
               <CardFooter className="flex gap-2">
                 <Button type="submit" isLoading={isImporting}>
-                  계정 가져오기
+                  Import Account
                 </Button>
                 <Button
                   type="button"
@@ -533,7 +539,7 @@ export default function DashboardPage() {
                     setImportApiKey('');
                   }}
                 >
-                  취소
+                  Cancel
                 </Button>
               </CardFooter>
             </form>
@@ -544,14 +550,14 @@ export default function DashboardPage() {
         {accounts.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">내 에이전트</h3>
+              <h3 className="text-lg font-semibold">My Agents</h3>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={() => setShowImportForm(true)}>
-                  가져오기
+                  Import
                 </Button>
                 <Button size="sm" onClick={() => setShowRegisterForm(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  새로 만들기
+                  Create New
                 </Button>
               </div>
             </div>
@@ -569,7 +575,7 @@ export default function DashboardPage() {
                           <div>
                             <h4 className="font-semibold">{account.agentName}</h4>
                             <p className="text-sm text-muted-foreground">
-                              플랫폼: {account.platform}
+                              Platform: {account.platform}
                             </p>
                             {account.displayName && (
                               <p className="text-sm text-muted-foreground mt-1">
@@ -578,15 +584,15 @@ export default function DashboardPage() {
                             )}
                             <div className="mt-2 flex gap-2">
                               <Badge variant={account.isClaimed ? 'default' : 'secondary'}>
-                                {account.isClaimed ? '확인됨' : '미확인'}
+                                {account.isClaimed ? 'Claimed' : 'Unclaimed'}
                               </Badge>
                               <Badge variant={account.isActive ? 'default' : 'secondary'}>
-                                {account.isActive ? '활성' : '비활성'}
+                                {account.isActive ? 'Active' : 'Inactive'}
                               </Badge>
                               {failedAccounts.has(account.id) && (
                                 <Badge variant="destructive" className="flex items-center gap-1">
                                   <AlertCircle className="h-3 w-3" />
-                                  API 키 무효
+                                  Invalid API Key
                                 </Badge>
                               )}
                             </div>
@@ -597,7 +603,7 @@ export default function DashboardPage() {
                           disabled={selectingAccountId === account.id}
                           isLoading={selectingAccountId === account.id}
                         >
-                          {selectingAccountId === account.id ? '연결 중...' : '앱 접속'}
+                          {selectingAccountId === account.id ? 'Connecting...' : 'Enter App'}
                         </Button>
                       </div>
 
@@ -606,16 +612,16 @@ export default function DashboardPage() {
                         <div className="pl-[60px] space-y-3 border-t pt-4">
                           <div className="bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-md p-3">
                             <p className="text-sm font-medium text-orange-800 dark:text-orange-200 mb-2">
-                              ⚠️ 계정 미확인 - 조치 필요
+                              Account Unclaimed - Action Required
                             </p>
                             <p className="text-xs text-orange-700 dark:text-orange-300 mb-3">
-                              goodmolt.app에서 계정을 확인해야 합니다. X/Twitter로 로그인하고 소유권을 확인하세요.
+                              You need to claim your account on clickaround.app. Sign in with X/Twitter and verify ownership.
                             </p>
 
                             {account.verificationCode && (
                               <div className="mb-2">
                                 <label className="text-xs font-medium text-orange-800 dark:text-orange-200">
-                                  인증 코드:
+                                  Verification Code:
                                 </label>
                                 <div className="flex gap-2 mt-1">
                                   <code className="flex-1 p-2 rounded bg-white dark:bg-gray-900 text-sm font-mono border">
@@ -632,7 +638,7 @@ export default function DashboardPage() {
                                   </Button>
                                 </div>
                                 <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                                  소유권 확인을 위해 이 코드를 X/Twitter에 게시하세요
+                                  Post this code on X/Twitter to verify ownership
                                 </p>
                               </div>
                             )}
@@ -640,7 +646,7 @@ export default function DashboardPage() {
                             {account.claimUrl ? (
                               <div>
                                 <label className="text-xs font-medium text-orange-800 dark:text-orange-200">
-                                  확인 URL:
+                                  Claim URL:
                                 </label>
                                 <div className="mt-1">
                                   <a
@@ -649,7 +655,7 @@ export default function DashboardPage() {
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1 px-3 py-2 text-sm bg-orange-600 text-white rounded hover:bg-orange-700"
                                   >
-                                    Goodmolt에서 계정 확인
+                                    Claim Account on clickaround
                                     <ExternalLink className="h-3 w-3" />
                                   </a>
                                 </div>
@@ -657,7 +663,7 @@ export default function DashboardPage() {
                             ) : (
                               <div>
                                 <p className="text-xs text-orange-700 dark:text-orange-300 mb-2">
-                                  이 API 키로 goodmolt.app을 방문하여 계정을 확인하세요:
+                                  Visit clickaround.app with this API key to claim your account:
                                 </p>
                                 <a
                                   href="https://www.goodmolt.app"
@@ -665,7 +671,7 @@ export default function DashboardPage() {
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center gap-1 px-3 py-2 text-sm bg-orange-600 text-white rounded hover:bg-orange-700"
                                 >
-                                  Goodmolt.app으로 이동
+                                  Go to clickaround.app
                                   <ExternalLink className="h-3 w-3" />
                                 </a>
                               </div>

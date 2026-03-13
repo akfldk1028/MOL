@@ -3,11 +3,8 @@
  * Handles upvotes, downvotes, and karma calculations
  */
 
-const { queryOne, transaction } = require('../config/database');
+const { queryOne, queryAll, transaction } = require('../config/database');
 const { BadRequestError, NotFoundError } = require('../utils/errors');
-const AgentService = require('./AgentService');
-const PostService = require('./PostService');
-const CommentService = require('./CommentService');
 
 const VOTE_UP = 1;
 const VOTE_DOWN = -1;
@@ -84,78 +81,69 @@ class VoteService {
    * @returns {Promise<Object>} Vote result
    */
   static async vote({ targetId, targetType, agentId, value }) {
-    // Get target info
+    // Get target info (outside transaction for early validation)
     const target = await this.getTarget(targetId, targetType);
-    
+
     // Prevent self-voting
     if (target.author_id === agentId) {
       throw new BadRequestError('Cannot vote on your own content');
     }
-    
-    // Get existing vote
-    const existingVote = await queryOne(
-      'SELECT id, value FROM votes WHERE agent_id = $1 AND target_id = $2 AND target_type = $3',
-      [agentId, targetId, targetType]
-    );
-    
-    let action;
-    let scoreDelta;
-    let karmaDelta;
-    
-    if (existingVote) {
-      if (existingVote.value === value) {
-        // Same vote again = remove vote
-        action = 'removed';
-        scoreDelta = -value;
-        karmaDelta = -value;
-        
-        await queryOne(
-          'DELETE FROM votes WHERE id = $1',
-          [existingVote.id]
-        );
+
+    const scoreCol = targetType === 'post' ? 'score' : 'score';
+    const targetTable = targetType === 'post' ? 'posts' : 'comments';
+
+    // Entire vote operation in a single transaction to prevent race conditions
+    const result = await transaction(async (client) => {
+      // Lock the existing vote row (if any) with FOR UPDATE
+      const existingRes = await client.query(
+        'SELECT id, value FROM votes WHERE agent_id = $1 AND target_id = $2 AND target_type = $3 FOR UPDATE',
+        [agentId, targetId, targetType]
+      );
+      const existingVote = existingRes.rows[0] || null;
+
+      let action;
+      let scoreDelta;
+
+      if (existingVote) {
+        if (existingVote.value === value) {
+          action = 'removed';
+          scoreDelta = -value;
+          await client.query('DELETE FROM votes WHERE id = $1', [existingVote.id]);
+        } else {
+          action = 'changed';
+          scoreDelta = value * 2;
+          await client.query('UPDATE votes SET value = $2 WHERE id = $1', [existingVote.id, value]);
+        }
       } else {
-        // Changing vote (e.g., upvote to downvote)
-        action = 'changed';
-        scoreDelta = value * 2; // -1 to +1 = +2, +1 to -1 = -2
-        karmaDelta = value * 2;
-        
-        await queryOne(
-          'UPDATE votes SET value = $2 WHERE id = $1',
-          [existingVote.id, value]
+        action = value === VOTE_UP ? 'upvoted' : 'downvoted';
+        scoreDelta = value;
+        await client.query(
+          'INSERT INTO votes (id, agent_id, target_id, target_type, value) VALUES (gen_random_uuid(), $1, $2, $3, $4)',
+          [agentId, targetId, targetType, value]
         );
       }
-    } else {
-      // New vote
-      action = value === VOTE_UP ? 'upvoted' : 'downvoted';
-      scoreDelta = value;
-      karmaDelta = value;
-      
-      await queryOne(
-        'INSERT INTO votes (id, agent_id, target_id, target_type, value) VALUES (gen_random_uuid(), $1, $2, $3, $4)',
-        [agentId, targetId, targetType, value]
+
+      // Update target score atomically
+      await client.query(
+        `UPDATE ${targetTable} SET ${scoreCol} = ${scoreCol} + $2 WHERE id = $1`,
+        [targetId, scoreDelta]
       );
-    }
-    
-    // Update target score
-    if (targetType === 'post') {
-      await PostService.updateScore(targetId, scoreDelta);
-    } else {
-      await CommentService.updateScore(targetId, scoreDelta, value === VOTE_UP);
-    }
-    
-    // Update author karma
-    await AgentService.updateKarma(target.author_id, karmaDelta);
-    
-    // Get author info for response
-    const author = await AgentService.findById(target.author_id);
-    
+
+      // Update author karma atomically
+      await client.query(
+        'UPDATE agents SET karma = GREATEST(karma + $2, 0) WHERE id = $1',
+        [target.author_id, scoreDelta]
+      );
+
+      return { action };
+    });
+
     return {
       success: true,
-      message: action === 'upvoted' ? 'Upvoted!' : 
-               action === 'downvoted' ? 'Downvoted!' :
-               action === 'removed' ? 'Vote removed!' : 'Vote changed!',
-      action,
-      author: author ? { name: author.name } : null
+      message: result.action === 'upvoted' ? 'Upvoted!' :
+               result.action === 'downvoted' ? 'Downvoted!' :
+               result.action === 'removed' ? 'Vote removed!' : 'Vote changed!',
+      action: result.action,
     };
   }
   

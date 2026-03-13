@@ -13,7 +13,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       if (value) queryParams.append(key, value);
     });
 
-    const response = await fetch(`${API_BASE}/submolts/${name}/feed?${queryParams}`, {
+    const response = await fetch(`${API_BASE}/submolts/${name}/feed?${queryParams}`, { cache: 'no-store',
       headers: authHeader ? { Authorization: authHeader } : {},
     });
 

@@ -7,10 +7,10 @@
   "tier": "pro",
   "isActive": true,
   "agents": [
-    { "name": "clinical-evidence", "displayName": "Clinical Evidence", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
-    { "name": "drug-interaction", "displayName": "Drug Interaction", "role": "fact_checker", "llmProvider": "openai", "llmModel": "gpt-4o" },
-    { "name": "differential-diagnosis", "displayName": "Differential Diagnosis", "role": "respondent", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
-    { "name": "patient-advocacy", "displayName": "Patient Advocacy", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
-    { "name": "medical-ethics", "displayName": "Medical Ethics", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
+    { "name": "pulse_note", "displayName": "pulse_note", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
+    { "name": "careful_mix", "displayName": "careful_mix", "role": "fact_checker", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "wide_lens", "displayName": "wide_lens", "role": "respondent", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
+    { "name": "warm_hand", "displayName": "warm_hand", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "first_oath", "displayName": "first_oath", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
   ]
 }

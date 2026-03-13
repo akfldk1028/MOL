@@ -3,13 +3,14 @@
 import { useState } from 'react';
 import { useParams, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { useAgent, useAuth } from '@/hooks';
-import { PageContainer } from '@/components/layout';
-import { PostList } from '@/components/post';
-import { Button, Card, CardHeader, CardTitle, CardContent, Avatar, AvatarImage, AvatarFallback, Skeleton, Badge, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui';
+import { useAgent } from '@/features/agents/queries';
+import { useAuth } from '@/features/auth/queries';
+import { PageContainer } from '@/common/components/page-container';
+import { PostList } from '@/features/community/components/post-list';
+import { Button, Card, CardHeader, CardTitle, CardContent, Avatar, AvatarImage, AvatarFallback, Skeleton, Badge, Tabs, TabsList, TabsTrigger, TabsContent } from '@/common/ui';
 import { Calendar, Award, Users, FileText, MessageSquare, Settings } from 'lucide-react';
-import { cn, formatScore, formatDate, getInitials } from '@/lib/utils';
-import { api } from '@/lib/api';
+import { cn, formatScore, formatDate, getInitials } from '@/common/lib/utils';
+import { api } from '@/common/lib/api';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 
 export default function UserProfilePage() {
@@ -36,7 +37,7 @@ export default function UserProfilePage() {
       }
       mutate();
     } catch (err) {
-      console.error('팔로우 실패:', err);
+      console.error('Follow failed:', err);
     } finally {
       setFollowing(false);
     }
@@ -77,7 +78,7 @@ export default function UserProfilePage() {
                         <h1 className="text-2xl font-bold flex items-center gap-2">
                           {agent?.displayName || agent?.name}
                           {agent?.status === 'active' && (
-                            <Badge variant="secondary" className="text-xs">인증됨</Badge>
+                            <Badge variant="secondary" className="text-xs">Verified</Badge>
                           )}
                         </h1>
                         <p className="text-muted-foreground">u/{agent?.name}</p>
@@ -91,12 +92,12 @@ export default function UserProfilePage() {
                     <Link href="/settings">
                       <Button variant="outline" size="sm">
                         <Settings className="h-4 w-4 mr-1" />
-                        프로필 수정
+                        Edit Profile
                       </Button>
                     </Link>
                   ) : isAuthenticated && (
                     <Button onClick={handleFollow} variant={isFollowing ? 'secondary' : 'default'} size="sm" disabled={following}>
-                      {isFollowing ? '팔로잉' : '팔로우'}
+                      {isFollowing ? 'Following' : 'Follow'}
                     </Button>
                   )}
                 </div>
@@ -114,18 +115,18 @@ export default function UserProfilePage() {
                   <span className={cn('font-medium', (agent?.karma || 0) > 0 && 'text-upvote')}>
                     {formatScore(agent?.karma || 0)}
                   </span>
-                  <span className="text-muted-foreground">카르마</span>
+                  <span className="text-muted-foreground">karma</span>
                 </div>
                 
                 <div className="flex items-center gap-1">
                   <Users className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">{formatScore(agent?.followerCount || 0)}</span>
-                  <span className="text-muted-foreground">팔로워</span>
+                  <span className="text-muted-foreground">followers</span>
                 </div>
                 
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{agent?.createdAt ? formatDate(agent.createdAt) : '최근'}에 가입</span>
+                  <span className="text-muted-foreground">Joined {agent?.createdAt ? formatDate(agent.createdAt) : 'recently'}</span>
                 </div>
               </div>
             </Card>
@@ -136,11 +137,11 @@ export default function UserProfilePage() {
                 <TabsPrimitive.List className="flex border-b">
                   <TabsPrimitive.Trigger value="posts" className={cn('flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors', activeTab === 'posts' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
                     <FileText className="h-4 w-4" />
-                    게시글
+                    Posts
                   </TabsPrimitive.Trigger>
                   <TabsPrimitive.Trigger value="comments" className={cn('flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors', activeTab === 'comments' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
                     <MessageSquare className="h-4 w-4" />
-                    댓글
+                    Comments
                   </TabsPrimitive.Trigger>
                 </TabsPrimitive.List>
               </Card>
@@ -151,7 +152,7 @@ export default function UserProfilePage() {
                 ) : (
                   <Card className="p-8 text-center">
                     <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                    <p className="text-muted-foreground">아직 게시글이 없습니다</p>
+                    <p className="text-muted-foreground">No posts yet</p>
                   </Card>
                 )}
               </TabsPrimitive.Content>
@@ -159,7 +160,7 @@ export default function UserProfilePage() {
               <TabsPrimitive.Content value="comments">
                 <Card className="p-8 text-center">
                   <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-                  <p className="text-muted-foreground">댓글 기능 준비 중</p>
+                  <p className="text-muted-foreground">Comments feature coming soon</p>
                 </Card>
               </TabsPrimitive.Content>
             </TabsPrimitive.Root>
@@ -169,17 +170,17 @@ export default function UserProfilePage() {
           <div className="w-full lg:w-80 space-y-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">트로피 케이스</CardTitle>
+                <CardTitle className="text-base">Trophy Case</CardTitle>
               </CardHeader>
               <CardContent>
                 {(agent?.karma || 0) >= 100 ? (
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">🏆 기여자</Badge>
-                    {(agent?.karma || 0) >= 1000 && <Badge variant="secondary">⭐ 탑 에이전트</Badge>}
-                    {(agent?.karma || 0) >= 10000 && <Badge variant="secondary">💎 엘리트</Badge>}
+                    <Badge variant="secondary">Contributor</Badge>
+                    {(agent?.karma || 0) >= 1000 && <Badge variant="secondary">Top Agent</Badge>}
+                    {(agent?.karma || 0) >= 10000 && <Badge variant="secondary">Elite</Badge>}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">아직 트로피가 없습니다. 계속 활동해 주세요!</p>
+                  <p className="text-sm text-muted-foreground">No trophies yet. Keep contributing!</p>
                 )}
               </CardContent>
             </Card>
@@ -189,11 +190,11 @@ export default function UserProfilePage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <span className="h-2 w-2 rounded-full bg-green-500" />
-                    확인된 에이전트
+                    Verified Agent
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-muted-foreground">이 에이전트는 사람 운영자가 소유권을 확인했습니다.</p>
+                  <p className="text-sm text-muted-foreground">This agent has been verified by a human operator.</p>
                 </CardContent>
               </Card>
             )}

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import MarkdownContent from '@/common/components/markdown-content';
 import { cn, formatScore, formatRelativeTime, getInitials, getAgentUrl } from '@/lib/utils';
 import { useCommentVote, useAuth, useToggle } from '@/hooks';
 import { Button, Avatar, AvatarImage, AvatarFallback, Textarea, Skeleton } from '@/components/ui';
@@ -50,7 +51,7 @@ export function CommentItem({ comment, postId, onReply, onDelete }: CommentProps
       setReplyContent('');
       setIsReplying(false);
     } catch (err) {
-      console.error('답글 작성 실패:', err);
+      console.error('Failed to create reply:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -82,7 +83,7 @@ export function CommentItem({ comment, postId, onReply, onDelete }: CommentProps
         <span className="text-xs text-muted-foreground" title={comment.createdAt}>
           {formatRelativeTime(comment.createdAt)}
         </span>
-        {comment.editedAt && <span className="text-xs text-muted-foreground">(수정됨)</span>}
+        {comment.editedAt && <span className="text-xs text-muted-foreground">(edited)</span>}
       </div>
       
       {/* Content */}
@@ -117,7 +118,7 @@ export function CommentItem({ comment, postId, onReply, onDelete }: CommentProps
             {isAuthenticated && (
               <button onClick={() => setIsReplying(!isReplying)} className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:bg-muted rounded">
                 <Reply className="h-3.5 w-3.5" />
-                답글
+                Reply
               </button>
             )}
 
@@ -131,15 +132,15 @@ export function CommentItem({ comment, postId, onReply, onDelete }: CommentProps
                   {isAuthor && (
                     <>
                       <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-left">
-                        <Edit2 className="h-3.5 w-3.5" /> 수정
+                        <Edit2 className="h-3.5 w-3.5" /> Edit
                       </button>
                       <button onClick={() => onDelete?.(comment.id)} className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-left text-destructive">
-                        <Trash2 className="h-3.5 w-3.5" /> 삭제
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
                       </button>
                     </>
                   )}
                   <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-left text-destructive">
-                    <Flag className="h-3.5 w-3.5" /> 신고
+                    <Flag className="h-3.5 w-3.5" /> Report
                   </button>
                 </div>
               )}
@@ -152,13 +153,13 @@ export function CommentItem({ comment, postId, onReply, onDelete }: CommentProps
               <Textarea
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
-                placeholder="답글을 작성하세요..."
+                placeholder="Write a reply..."
                 className="min-h-[80px] text-sm"
               />
               <div className="flex justify-end gap-2 mt-2">
-                <Button variant="ghost" size="sm" onClick={() => setIsReplying(false)}>취소</Button>
+                <Button variant="ghost" size="sm" onClick={() => setIsReplying(false)}>Cancel</Button>
                 <Button size="sm" onClick={handleReply} disabled={!replyContent.trim() || isSubmitting} isLoading={isSubmitting}>
-                  답글
+                  Reply
                 </Button>
               </div>
             </div>
@@ -178,7 +179,7 @@ export function CommentItem({ comment, postId, onReply, onDelete }: CommentProps
       {/* Collapsed indicator */}
       {isCollapsed && hasReplies && (
         <button onClick={() => toggleCollapsed()} className="text-xs text-muted-foreground hover:text-foreground">
-          {comment.replies!.length}개의 답글 더 보기
+          Show {comment.replies!.length} more replies
         </button>
       )}
     </div>
@@ -272,7 +273,7 @@ export function CommentList({ comments, postId, isLoading, sseChannelId }: { com
       };
       setLocalComments(removeComment(localComments));
     } catch (err) {
-      console.error('댓글 삭제 실패:', err);
+      console.error('Failed to delete comment:', err);
     }
   };
   
@@ -290,7 +291,7 @@ export function CommentList({ comments, postId, isLoading, sseChannelId }: { com
     return (
       <div className="text-center py-8">
         <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-        <p className="text-muted-foreground">아직 댓글이 없습니다. 첫 댓글을 작성해 보세요!</p>
+        <p className="text-muted-foreground">No comments yet. Be the first to comment!</p>
       </div>
     );
   }
@@ -314,8 +315,8 @@ export function CommentForm({ postId, parentId, onSubmit, onCancel }: { postId: 
     return (
       <div className="p-4 text-center bg-muted rounded-lg">
         <p className="text-sm text-muted-foreground">
-          <Link href="/auth/login" className="text-primary hover:underline">로그인</Link> 또는{' '}
-          <Link href="/auth/register" className="text-primary hover:underline">회원가입</Link> 후 댓글을 작성하세요
+          <Link href="/auth/login" className="text-primary hover:underline">Log in</Link> or{' '}
+          <Link href="/auth/register" className="text-primary hover:underline">Sign up</Link> to leave a comment
         </p>
       </div>
     );
@@ -331,7 +332,7 @@ export function CommentForm({ postId, parentId, onSubmit, onCancel }: { postId: 
       setContent('');
       onSubmit?.(comment);
     } catch (err) {
-      console.error('댓글 작성 실패:', err);
+      console.error('Failed to create comment:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -342,13 +343,13 @@ export function CommentForm({ postId, parentId, onSubmit, onCancel }: { postId: 
       <Textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
-        placeholder="의견을 남겨주세요"
+        placeholder="Share your thoughts..."
         className="min-h-[100px]"
       />
       <div className="flex justify-end gap-2 mt-2">
-        {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>취소</Button>}
+        {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
         <Button type="submit" disabled={!content.trim() || isSubmitting} isLoading={isSubmitting}>
-          댓글 작성
+          Comment
         </Button>
       </div>
     </form>
@@ -357,22 +358,11 @@ export function CommentForm({ postId, parentId, onSubmit, onCancel }: { postId: 
 
 // Render @mentions as links
 function CommentContent({ content }: { content: string }) {
-  const parts = content.split(/(@[a-z0-9_]{2,32})/gi);
-  return (
-    <>
-      {parts.map((part, i) => {
-        if (/^@[a-z0-9_]{2,32}$/i.test(part)) {
-          const agentName = part.slice(1).toLowerCase();
-          return (
-            <Link key={i} href={`/u/${agentName}`} className="text-primary font-medium hover:underline">
-              {part}
-            </Link>
-          );
-        }
-        return <React.Fragment key={i}>{part}</React.Fragment>;
-      })}
-    </>
+  const processed = content.replace(
+    /@([a-z0-9_]{2,32})/gi,
+    (match, name) => `[${match}](/u/${name.toLowerCase()})`
   );
+  return <MarkdownContent content={processed} className="text-sm" />;
 }
 
 // Comment Skeleton
@@ -396,14 +386,14 @@ export function CommentSkeleton() {
 // Comment Sort
 export function CommentSort({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const options = [
-    { value: 'top', label: '인기순' },
-    { value: 'new', label: '최신순' },
-    { value: 'controversial', label: '논쟁순' },
+    { value: 'top', label: 'Top' },
+    { value: 'new', label: 'Newest' },
+    { value: 'controversial', label: 'Controversial' },
   ];
   
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">정렬:</span>
+      <span className="text-sm text-muted-foreground">Sort by:</span>
       <select value={value} onChange={(e) => onChange(e.target.value)} className="text-sm bg-transparent border rounded px-2 py-1">
         {options.map(opt => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>

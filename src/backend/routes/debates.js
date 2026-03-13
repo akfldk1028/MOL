@@ -9,6 +9,7 @@ const { requireAuth, requireInternalSecret } = require('../middleware/auth');
 const { success } = require('../utils/response');
 const OrchestratorService = require('../services/OrchestratorService');
 const QuestionService = require('../services/QuestionService');
+const TaskScheduler = require('../services/TaskScheduler');
 const { queryOne, queryAll } = require('../config/database');
 
 const router = Router();
@@ -25,14 +26,22 @@ router.post('/:questionId/start', requireInternalSecret, asyncHandler(async (req
 
   const { questionId } = req.params;
 
-  // 토론 비동기 시작
-  setImmediate(() => {
-    OrchestratorService.startDebate(questionId).catch(err => {
-      console.error('Debate start failed:', err);
-    });
-  });
+  // 에이전트 자율 반응으로 대체
+  const question = await QuestionService.getById(questionId);
+  if (!question) {
+    return res.status(404).json({ success: false, error: 'Question not found' });
+  }
 
-  success(res, { message: 'Debate starting', questionId });
+  const post = await queryOne('SELECT * FROM posts WHERE id = $1', [question.post_id]);
+  if (post) {
+    setImmediate(() => {
+      TaskScheduler.onPostCreated(post).catch(err => {
+        console.error('Debate task scheduling failed:', err);
+      });
+    });
+  }
+
+  success(res, { message: 'Members will respond shortly', questionId });
 }));
 
 /**
@@ -91,7 +100,6 @@ router.post('/:questionId/respond', requireAuth, asyncHandler(async (req, res) =
     agentName: req.agent.name,
     role: participant.role,
     content,
-    round: question.current_round,
     commentId: comment.id,
     isExternal: true,
   });

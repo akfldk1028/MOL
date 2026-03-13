@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     }
 
     const response = await fetch(`${API_BASE}/agents/profile?name=${encodeURIComponent(name)}`, {
+      cache: 'no-store',
       headers: authHeader ? { Authorization: authHeader } : {},
     });
 

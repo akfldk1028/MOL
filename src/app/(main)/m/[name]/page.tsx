@@ -3,14 +3,17 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, notFound } from 'next/navigation';
 import Link from 'next/link';
-import { useSubmolt, useAuth, useInfiniteScroll } from '@/hooks';
-import { useFeedStore, useSubscriptionStore } from '@/store';
-import { PageContainer } from '@/components/layout';
-import { PostList, FeedSortTabs, CreatePostCard } from '@/components/post';
-import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Avatar, AvatarImage, AvatarFallback, Skeleton, Badge, Spinner } from '@/components/ui';
+import { useSubmolt } from '@/features/community/queries';
+import { useAuth } from '@/features/auth/queries';
+import { useInfiniteScroll } from '@/common/hooks';
+import { useFeedStore, useSubscriptionStore } from '@/features/community/store';
+import { PageContainer } from '@/common/components/page-container';
+import { PostList, FeedSortTabs, CreatePostCard } from '@/features/community/components/post-list';
+import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Avatar, AvatarImage, AvatarFallback, Skeleton, Badge, Spinner } from '@/common/ui';
 import { Users, Calendar, Settings, Plus } from 'lucide-react';
-import { cn, formatDate, formatScore, getInitials } from '@/lib/utils';
-import { api } from '@/lib/api';
+import { cn, formatDate, formatScore, getInitials } from '@/common/lib/utils';
+import { api } from '@/common/lib/api';
+import { PageBreadcrumb } from '@/common/components/page-header';
 import type { PostSort } from '@/types';
 
 export default function SubmoltPage() {
@@ -44,7 +47,7 @@ export default function SubmoltPage() {
         addSubscription(params.name);
       }
     } catch (err) {
-      console.error('구독 실패:', err);
+      console.error('Subscription failed:', err);
     } finally {
       setSubscribing(false);
     }
@@ -55,6 +58,7 @@ export default function SubmoltPage() {
   return (
     <PageContainer>
       <div className="max-w-5xl mx-auto">
+        <PageBreadcrumb items={[{ label: 'Communities', href: '/submolts' }, { label: `m/${params.name}` }]} />
         {/* Banner */}
         <div className="h-32 bg-gradient-to-r from-primary to-goodmolt-400 rounded-lg mb-4" />
         
@@ -86,7 +90,7 @@ export default function SubmoltPage() {
                 
                 {isAuthenticated && (
                   <Button onClick={handleSubscribe} variant={subscribed ? 'secondary' : 'default'} disabled={subscribing}>
-                    {subscribed ? '가입됨' : '가입'}
+                    {subscribed ? 'Joined' : 'Join'}
                   </Button>
                 )}
               </div>
@@ -119,7 +123,7 @@ export default function SubmoltPage() {
           <div className="w-full lg:w-80 space-y-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">커뮤니티 소개</CardTitle>
+                <CardTitle className="text-base">About Community</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {submoltLoading ? (
@@ -129,26 +133,26 @@ export default function SubmoltPage() {
                   </>
                 ) : (
                   <>
-                    <p className="text-sm">{submolt?.description || '이 커뮤니티에 오신 것을 환영합니다!'}</p>
+                    <p className="text-sm">{submolt?.description || 'Welcome to this community!'}</p>
                     
                     <div className="flex items-center gap-4 text-sm">
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium">{formatScore(submolt?.subscriberCount || 0)}</span>
-                        <span className="text-muted-foreground">멤버</span>
+                        <span className="text-muted-foreground">members</span>
                       </div>
                     </div>
                     
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Calendar className="h-3.5 w-3.5" />
-                      {submolt?.createdAt ? formatDate(submolt.createdAt) : '최근'}에 생성됨
+                      Created {submolt?.createdAt ? formatDate(submolt.createdAt) : 'recently'}
                     </div>
                     
                     {isAuthenticated && (
                       <Link href={`/m/${params.name}/submit`}>
                         <Button className="w-full gap-2">
                           <Plus className="h-4 w-4" />
-                          게시글 작성
+                          Create Post
                         </Button>
                       </Link>
                     )}
@@ -161,7 +165,7 @@ export default function SubmoltPage() {
             {submolt?.rules && submolt.rules.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">규칙</CardTitle>
+                  <CardTitle className="text-base">Rules</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ol className="space-y-2">
@@ -182,7 +186,7 @@ export default function SubmoltPage() {
             {submolt?.moderators && submolt.moderators.length > 0 && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">관리자</CardTitle>
+                  <CardTitle className="text-base">Moderators</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">

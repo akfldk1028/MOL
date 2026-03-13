@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button, Card, CardContent, Skeleton } from '@/components/ui';
 import { ChevronLeft, ChevronRight, AlertTriangle, RefreshCw, Home, ArrowUp } from 'lucide-react';
 
-// 빈 상태
+// Empty state
 interface EmptyStateProps {
   icon?: React.ReactNode;
   title: string;
@@ -31,14 +31,14 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
   );
 }
 
-// 오류 상태
+// Error state
 interface ErrorStateProps {
   title?: string;
   description?: string;
   onRetry?: () => void;
 }
 
-export function ErrorState({ title = '문제가 발생했습니다', description = '콘텐츠를 불러오는 중 오류가 발생했습니다.', onRetry }: ErrorStateProps) {
+export function ErrorState({ title = 'Something went wrong', description = 'An error occurred while loading content.', onRetry }: ErrorStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
       <AlertTriangle className="h-12 w-12 text-destructive/50 mb-4" />
@@ -47,19 +47,19 @@ export function ErrorState({ title = '문제가 발생했습니다', description
       {onRetry && (
         <Button variant="outline" onClick={onRetry} className="gap-2">
           <RefreshCw className="h-4 w-4" />
-          다시 시도
+          Retry
         </Button>
       )}
     </div>
   );
 }
 
-// 로딩 상태
+// Loading state
 interface LoadingStateProps {
   text?: string;
 }
 
-export function LoadingState({ text = '불러오는 중...' }: LoadingStateProps) {
+export function LoadingState({ text = 'Loading...' }: LoadingStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4">
       <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4" />
@@ -68,7 +68,7 @@ export function LoadingState({ text = '불러오는 중...' }: LoadingStateProps
   );
 }
 
-// 페이지네이션
+// Pagination
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
@@ -138,7 +138,7 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
   );
 }
 
-// 브레드크럼
+// Breadcrumbs
 interface BreadcrumbsProps {
   items: { label: string; href?: string }[];
 }
@@ -165,7 +165,7 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
   );
 }
 
-// 맨 위로 이동 버튼
+// Back to top button
 export function BackToTop() {
   const [visible, setVisible] = React.useState(false);
   
@@ -196,7 +196,7 @@ export function BackToTop() {
   );
 }
 
-// 정보 카드
+// Info card
 interface InfoCardProps {
   title: string;
   description?: string;
@@ -215,7 +215,7 @@ export function InfoCard({ title, description, children }: InfoCardProps) {
   );
 }
 
-// 통계 카드
+// Stat card
 interface StatCardProps {
   label: string;
   value: string | number;
@@ -242,7 +242,7 @@ export function StatCard({ label, value, icon, trend }: StatCardProps) {
   );
 }
 
-// 콘텐츠 플레이스홀더
+// Content placeholder
 export function ContentPlaceholder({ lines = 3 }: { lines?: number }) {
   return (
     <div className="space-y-3">
@@ -253,7 +253,7 @@ export function ContentPlaceholder({ lines = 3 }: { lines?: number }) {
   );
 }
 
-// 텍스트가 포함된 구분선
+// Divider with text
 export function DividerWithText({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-4 my-4">
@@ -264,7 +264,7 @@ export function DividerWithText({ text }: { text: string }) {
   );
 }
 
-// 카운트다운
+// Countdown
 interface CountdownProps {
   targetDate: Date;
   onComplete?: () => void;
@@ -295,7 +295,7 @@ export function Countdown({ targetDate, onComplete }: CountdownProps) {
     return () => clearInterval(interval);
   }, [targetDate, onComplete]);
   
-  const unitLabels = { days: '일', hours: '시간', minutes: '분', seconds: '초' };
+  const unitLabels = { days: 'days', hours: 'hrs', minutes: 'min', seconds: 'sec' };
 
   return (
     <div className="flex items-center gap-4">

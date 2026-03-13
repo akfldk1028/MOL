@@ -56,8 +56,8 @@ class CommentService {
     
     // Create comment
     const comment = await queryOne(
-      `INSERT INTO comments (id, post_id, author_id, content, parent_id, depth, is_human_authored)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)
+      `INSERT INTO comments (id, post_id, author_id, content, parent_id, depth, is_human_authored, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, NOW(), NOW())
        RETURNING id, content, score, depth, is_human_authored, created_at`,
       [postId, authorId, content.trim(), parentId, depth, isHumanAuthored]
     );

@@ -1,0 +1,69 @@
+{
+  "id": "enhanced-critique",
+  "name": "Enhanced Critique",
+  "version": "1.0.0",
+  "config": {
+    "maxRounds": 3,
+    "convergenceStrategy": "round-limit",
+    "synthesisFormat": "critique",
+    "roundMode": "parallel-first"
+  },
+  "nodes": [
+    { "id": "check-credits",         "type": "credit-check" },
+    { "id": "prepare-content",       "type": "content-prepare" },
+    { "id": "select-agents",         "type": "agent-select",       "config": { "strategy": "domain" } },
+    { "id": "status-recruiting",     "type": "status-update",      "config": { "status": "recruiting" } },
+    { "id": "sse-agents",            "type": "sse-broadcast",      "config": { "event": "agents_selected" } },
+    { "id": "status-active",         "type": "status-update",      "config": { "status": "active" } },
+    { "id": "run-round",             "type": "round-execute" },
+    { "id": "sse-round",             "type": "sse-broadcast",      "config": { "event": "round_complete" } },
+    { "id": "check-convergence",     "type": "convergence-detect" },
+    { "id": "status-converging",     "type": "status-update",      "config": { "status": "converging" } },
+    { "id": "run-synthesis",         "type": "synthesis" },
+    { "id": "persist-synthesis",     "type": "persist-response",   "config": { "isSynthesis": true } },
+    { "id": "sse-synthesis",         "type": "sse-broadcast",      "config": { "event": "synthesis" } },
+
+    { "id": "run-rewrite",           "type": "rewrite-generate" },
+    { "id": "sse-rewrite",           "type": "sse-broadcast",      "config": { "event": "rewrite_complete" } },
+
+    { "id": "run-compare",           "type": "ab-compare" },
+    { "id": "sse-compare",           "type": "sse-broadcast",      "config": { "event": "comparison_complete" } },
+
+    { "id": "run-final-report",      "type": "synthesis",          "config": { "format": "final-report" } },
+    { "id": "persist-final-report",  "type": "persist-response",   "config": { "isSynthesis": false, "field": "final_report" } },
+    { "id": "sse-final-report",      "type": "sse-broadcast",      "config": { "event": "final_report" } },
+
+    { "id": "status-complete",       "type": "status-update",      "config": { "status": "completed" } },
+    { "id": "sse-complete",          "type": "sse-broadcast",      "config": { "event": "debate_complete" } },
+    { "id": "status-open",           "type": "status-update",      "config": { "status": "open" } }
+  ],
+  "edges": [
+    { "from": "check-credits",       "to": "prepare-content" },
+    { "from": "prepare-content",     "to": "select-agents" },
+    { "from": "select-agents",       "to": "status-recruiting" },
+    { "from": "status-recruiting",   "to": "sse-agents" },
+    { "from": "sse-agents",          "to": "status-active" },
+    { "from": "status-active",       "to": "run-round" },
+    { "from": "run-round",           "to": "sse-round" },
+    { "from": "sse-round",           "to": "check-convergence" },
+    { "from": "check-convergence",   "to": "run-round",           "condition": "!converged && currentRound < maxRounds" },
+    { "from": "check-convergence",   "to": "status-converging",   "condition": "converged || currentRound >= maxRounds" },
+    { "from": "status-converging",   "to": "run-synthesis" },
+    { "from": "run-synthesis",       "to": "persist-synthesis" },
+    { "from": "persist-synthesis",   "to": "sse-synthesis" },
+
+    { "from": "sse-synthesis",       "to": "run-rewrite" },
+    { "from": "run-rewrite",         "to": "sse-rewrite" },
+
+    { "from": "sse-rewrite",         "to": "run-compare" },
+    { "from": "run-compare",         "to": "sse-compare" },
+
+    { "from": "sse-compare",         "to": "run-final-report" },
+    { "from": "run-final-report",    "to": "persist-final-report" },
+    { "from": "persist-final-report","to": "sse-final-report" },
+
+    { "from": "sse-final-report",    "to": "status-complete" },
+    { "from": "status-complete",     "to": "sse-complete" },
+    { "from": "sse-complete",        "to": "status-open" }
+  ]
+}

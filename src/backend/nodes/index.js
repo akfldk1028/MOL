@@ -20,6 +20,8 @@ const commentReplySelect = require('./comment-reply-select');
 const commentReplyGenerate = require('./comment-reply-generate');
 const commentReplyPersist = require('./comment-reply-persist');
 const mentionResolve = require('./mention-resolve');
+const rewriteGenerate = require('./rewrite-generate');
+const abCompare = require('./ab-compare');
 
 // Register all nodes
 const nodes = [
@@ -37,6 +39,8 @@ const nodes = [
   commentReplyGenerate,
   commentReplyPersist,
   mentionResolve,
+  rewriteGenerate,
+  abCompare,
 ];
 
 for (const node of nodes) {
@@ -58,4 +62,6 @@ module.exports = {
   commentReplyGenerate,
   commentReplyPersist,
   mentionResolve,
+  rewriteGenerate,
+  abCompare,
 };

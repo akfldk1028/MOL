@@ -57,7 +57,7 @@ export function CreatePostModal() {
       reset();
       router.push(`/post/${post.id}`);
     } catch (err) {
-      console.error('게시글 작성 실패:', err);
+      console.error('Failed to create post:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -69,7 +69,7 @@ export function CreatePostModal() {
     <Dialog open={createPostOpen} onOpenChange={closeCreatePost}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>게시글 작성</DialogTitle>
+          <DialogTitle>Create Post</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -81,7 +81,7 @@ export function CreatePostModal() {
               className="w-full flex items-center justify-between px-3 py-2 border rounded-md hover:bg-muted transition-colors"
             >
               <span className={selectedSubmolt ? 'text-foreground' : 'text-muted-foreground'}>
-                {selectedSubmolt ? `m/${selectedSubmolt}` : '커뮤니티 선택'}
+                {selectedSubmolt ? `m/${selectedSubmolt}` : 'Select a community'}
               </span>
               <ChevronDown className="h-4 w-4" />
             </button>
@@ -115,7 +115,7 @@ export function CreatePostModal() {
               className={cn('flex items-center gap-2 px-4 py-2 rounded-md transition-colors flex-1 justify-center', postType === 'text' ? 'bg-background shadow' : 'hover:bg-background/50')}
             >
               <FileText className="h-4 w-4" />
-              <span>텍스트</span>
+              <span>Text</span>
             </button>
             <button
               type="button"
@@ -123,7 +123,7 @@ export function CreatePostModal() {
               className={cn('flex items-center gap-2 px-4 py-2 rounded-md transition-colors flex-1 justify-center', postType === 'link' ? 'bg-background shadow' : 'hover:bg-background/50')}
             >
               <LinkIcon className="h-4 w-4" />
-              <span>링크</span>
+              <span>Link</span>
             </button>
           </div>
 
@@ -131,7 +131,7 @@ export function CreatePostModal() {
           <div>
             <Input
               {...register('title')}
-              placeholder="제목"
+              placeholder="Title"
               maxLength={300}
               className="text-lg"
             />
@@ -143,7 +143,7 @@ export function CreatePostModal() {
             <div>
               <Textarea
                 {...register('content')}
-                placeholder="텍스트 (선택사항)"
+                placeholder="Text (optional)"
                 rows={8}
                 maxLength={40000}
               />
@@ -162,8 +162,8 @@ export function CreatePostModal() {
 
           {/* Actions */}
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" variant="ghost" onClick={closeCreatePost}>취소</Button>
-            <Button type="submit" isLoading={isSubmitting}>게시</Button>
+            <Button type="button" variant="ghost" onClick={closeCreatePost}>Cancel</Button>
+            <Button type="submit" isLoading={isSubmitting}>Post</Button>
           </div>
         </form>
       </DialogContent>
@@ -192,19 +192,19 @@ export function SearchModal() {
     <Dialog open={searchOpen} onOpenChange={closeSearch}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Goodmolt 검색</DialogTitle>
+          <DialogTitle>Search Goodmolt</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSearch}>
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="게시글, 에이전트, 커뮤니티 검색..."
+            placeholder="Search posts, agents, communities..."
             autoFocus
             className="text-lg"
           />
           <div className="flex justify-end gap-2 mt-4">
-            <Button type="button" variant="ghost" onClick={closeSearch}>취소</Button>
-            <Button type="submit" disabled={!query.trim()}>검색</Button>
+            <Button type="button" variant="ghost" onClick={closeSearch}>Cancel</Button>
+            <Button type="submit" disabled={!query.trim()}>Search</Button>
           </div>
         </form>
       </DialogContent>

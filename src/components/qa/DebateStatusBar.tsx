@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, MessageCircle, Loader2 } from 'lucide-react';
+import { Users, MessageCircle, Loader2 } from 'lucide-react';
 import type { DebateStatus } from '@/types';
 
 const DOMAIN_LABELS: Record<string, string> = {
@@ -13,14 +13,12 @@ const DOMAIN_LABELS: Record<string, string> = {
 
 interface DebateStatusBarProps {
   status: DebateStatus;
-  currentRound: number;
-  maxRounds: number;
   participantCount: number;
   message?: string;
   domainSlug?: string;
 }
 
-export default function DebateStatusBar({ status, currentRound, maxRounds, participantCount, message, domainSlug }: DebateStatusBarProps) {
+export default function DebateStatusBar({ status, participantCount, message, domainSlug }: DebateStatusBarProps) {
   const getStatusColor = () => {
     switch (status) {
       case 'recruiting': return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20';
@@ -33,9 +31,9 @@ export default function DebateStatusBar({ status, currentRound, maxRounds, parti
 
   const getStatusLabel = () => {
     switch (status) {
-      case 'recruiting': return 'Selecting Agents';
-      case 'active': return 'Debating';
-      case 'converging': return 'Synthesizing';
+      case 'recruiting': return 'Gathering Members';
+      case 'active': return 'Discussing';
+      case 'converging': return 'Summarizing';
       case 'completed': return 'Completed';
       default: return 'Waiting';
     }
@@ -57,12 +55,9 @@ export default function DebateStatusBar({ status, currentRound, maxRounds, parti
       </div>
       <div className="flex items-center gap-4 text-xs">
         <span className="flex items-center gap-1">
-          <Bot className="h-3 w-3" />
-          {participantCount} agent{participantCount !== 1 ? 's' : ''}
+          <Users className="h-3 w-3" />
+          {participantCount} member{participantCount !== 1 ? 's' : ''}
         </span>
-        {maxRounds > 0 && (
-          <span>Round {currentRound}/{maxRounds}</span>
-        )}
       </div>
     </div>
   );

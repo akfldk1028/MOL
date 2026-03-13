@@ -2,21 +2,17 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Share2, ThumbsUp } from 'lucide-react';
-import { Button } from '@/components/ui';
-import DebateStatusBar from '@/components/qa/DebateStatusBar';
-import DebateThread from '@/components/qa/DebateThread';
-import type { Question, DebateResponse, DebateStatus, DebateParticipant } from '@/types';
+import { Button } from '@/common/ui';
+import DebateStatusBar from '@/features/qa/components/debate-status-bar';
+import DebateThread from '@/features/qa/components/debate-thread';
+import { PageBreadcrumb } from '@/common/components/page-header';
+import type { Question, DebateResponse } from '@/types';
 
 export default function QuestionDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [question, setQuestion] = useState<Question | null>(null);
   const [responses, setResponses] = useState<DebateResponse[]>([]);
   const [synthesis, setSynthesis] = useState<string | null>(null);
-  const [debateStatus, setDebateStatus] = useState<DebateStatus>('recruiting');
-  const [currentRound, setCurrentRound] = useState(0);
-  const [maxRounds, setMaxRounds] = useState(5);
-  const [participantCount, setParticipantCount] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
   const [newResponseIds, setNewResponseIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -24,11 +20,11 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
   const eventSourceRef = useRef<EventSource | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
 
-  // 질문 데이터 로드
   useEffect(() => {
     loadQuestion();
     return () => {
       eventSourceRef.current?.close();
+      if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [id]);
 
@@ -40,35 +36,43 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
 
       const q = data.question;
       setQuestion(q);
-      setDebateStatus(q.debate_status || q.debateStatus || 'recruiting');
-      setCurrentRound(q.current_round || q.currentRound || 0);
-      setMaxRounds(q.max_rounds || q.maxRounds || 5);
-      setParticipantCount(q.participants?.length || q.participant_count || 0);
 
-      // 기존 응답 로드
+      const questionStatus = q.status;
+      const isCompleted = questionStatus === 'answered';
+
+      // Load existing responses (comments on the question's post)
       if (data.responses && data.responses.length > 0) {
         const mapped: DebateResponse[] = data.responses.map((r: any) => ({
-          agentName: r.agent_name || r.agentName,
+          agentName: r.agent_name || r.agentName || r.display_name,
           role: r.debate_role || r.role || 'respondent',
           content: r.content,
-          round: (r.depth || 0) + 1,
+          round: 0,
           commentId: r.id,
-          llmProvider: r.llm_provider || r.llmProvider,
-          llmModel: r.llm_model || r.llmModel,
         }));
-        setResponses(mapped);
 
-        // 종합 응답 찾기
-        const synthResp = mapped.find(r => r.content.startsWith('## Synthesis'));
-        if (synthResp) setSynthesis(synthResp.content);
+        if (isCompleted) {
+          // Completed question — show all at once
+          setResponses(mapped);
+        } else {
+          // Still in progress — stagger for natural feel
+          mapped.forEach((r, i) => {
+            setTimeout(() => {
+              setResponses(prev => {
+                // Deduplicate
+                if (prev.some(p => p.commentId === r.commentId)) return prev;
+                return [...prev, r];
+              });
+              setNewResponseIds(prev => new Set(prev).add(r.commentId));
+            }, (i + 1) * 600);
+          });
+        }
+
+        if (q.summary_content) setSynthesis(q.summary_content);
       }
 
-      if (q.summary_content) setSynthesis(q.summary_content);
-
-      // 토론이 진행 중이면 SSE 연결
-      const ds = q.debate_status || q.debateStatus;
-      if (ds && ds !== 'completed') {
-        connectSSE();
+      // Start polling for new responses (SSE unreliable through Next.js proxy)
+      if (!isCompleted) {
+        startPolling();
       }
     } catch (err) {
       setError((err as Error).message);
@@ -80,26 +84,12 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
   const connectSSE = () => {
     if (eventSourceRef.current) eventSourceRef.current.close();
 
-    const es = new EventSource(`/api/questions/${id}/stream`);
+    const es = new EventSource(`/api/v1/questions/${id}/stream`);
     eventSourceRef.current = es;
+    let sseWorking = false;
+    let errorCount = 0;
 
-    es.addEventListener('status', (e) => {
-      const data = JSON.parse(e.data);
-      setDebateStatus(data.status);
-      if (data.message) setStatusMessage(data.message);
-      if (data.currentRound) setCurrentRound(data.currentRound);
-    });
-
-    es.addEventListener('agents_selected', (e) => {
-      const data = JSON.parse(e.data);
-      setParticipantCount(data.agents.length);
-    });
-
-    es.addEventListener('round_start', (e) => {
-      const data = JSON.parse(e.data);
-      setCurrentRound(data.round);
-      setMaxRounds(data.maxRounds);
-    });
+    es.addEventListener('connected', () => { sseWorking = true; });
 
     es.addEventListener('agent_thinking', (e) => {
       const data = JSON.parse(e.data);
@@ -107,12 +97,15 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
     });
 
     es.addEventListener('agent_response', (e) => {
+      sseWorking = true;
       const data = JSON.parse(e.data) as DebateResponse;
-      setResponses(prev => [...prev, data]);
+      setResponses(prev => {
+        if (prev.some(p => p.commentId === data.commentId)) return prev;
+        return [...prev, data];
+      });
       setNewResponseIds(prev => new Set(prev).add(data.commentId));
       setStatusMessage('');
 
-      // 새 응답 후 스크롤
       setTimeout(() => {
         threadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }, 100);
@@ -124,14 +117,62 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
     });
 
     es.addEventListener('debate_complete', () => {
-      setDebateStatus('completed');
       setStatusMessage('');
       es.close();
     });
 
     es.onerror = () => {
-      // 자동 재연결은 EventSource가 처리
+      errorCount++;
+      // SSE keeps failing (Next.js proxy issue) → switch to polling
+      if (!sseWorking && errorCount >= 2) {
+        es.close();
+        eventSourceRef.current = null;
+        startPolling();
+      }
     };
+  };
+
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startPolling = () => {
+    if (pollingRef.current) return;
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/questions/${id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const q = data.question;
+
+        if (data.responses?.length) {
+          const mapped: DebateResponse[] = data.responses.map((r: any) => ({
+            agentName: r.agent_name || r.agentName || r.display_name,
+            role: r.debate_role || r.role || 'respondent',
+            content: r.content,
+            round: 0,
+            commentId: r.id,
+          }));
+          setResponses(prev => {
+            const existing = new Set(prev.map(p => p.commentId));
+            const newOnes = mapped.filter(m => !existing.has(m.commentId));
+            if (newOnes.length === 0) return prev;
+            // Scroll to new
+            newOnes.forEach(n => setNewResponseIds(s => new Set(s).add(n.commentId)));
+            setTimeout(() => {
+              threadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }, 100);
+            return [...prev, ...newOnes];
+          });
+        }
+
+        if (q.summary_content) setSynthesis(q.summary_content);
+
+        // Stop polling when answered
+        if (q.status === 'answered' && pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      } catch { /* ignore */ }
+    }, 5000);
   };
 
   if (isLoading) {
@@ -151,13 +192,13 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
     );
   }
 
+  const isOpen = question.status !== 'answered';
+
   return (
     <div className="max-w-3xl mx-auto py-6 px-4">
       {/* Header */}
       <div className="mb-6">
-        <Link href="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Link>
+        <PageBreadcrumb items={[{ label: 'Q&A', href: '/qa' }, { label: question.title }]} />
         <h1 className="text-xl font-bold">{question.title}</h1>
         {question.content && (
           <p className="text-muted-foreground mt-2 text-sm">{question.content}</p>
@@ -174,32 +215,33 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
         </div>
       </div>
 
-      {/* Status Bar */}
-      <div className="mb-6">
-        <DebateStatusBar
-          status={debateStatus}
-          currentRound={currentRound}
-          maxRounds={maxRounds}
-          participantCount={participantCount}
-          message={statusMessage}
-        />
-      </div>
+      {/* Status message */}
+      {statusMessage && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-muted text-sm text-muted-foreground animate-pulse">
+          {statusMessage}
+        </div>
+      )}
 
-      {/* Debate Thread */}
+      {/* Responses */}
       <div ref={threadRef}>
         {responses.length > 0 ? (
           <DebateThread
-            responses={responses.filter(r => !r.content.startsWith('## Synthesis'))}
+            responses={responses}
             synthesis={synthesis || undefined}
             newResponseIds={newResponseIds}
           />
-        ) : debateStatus !== 'completed' ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>Waiting for agents to start discussing...</p>
+        ) : isOpen ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <div className="flex gap-1">
+              <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            <p className="text-sm text-muted-foreground">Members are reviewing your question</p>
           </div>
         ) : (
           <div className="text-center py-12 text-muted-foreground">
-            <p>No responses yet.</p>
+            <p className="text-sm">No responses yet.</p>
           </div>
         )}
       </div>

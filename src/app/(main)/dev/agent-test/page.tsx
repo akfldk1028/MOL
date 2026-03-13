@@ -11,8 +11,8 @@
  */
 
 import { useState } from 'react';
-import AgentCanvas from '@/components/agent/AgentCanvas';
-import AgentCreator from '@/components/agent/AgentCreator';
+import AgentCanvas from '@/features/agents/components/agent-canvas';
+import AgentCreator from '@/features/agents/components/agent-creator';
 import type {
   AgentVisualConfig,
   EmotionBlend,

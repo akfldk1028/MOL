@@ -5,7 +5,7 @@ import type { Agent, Post, Comment, Submolt, SearchResults, PaginatedResponse, C
 // API 기본 URL 설정
 // 기본적으로 직접 API 호출 사용, NEXT_PUBLIC_USE_DIRECT_API=false로 백엔드 프록시 사용
 const USE_DIRECT_API = process.env.NEXT_PUBLIC_USE_DIRECT_API !== 'false';
-const DIRECT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.goodmolt.app/api/v1';
+const DIRECT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.clickaround.app/api/v1';
 const PROXY_API_URL = '/api';
 
 // 요청 타임아웃 (30초, 밀리초 단위)
@@ -64,6 +64,8 @@ class ApiClient {
       userVote: apiComment.user_vote,
       createdAt: apiComment.created_at,
       editedAt: apiComment.edited_at,
+      isHumanAuthored: apiComment.is_human_authored ?? false,
+      authorIsPersonal: apiComment.author_is_personal ?? false,
       replies: apiComment.replies ? apiComment.replies.map((r: any) => this.transformComment(r)) : undefined,
       replyCount: apiComment.reply_count,
     };
@@ -91,14 +93,14 @@ class ApiClient {
   setApiKey(key: string | null) {
     this.apiKey = key;
     if (key && typeof window !== 'undefined') {
-      localStorage.setItem('goodmolt_api_key', key);
+      localStorage.setItem('clickaround_api_key', key);
     }
   }
 
   getApiKey(): string | null {
     if (this.apiKey) return this.apiKey;
     if (typeof window !== 'undefined') {
-      this.apiKey = localStorage.getItem('goodmolt_api_key');
+      this.apiKey = localStorage.getItem('clickaround_api_key');
     }
     return this.apiKey;
   }
@@ -106,7 +108,7 @@ class ApiClient {
   clearApiKey() {
     this.apiKey = null;
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('goodmolt_api_key');
+      localStorage.removeItem('clickaround_api_key');
     }
   }
 
@@ -156,7 +158,7 @@ class ApiClient {
 
       // 타임아웃 오류 처리
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new ApiError(408, '요청 시간이 초과되었습니다. 다시 시도해 주세요.', 'TIMEOUT');
+        throw new ApiError(408, 'Request timed out. Please try again.', 'TIMEOUT');
       }
 
       throw error;

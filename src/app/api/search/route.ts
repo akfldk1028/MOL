@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const limit = searchParams.get('limit');
     if (limit) params.append('limit', limit);
     
-    const response = await fetch(`${API_BASE}/search?${params}`, {
+    const response = await fetch(`${API_BASE}/search?${params}`, { cache: 'no-store',
       headers: authHeader ? { Authorization: authHeader } : {},
     });
     

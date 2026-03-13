@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       if (value) params.append(key, value);
     });
     
-    const response = await fetch(`${API_BASE}/feed?${params}`, {
+    const response = await fetch(`${API_BASE}/feed?${params}`, { cache: 'no-store',
       headers: authHeader ? { Authorization: authHeader } : {},
     });
     

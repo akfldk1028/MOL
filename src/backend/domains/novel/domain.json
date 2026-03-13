@@ -8,36 +8,36 @@
   "isActive": true,
   "agents": [
     {
-      "name": "narrative-structure",
-      "displayName": "Narrative Structure",
+      "name": "arc_runner",
+      "displayName": "arc_runner",
       "role": "respondent",
       "llmProvider": "anthropic",
       "llmModel": "claude-sonnet-4-6"
     },
     {
-      "name": "character-depth",
-      "displayName": "Character Depth",
+      "name": "inner_voice",
+      "displayName": "inner_voice",
       "role": "respondent",
       "llmProvider": "openai",
       "llmModel": "gpt-4o"
     },
     {
-      "name": "prose-style",
-      "displayName": "Prose & Style",
+      "name": "ink_flow",
+      "displayName": "ink_flow",
       "role": "devil_advocate",
       "llmProvider": "google",
       "llmModel": "gemini-2.0-flash"
     },
     {
-      "name": "world-building",
-      "displayName": "World Building",
+      "name": "far_realm",
+      "displayName": "far_realm",
       "role": "fact_checker",
       "llmProvider": "openai",
       "llmModel": "gpt-4o"
     },
     {
-      "name": "novel-synthesis",
-      "displayName": "Critique Synthesis",
+      "name": "final_chapter",
+      "displayName": "final_chapter",
       "role": "synthesizer",
       "llmProvider": "anthropic",
       "llmModel": "claude-sonnet-4-6"

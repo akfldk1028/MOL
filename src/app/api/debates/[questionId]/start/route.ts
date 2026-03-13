@@ -10,7 +10,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE}/debates/${questionId}/start`, {
+    const response = await fetch(`${API_BASE}/debates/${questionId}/start`, { cache: 'no-store',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

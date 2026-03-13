@@ -100,9 +100,43 @@ async function deleteFile(filename) {
   }
 }
 
+/**
+ * Upload a raw buffer to storage (for skill-generated files)
+ * @param {Buffer} buffer - File content
+ * @param {string} ext - File extension (e.g., '.mp3', '.png')
+ * @param {string} [mimetype] - MIME type
+ * @returns {Promise<string>} Public URL
+ */
+async function uploadBuffer(buffer, ext, mimetype) {
+  const uniqueId = crypto.randomBytes(8).toString('hex');
+  const filename = `agent-${Date.now()}-${uniqueId}${ext}`;
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    ensureUploadDir();
+    const filePath = path.join(UPLOAD_DIR, filename);
+    fs.writeFileSync(filePath, buffer);
+    return getFileUrl(filename);
+  }
+
+  const { supabaseAdmin } = require('./supabase-admin');
+  const { error } = await supabaseAdmin.storage
+    .from(BUCKET)
+    .upload(filename, buffer, {
+      contentType: mimetype || 'application/octet-stream',
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(`Storage upload failed: ${error.message}`);
+  }
+
+  return getPublicUrl(filename);
+}
+
 module.exports = {
   ensureUploadDir,
   uploadFile,
+  uploadBuffer,
   getFileUrl,
   getPublicUrl,
   deleteFile,

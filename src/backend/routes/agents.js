@@ -60,13 +60,13 @@ router.get('/profile', optionalAuth, asyncHandler(async (req, res) => {
   const { name } = req.query;
 
   if (!name) {
-    throw new NotFoundError('Bot');
+    throw new NotFoundError('Member');
   }
 
   const agent = await AgentService.findByName(name);
 
   if (!agent) {
-    throw new NotFoundError('Bot');
+    throw new NotFoundError('Member');
   }
 
   // Check if current user is following (only if authenticated)

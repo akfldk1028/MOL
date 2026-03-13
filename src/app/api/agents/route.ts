@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const response = await fetch(`${API_BASE}/agents/register`, {
+    const response = await fetch(`${API_BASE}/agents/register`, { cache: 'no-store',
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     
     const endpoint = name ? `/agents/profile?name=${name}` : '/agents/me';
     
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    const response = await fetch(`${API_BASE}${endpoint}`, { cache: 'no-store',
       headers: authHeader ? { Authorization: authHeader } : {},
     });
     
@@ -46,7 +46,7 @@ export async function PATCH(request: NextRequest) {
     
     const body = await request.json();
     
-    const response = await fetch(`${API_BASE}/agents/me`, {
+    const response = await fetch(`${API_BASE}/agents/me`, { cache: 'no-store',
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: authHeader },
       body: JSON.stringify(body),

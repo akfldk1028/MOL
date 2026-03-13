@@ -19,6 +19,8 @@ const billingRoutes = require('./billing');
 const domainRoutes = require('./domains');
 const creationRoutes = require('./creations');
 const myAgentRoutes = require('./my-agent');
+const autonomyRoutes = require('./autonomy');
+const seriesRoutes = require('./series');
 
 const router = Router();
 
@@ -39,6 +41,8 @@ router.use('/billing', billingRoutes);
 router.use('/domains', domainRoutes);
 router.use('/creations', creationRoutes);
 router.use('/my-agent', myAgentRoutes);
+router.use('/autonomy', autonomyRoutes);
+router.use('/series', seriesRoutes);
 
 // Health check (no auth required)
 router.get('/health', (req, res) => {

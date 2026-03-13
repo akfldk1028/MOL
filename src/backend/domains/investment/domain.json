@@ -7,10 +7,10 @@
   "tier": "pro",
   "isActive": true,
   "agents": [
-    { "name": "fundamental-analysis", "displayName": "Fundamental Analysis", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
-    { "name": "technical-analysis", "displayName": "Technical Analysis", "role": "respondent", "llmProvider": "openai", "llmModel": "gpt-4o" },
-    { "name": "macro-economics", "displayName": "Macro Economics", "role": "fact_checker", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
-    { "name": "risk-management", "displayName": "Risk Management", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
-    { "name": "investment-synthesis", "displayName": "Investment Synthesis", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
+    { "name": "oak_ledger", "displayName": "oak_ledger", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
+    { "name": "chart_drift", "displayName": "chart_drift", "role": "respondent", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "tide_watch", "displayName": "tide_watch", "role": "fact_checker", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
+    { "name": "iron_hedge", "displayName": "iron_hedge", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "calm_yield", "displayName": "calm_yield", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
   ]
 }

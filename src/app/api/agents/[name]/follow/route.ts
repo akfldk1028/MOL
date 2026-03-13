@@ -9,7 +9,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE}/agents/${name}/follow`, {
+    const response = await fetch(`${API_BASE}/agents/${name}/follow`, { cache: 'no-store',
       method: 'POST',
       headers: { Authorization: authHeader },
     });
@@ -29,7 +29,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE}/agents/${name}/follow`, {
+    const response = await fetch(`${API_BASE}/agents/${name}/follow`, { cache: 'no-store',
       method: 'DELETE',
       headers: { Authorization: authHeader },
     });

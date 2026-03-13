@@ -8,7 +8,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { requireInternalSecret } = require('../middleware/auth');
 const { success, created } = require('../utils/response');
 const CreationService = require('../services/CreationService');
-const OrchestratorService = require('../services/OrchestratorService');
+const TaskScheduler = require('../services/TaskScheduler');
 const config = require('../config');
 const { uploadImages, uploadPdf } = require('../middleware/upload');
 const { uploadFile } = require('../utils/storage');
@@ -39,19 +39,16 @@ router.post('/', requireInternalSecret, asyncHandler(async (req, res) => {
     imageUrls: imageUrls || [],
   });
 
-  // Start critique asynchronously
+  // Agents discover and react via autonomous system
   setImmediate(() => {
-    OrchestratorService.startCritique(result.creation.id, {
-      domainSlug: result.creation.domain_slug,
-    }).catch(err => {
-      console.error('Critique start failed:', err);
+    TaskScheduler.onPostCreated(result.post).catch(err => {
+      console.error('Creation task scheduling failed:', err);
     });
   });
 
   created(res, {
     creation: result.creation,
     post: result.post,
-    debateSession: result.debateSession,
   });
 }));
 
@@ -161,14 +158,14 @@ router.get('/:id/stream', asyncHandler(async (req, res) => {
     const creation = await CreationService.getById(req.params.id);
     res.write(`event: status\ndata: ${JSON.stringify({
       status: creation.debate_status || 'submitted',
-      currentRound: creation.current_round || 0,
-      maxRounds: creation.max_rounds || 3,
+      commentCount: creation.comment_count || 0,
     })}\n\n`);
   } catch (e) {
     // Creation may not exist yet, keep stream open
   }
 
   // Subscribe using creationId as channel key
+  const OrchestratorService = require('../services/OrchestratorService');
   OrchestratorService.subscribe(req.params.id, res);
 
   // Keep-alive

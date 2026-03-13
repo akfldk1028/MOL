@@ -10,7 +10,7 @@ import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { X, ChevronDown, Check, Circle, Loader2 } from 'lucide-react';
 
-// 버튼
+// Button
 const buttonVariants = cva(
   'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
   {
@@ -48,7 +48,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = 'Button';
 
-// 입력 필드
+// Input
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {}
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type, ...props }, ref) => (
@@ -61,7 +61,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className
 ));
 Input.displayName = 'Input';
 
-// 텍스트 영역
+// Textarea
 export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ className, ...props }, ref) => (
@@ -73,7 +73,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(({ 
 ));
 Textarea.displayName = 'Textarea';
 
-// 아바타
+// Avatar
 export const Avatar = React.forwardRef<React.ElementRef<typeof AvatarPrimitive.Root>, React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>>(
   ({ className, ...props }, ref) => (
     <AvatarPrimitive.Root ref={ref} className={cn('relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full', className)} {...props} />
@@ -93,7 +93,7 @@ export const AvatarFallback = React.forwardRef<React.ElementRef<typeof AvatarPri
 );
 AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
 
-// 배지
+// Badge
 const badgeVariants = cva(
   'inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
   {
@@ -115,7 +115,7 @@ export function Badge({ className, variant, ...props }: BadgeProps) {
   return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
-// 카드
+// Card
 export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div ref={ref} className={cn('rounded-xl border bg-card text-card-foreground shadow', className)} {...props} />
 ));
@@ -146,7 +146,7 @@ export const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<
 ));
 CardFooter.displayName = 'CardFooter';
 
-// 대화상자
+// Dialog
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogPortal = DialogPrimitive.Portal;
@@ -167,7 +167,7 @@ export const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrim
         {children}
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
           <X className="h-4 w-4" />
-          <span className="sr-only">닫기</span>
+          <span className="sr-only">Close</span>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPortal>
@@ -193,7 +193,7 @@ export const DialogDescription = React.forwardRef<React.ElementRef<typeof Dialog
 );
 DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
-// 툴팁
+// Tooltip
 export const TooltipProvider = TooltipPrimitive.Provider;
 export const Tooltip = TooltipPrimitive.Root;
 export const TooltipTrigger = TooltipPrimitive.Trigger;
@@ -205,18 +205,18 @@ export const TooltipContent = React.forwardRef<React.ElementRef<typeof TooltipPr
 );
 TooltipContent.displayName = TooltipPrimitive.Content.displayName;
 
-// 스켈레톤
+// Skeleton
 export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('animate-pulse rounded-md bg-primary/10', className)} {...props} />;
 }
 
-// 스피너
+// Spinner
 export function Spinner({ className, size = 'default' }: { className?: string; size?: 'sm' | 'default' | 'lg' }) {
   const sizeClasses = { sm: 'h-4 w-4', default: 'h-6 w-6', lg: 'h-8 w-8' };
   return <Loader2 className={cn('animate-spin', sizeClasses[size], className)} />;
 }
 
-// 구분선
+// Separator
 export function Separator({ className, orientation = 'horizontal', ...props }: React.HTMLAttributes<HTMLDivElement> & { orientation?: 'horizontal' | 'vertical' }) {
   return (
     <div
@@ -226,7 +226,7 @@ export function Separator({ className, orientation = 'horizontal', ...props }: R
   );
 }
 
-// 탭
+// Tabs
 export const Tabs = TabsPrimitive.Root;
 
 export const TabsList = React.forwardRef<React.ElementRef<typeof TabsPrimitive.List>, React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>>(

@@ -1,6 +1,6 @@
-import { MainLayout } from '@/components/layout';
-import { CreatePostModal, SearchModal } from '@/components/common/modals';
-import { PersonalAgentBanner } from '@/components/common/PersonalAgentBanner';
+import { MainLayout } from '@/common/components/page-container';
+import { CreatePostModal, SearchModal } from '@/common/components/modals';
+import { PersonalAgentBanner } from '@/common/components/personal-agent-banner';
 
 export default function MainGroupLayout({ children }: { children: React.ReactNode }) {
   return (

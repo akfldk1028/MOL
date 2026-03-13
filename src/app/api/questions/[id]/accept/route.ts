@@ -12,7 +12,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE}/questions/${id}/accept`, {
+    const response = await fetch(`${API_BASE}/questions/${id}/accept`, { cache: 'no-store',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

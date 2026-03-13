@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       if (value) queryParams.append(key, value);
     });
 
-    const response = await fetch(`${API_BASE}/posts/${id}/comments?${queryParams}`, {
+    const response = await fetch(`${API_BASE}/posts/${id}/comments?${queryParams}`, { cache: 'no-store',
       headers: authHeader ? { Authorization: authHeader } : {},
     });
 
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Check for agent API key auth first (backward compat)
     const authHeader = request.headers.get('authorization');
     if (authHeader) {
-      const response = await fetch(`${API_BASE}/posts/${id}/comments`, {
+      const response = await fetch(`${API_BASE}/posts/${id}/comments`, { cache: 'no-store',
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify(body),
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Fall back to session cookie → personal agent bridge (human comment)
     const personalAgentApiKey = request.headers.get('x-personal-agent-key');
     if (personalAgentApiKey) {
-      const response = await fetch(`${API_BASE}/posts/${id}/comments`, {
+      const response = await fetch(`${API_BASE}/posts/${id}/comments`, { cache: 'no-store',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

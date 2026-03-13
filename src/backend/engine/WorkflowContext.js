@@ -44,6 +44,12 @@ class WorkflowContext {
     this.contentText = null;     // Processed text to send to agents
     this.imageUrls = [];         // Image URLs for multimodal critique
 
+    // Enhanced critique workflow state
+    this.rewriteContent = null;    // Rewritten version of the content
+    this.comparisonResult = null;  // { content, scores: { original, rewrite, delta } }
+    this.finalReportContent = null; // Final comprehensive report
+    this.workflowPhase = 'critique'; // Current phase: critique | rewrite | compare | report | complete
+
     // Metadata
     this.startedAt = new Date();
     this.errors = [];

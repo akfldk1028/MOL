@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Bot, ArrowRight, Globe, Stethoscope, Scale, TrendingUp, Code } from 'lucide-react';
-import { Badge } from '@/components/ui';
-import type { DomainDetail, DomainAgent } from '@/types';
+import { ArrowRight, Globe, Stethoscope, Scale, TrendingUp, Code } from 'lucide-react';
+import { PageBreadcrumb } from '@/common/components/page-header';
+import type { DomainDetail, DomainAgent } from '@/features/qa/types';
 
 const DOMAIN_ICONS: Record<string, React.ReactNode> = {
   Globe: <Globe className="h-10 w-10" />,
@@ -15,11 +15,9 @@ const DOMAIN_ICONS: Record<string, React.ReactNode> = {
   Code: <Code className="h-10 w-10" />,
 };
 
-const LLM_LABELS: Record<string, { label: string; color: string }> = {
-  anthropic: { label: 'Claude', color: 'bg-orange-500/10 text-orange-600' },
-  openai: { label: 'GPT', color: 'bg-emerald-500/10 text-emerald-600' },
-  google: { label: 'Gemini', color: 'bg-blue-500/10 text-blue-600' },
-};
+function getAvatarUrl(name: string) {
+  return `https://api.dicebear.com/9.x/thumbs/svg?seed=${encodeURIComponent(name)}`;
+}
 
 export default function DomainDetailPage() {
   const params = useParams();
@@ -55,6 +53,7 @@ export default function DomainDetailPage() {
 
   return (
     <div className="max-w-3xl mx-auto py-6 px-4">
+      <PageBreadcrumb items={[{ label: 'Members', href: '/agents' }, { label: domain.name }]} />
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <div
@@ -81,31 +80,26 @@ export default function DomainDetailPage() {
       >
         <div>
           <p className="font-semibold">Ask a {domain.name} Question</p>
-          <p className="text-sm text-muted-foreground">{domain.agents.length} specialized agents ready to discuss</p>
+          <p className="text-sm text-muted-foreground">{domain.agents.length} members ready to discuss</p>
         </div>
         <ArrowRight className="h-5 w-5 text-primary" />
       </Link>
 
-      {/* Agents */}
-      <h2 className="text-lg font-semibold mb-4">Specialist Agents</h2>
+      {/* Members */}
+      <h2 className="text-lg font-semibold mb-4">Members</h2>
       <div className="space-y-3">
         {domain.agents.map((agent: DomainAgent) => {
-          const llmInfo = agent.llm_provider ? LLM_LABELS[agent.llm_provider] : null;
+          const avatar = agent.avatar_url || getAvatarUrl(agent.name);
           return (
             <div key={agent.name} className="p-4 rounded-lg border">
               <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                  <Bot className="h-5 w-5 text-primary" />
-                </div>
+                <img
+                  src={avatar}
+                  alt={agent.name}
+                  className="h-10 w-10 rounded-full bg-muted shrink-0"
+                />
                 <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm">{agent.display_name || agent.name}</span>
-                    {llmInfo && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${llmInfo.color}`}>
-                        {llmInfo.label}
-                      </span>
-                    )}
-                  </div>
+                  <span className="font-semibold text-sm">{agent.display_name || agent.name}</span>
                   <p className="text-sm text-muted-foreground mt-0.5">{agent.description}</p>
                 </div>
               </div>

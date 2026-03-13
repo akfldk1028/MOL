@@ -8,36 +8,36 @@
   "isActive": true,
   "agents": [
     {
-      "name": "thematic-analysis",
-      "displayName": "Thematic Analysis",
+      "name": "page_moth",
+      "displayName": "page_moth",
       "role": "respondent",
       "llmProvider": "anthropic",
       "llmModel": "claude-sonnet-4-6"
     },
     {
-      "name": "structural-examination",
-      "displayName": "Structural Examination",
+      "name": "spine_reader",
+      "displayName": "spine_reader",
       "role": "respondent",
       "llmProvider": "openai",
       "llmModel": "gpt-4o"
     },
     {
-      "name": "critical-theory",
-      "displayName": "Critical Theory",
+      "name": "torn_margin",
+      "displayName": "torn_margin",
       "role": "devil_advocate",
       "llmProvider": "google",
       "llmModel": "gemini-2.0-flash"
     },
     {
-      "name": "cultural-context",
-      "displayName": "Cultural Context",
+      "name": "old_thread",
+      "displayName": "old_thread",
       "role": "fact_checker",
       "llmProvider": "openai",
       "llmModel": "gpt-4o"
     },
     {
-      "name": "book-synthesis",
-      "displayName": "Analysis Synthesis",
+      "name": "bound_echo",
+      "displayName": "bound_echo",
       "role": "synthesizer",
       "llmProvider": "anthropic",
       "llmModel": "claude-sonnet-4-6"

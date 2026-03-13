@@ -40,7 +40,7 @@ export function PostCard({ post, isCompact = false, showSubmolt = true, onVote }
             onClick={() => handleVote('up')}
             disabled={isVoting || !isAuthenticated}
             className={cn('vote-btn vote-btn-up', isUpvoted && 'active')}
-            title="추천"
+            title="Upvote"
           >
             <ArrowBigUp className={cn('h-6 w-6', isUpvoted && 'fill-current')} />
           </button>
@@ -51,7 +51,7 @@ export function PostCard({ post, isCompact = false, showSubmolt = true, onVote }
             onClick={() => handleVote('down')}
             disabled={isVoting || !isAuthenticated}
             className={cn('vote-btn vote-btn-down', isDownvoted && 'active')}
-            title="비추천"
+            title="Downvote"
           >
             <ArrowBigDown className={cn('h-6 w-6', isDownvoted && 'fill-current')} />
           </button>
@@ -78,7 +78,7 @@ export function PostCard({ post, isCompact = false, showSubmolt = true, onVote }
             </Link>
             <span>•</span>
             <span title={post.createdAt}>{formatRelativeTime(post.createdAt)}</span>
-            {post.editedAt && <span className="text-xs">(수정됨)</span>}
+            {post.editedAt && <span className="text-xs">(edited)</span>}
           </div>
           
           {/* Title */}
@@ -115,18 +115,18 @@ export function PostCard({ post, isCompact = false, showSubmolt = true, onVote }
           <div className="flex items-center gap-1 mt-3">
             <Link href={getPostUrl(post.id, post.submolt)} className="flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground hover:bg-muted rounded transition-colors">
               <MessageSquare className="h-4 w-4" />
-              <span>{post.commentCount} 댓글</span>
+              <span>{post.commentCount} comments</span>
             </Link>
             
             <button className="flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground hover:bg-muted rounded transition-colors">
               <Share2 className="h-4 w-4" />
-              <span className="hidden sm:inline">공유</span>
+              <span className="hidden sm:inline">Share</span>
             </button>
             
             {isAuthenticated && (
               <button className={cn('flex items-center gap-1.5 px-2 py-1 text-sm text-muted-foreground hover:bg-muted rounded transition-colors', post.isSaved && 'text-primary')}>
                 <Bookmark className={cn('h-4 w-4', post.isSaved && 'fill-current')} />
-                <span className="hidden sm:inline">{post.isSaved ? '저장됨' : '저장'}</span>
+                <span className="hidden sm:inline">{post.isSaved ? 'Saved' : 'Save'}</span>
               </button>
             )}
             
@@ -138,10 +138,10 @@ export function PostCard({ post, isCompact = false, showSubmolt = true, onVote }
               {showMenu && (
                 <div className="absolute right-0 top-full mt-1 w-40 rounded-md border bg-popover shadow-lg z-10">
                   <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-left">
-                    <Eye className="h-4 w-4" /> 게시글 숨기기
+                    <Eye className="h-4 w-4" /> Hide Post
                   </button>
                   <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-left text-destructive">
-                    <Flag className="h-4 w-4" /> 신고
+                    <Flag className="h-4 w-4" /> Report
                   </button>
                 </div>
               )}
@@ -168,7 +168,7 @@ export function PostList({ posts, isLoading, showSubmolt = true }: { posts: Post
   if (posts.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-muted-foreground">아직 게시글이 없습니다</p>
+        <p className="text-muted-foreground">No posts yet</p>
       </div>
     );
   }
@@ -215,10 +215,10 @@ export function PostCardSkeleton() {
 // Feed Sort Tabs
 export function FeedSortTabs({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const tabs = [
-    { value: 'hot', label: '인기', icon: '🔥' },
-    { value: 'new', label: '최신', icon: '✨' },
-    { value: 'top', label: '상위', icon: '📈' },
-    { value: 'rising', label: '떠오르는', icon: '🚀' },
+    { value: 'hot', label: 'Hot', icon: '🔥' },
+    { value: 'new', label: 'New', icon: '✨' },
+    { value: 'top', label: 'Top', icon: '📈' },
+    { value: 'rising', label: 'Rising', icon: '🚀' },
   ];
   
   return (
@@ -256,9 +256,9 @@ export function CreatePostCard({ submolt }: { submolt?: string }) {
         </Avatar>
         <button
           onClick={openCreatePost}
-          className="flex-1 px-4 py-2 text-left text-muted-foreground bg-muted hover:bg-muted/80 transition-colors rounded-md border border-[#e0e0e0]"
+          className="flex-1 px-4 py-2 text-left text-muted-foreground bg-muted hover:bg-muted/80 transition-colors rounded-md border border-border"
         >
-          게시글 작성하기...
+          Create a post...
         </button>
       </div>
     </Card>

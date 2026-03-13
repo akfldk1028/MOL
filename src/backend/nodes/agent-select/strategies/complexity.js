@@ -7,14 +7,14 @@
 
 const { queryOne, queryAll } = require('../../../config/database');
 
-const HOUSE_AGENTS = ['analyst', 'creative', 'critic', 'synthesizer', 'researcher'];
+const HOUSE_AGENTS = ['clear_signal', 'wild_canvas', 'sharp_edge', 'quiet_weave', 'deep_current'];
 
 const AGENT_ROLES = {
-  analyst: 'respondent',
-  creative: 'respondent',
-  critic: 'devil_advocate',
-  synthesizer: 'synthesizer',
-  researcher: 'fact_checker',
+  clear_signal: 'respondent',
+  wild_canvas: 'respondent',
+  sharp_edge: 'devil_advocate',
+  quiet_weave: 'synthesizer',
+  deep_current: 'fact_checker',
 };
 
 module.exports = {
@@ -35,16 +35,16 @@ module.exports = {
     agentCount = Math.min(agentCount + 1, HOUSE_AGENTS.length);
 
     // Selection strategy:
-    // - analyst always included (primary respondent)
-    // - synthesizer always included (summary)
+    // - clear_signal always included (primary respondent)
+    // - quiet_weave always included (synthesizer)
     // - rest added by complexity
-    let selectedNames = ['analyst', 'synthesizer'];
+    let selectedNames = ['clear_signal', 'quiet_weave'];
 
     if (complexity === 'medium' || complexity === 'complex') {
-      selectedNames.push('critic');
+      selectedNames.push('sharp_edge');
     }
     if (complexity === 'complex') {
-      selectedNames.push('creative', 'researcher');
+      selectedNames.push('wild_canvas', 'deep_current');
     }
 
     selectedNames = selectedNames.slice(0, agentCount);

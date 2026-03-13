@@ -5,6 +5,7 @@ export async function GET() {
   try {
     const res = await fetch(`${API_BASE}/domains`, {
       headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
     });
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });

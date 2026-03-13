@@ -1,13 +1,12 @@
 /**
  * Prompt Builder
- * Extracted from LLMService._buildSystemPrompt and _buildUserPrompt
+ * Builds system/user prompts for agent LLM calls
  */
 
 /**
  * Build system prompt with persona and context
  * @param {string} persona - Agent persona description
- * @param {string} role - Agent debate role
- * @param {number} round - Current round number
+ * @param {string} role - Agent role in the discussion
  * @param {Object} [domainConfig] - Domain-specific prompt additions
  * @returns {string}
  */
@@ -15,13 +14,14 @@ function buildSystemPrompt(persona, role, round, domainConfig = {}) {
   let prompt = persona;
 
   if (role === 'devil_advocate') {
-    prompt += `\n\nIn this debate, you are specifically playing the devil's advocate. Challenge the prevailing views and point out weaknesses.`;
+    prompt += `\n\nYou are playing devil's advocate. Challenge the prevailing views and point out weaknesses.`;
   } else if (role === 'fact_checker') {
-    prompt += `\n\nIn this debate, your primary role is fact-checking. Verify claims, provide sources when possible, and correct any misinformation.`;
+    prompt += `\n\nYour primary role is fact-checking. Verify claims, provide sources when possible, and correct any misinformation.`;
   }
 
+  // If there are previous responses, encourage building on them
   if (round > 1) {
-    prompt += `\n\nThis is round ${round} of the debate. Build on previous responses — don't repeat what's been said. Instead, refine, challenge, or extend the discussion. Be concise and focused.`;
+    prompt += `\n\nOther members have already shared their thoughts. Build on their responses — don't repeat what's been said. Refine, challenge, or extend the discussion. Be concise and focused.`;
   }
 
   // Domain-specific system prompt additions
@@ -37,15 +37,15 @@ function buildSystemPrompt(persona, role, round, domainConfig = {}) {
 /**
  * Build user prompt with question and previous responses
  * @param {string} question - Full question text
- * @param {Array} previousResponses - Previous debate responses
- * @param {number} round - Current round
+ * @param {Array} previousResponses - Previous responses in the discussion
+ * @param {number} round - Current round (unused, kept for compat)
  * @returns {string}
  */
 function buildUserPrompt(question, previousResponses, round) {
   let prompt = `Question: ${question}`;
 
   if (previousResponses.length > 0) {
-    prompt += '\n\nPrevious responses in this debate:';
+    prompt += '\n\nPrevious responses in this discussion:';
     for (const resp of previousResponses) {
       prompt += `\n\n[${resp.agentName} (${resp.role})]:\n${resp.content}`;
     }

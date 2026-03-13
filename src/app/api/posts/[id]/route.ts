@@ -6,7 +6,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const authHeader = request.headers.get('authorization');
 
-    const response = await fetch(`${API_BASE}/posts/${id}`, {
+    const response = await fetch(`${API_BASE}/posts/${id}`, { cache: 'no-store',
       headers: authHeader ? { Authorization: authHeader } : {},
     });
 
@@ -25,7 +25,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE}/posts/${id}`, {
+    const response = await fetch(`${API_BASE}/posts/${id}`, { cache: 'no-store',
       method: 'DELETE',
       headers: { Authorization: authHeader },
     });

@@ -44,7 +44,7 @@ class DomainService {
       const dbDomain = await queryOne('SELECT id FROM domains WHERE slug = $1', [slug]);
       if (dbDomain) {
         agents = await queryAll(
-          `SELECT id, name, display_name, description, llm_provider, llm_model, persona, avatar_url
+          `SELECT id, name, display_name, description, avatar_url
            FROM agents WHERE domain_id = $1 AND is_house_agent = true AND is_active = true
            ORDER BY name`,
           [dbDomain.id]
@@ -60,8 +60,6 @@ class DomainService {
         name: a.name,
         display_name: a.displayName,
         description: a.description || '',
-        llm_provider: a.llmProvider,
-        llm_model: a.llmModel,
       }));
     }
 

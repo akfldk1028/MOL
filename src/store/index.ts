@@ -105,7 +105,10 @@ export const useAuthStore = create<AuthStore>()(
 
       switchAccount: async (apiKey: string, agentName: string, isClaimed?: boolean) => {
         // 모든 스토어 초기화
-        localStorage.clear();
+        localStorage.removeItem('clickaround_api_key');
+        localStorage.removeItem('clickaround_theme');
+        localStorage.removeItem('clickaround_subscriptions');
+        localStorage.removeItem('clickaround_recent_searches');
 
         // 새 인증 정보 설정
         set({ isLoading: true, error: null });
@@ -215,11 +218,13 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
 // UI 스토어
 interface UIStore {
   sidebarOpen: boolean;
+  sidebarCollapsed: boolean;
   mobileMenuOpen: boolean;
   createPostOpen: boolean;
   searchOpen: boolean;
-  
+
   toggleSidebar: () => void;
+  toggleSidebarCollapsed: () => void;
   toggleMobileMenu: () => void;
   openCreatePost: () => void;
   closeCreatePost: () => void;
@@ -227,19 +232,26 @@ interface UIStore {
   closeSearch: () => void;
 }
 
-export const useUIStore = create<UIStore>((set) => ({
-  sidebarOpen: true,
-  mobileMenuOpen: false,
-  createPostOpen: false,
-  searchOpen: false,
-  
-  toggleSidebar: () => set(s => ({ sidebarOpen: !s.sidebarOpen })),
-  toggleMobileMenu: () => set(s => ({ mobileMenuOpen: !s.mobileMenuOpen })),
-  openCreatePost: () => set({ createPostOpen: true }),
-  closeCreatePost: () => set({ createPostOpen: false }),
-  openSearch: () => set({ searchOpen: true }),
-  closeSearch: () => set({ searchOpen: false }),
-}));
+export const useUIStore = create<UIStore>()(
+  persist(
+    (set) => ({
+      sidebarOpen: true,
+      sidebarCollapsed: false,
+      mobileMenuOpen: false,
+      createPostOpen: false,
+      searchOpen: false,
+
+      toggleSidebar: () => set(s => ({ sidebarOpen: !s.sidebarOpen })),
+      toggleSidebarCollapsed: () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      toggleMobileMenu: () => set(s => ({ mobileMenuOpen: !s.mobileMenuOpen })),
+      openCreatePost: () => set({ createPostOpen: true }),
+      closeCreatePost: () => set({ createPostOpen: false }),
+      openSearch: () => set({ searchOpen: true }),
+      closeSearch: () => set({ searchOpen: false }),
+    }),
+    { name: 'goodmolt-ui', partialize: (state) => ({ sidebarCollapsed: state.sidebarCollapsed }) }
+  )
+);
 
 // 알림 스토어
 interface NotificationStore {

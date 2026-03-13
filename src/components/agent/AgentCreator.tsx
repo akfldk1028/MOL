@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * AgentCreator — 슬라이더 기반 캐릭터 생성기
+ * AgentCreator — Slider-based character creator
  *
- * FaceParameters + 색상 + PersonalityTraits를 슬라이더로 조절
- * 실시간 미리보기 (AgentCanvas)
- * JSON으로 저장/내보내기
+ * Adjust FaceParameters + colors + PersonalityTraits with sliders
+ * Real-time preview (AgentCanvas)
+ * Save/export as JSON
  */
 
 import { useState, useCallback } from 'react';
@@ -30,32 +30,32 @@ interface AgentCreatorProps {
 }
 
 const FACE_PARAM_LABELS: Record<keyof FaceParameters, string> = {
-  headShape: '머리 형태 (둥근 ↔ 각진)',
-  eyeSize: '눈 크기',
-  eyeSpacing: '눈 간격',
-  noseSize: '코 크기',
-  mouthWidth: '입 너비',
-  browThickness: '눈썹 두께',
-  chinLength: '턱 길이',
+  headShape: 'Head Shape (Round ↔ Angular)',
+  eyeSize: 'Eye Size',
+  eyeSpacing: 'Eye Spacing',
+  noseSize: 'Nose Size',
+  mouthWidth: 'Mouth Width',
+  browThickness: 'Brow Thickness',
+  chinLength: 'Chin Length',
 };
 
 const TRAIT_LABELS: Record<keyof PersonalityTraits, string> = {
-  openness: '개방성',
-  conscientiousness: '성실성',
-  extraversion: '외향성',
-  agreeableness: '친화성',
-  neuroticism: '신경성',
+  openness: 'Openness',
+  conscientiousness: 'Conscientiousness',
+  extraversion: 'Extraversion',
+  agreeableness: 'Agreeableness',
+  neuroticism: 'Neuroticism',
 };
 
 const EMOTION_LABELS: Record<keyof EmotionBlend, string> = {
-  joy: '기쁨',
-  anger: '분노',
-  sadness: '슬픔',
-  surprise: '놀람',
-  disgust: '혐오',
-  fear: '공포',
-  trust: '신뢰',
-  anticipation: '기대',
+  joy: 'Joy',
+  anger: 'Anger',
+  sadness: 'Sadness',
+  surprise: 'Surprise',
+  disgust: 'Disgust',
+  fear: 'Fear',
+  trust: 'Trust',
+  anticipation: 'Anticipation',
 };
 
 const COLOR_PRESETS = {
@@ -116,7 +116,7 @@ export default function AgentCreator({
     <div className="flex flex-col lg:flex-row gap-6 p-4">
       {/* Preview */}
       <div className="flex flex-col items-center gap-3">
-        <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4">
+        <div className="bg-muted rounded-xl p-4">
           <AgentCanvas
             config={config}
             expression={expression}
@@ -126,29 +126,29 @@ export default function AgentCreator({
         </div>
         <button
           onClick={handleSave}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
         >
-          저장
+          Save
         </button>
       </div>
 
       {/* Controls */}
       <div className="flex-1 min-w-0">
         {/* Tabs */}
-        <div className="flex gap-1 mb-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex gap-1 mb-4 border-b border-border">
           {([
-            ['face', '얼굴'],
-            ['color', '색상'],
-            ['personality', '성격'],
-            ['emotion', '감정 테스트'],
+            ['face', 'Face'],
+            ['color', 'Color'],
+            ['personality', 'Personality'],
+            ['emotion', 'Emotion Test'],
           ] as [Tab, string][]).map(([tab, label]) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {label}
@@ -170,10 +170,10 @@ export default function AgentCreator({
 
           {activeTab === 'color' && (
             <>
-              <ColorPicker label="피부색" colors={COLOR_PRESETS.skin} value={config.skinColor} onChange={v => updateColor('skinColor', v)} />
-              <ColorPicker label="머리 색" colors={COLOR_PRESETS.hair} value={config.hairColor} onChange={v => updateColor('hairColor', v)} />
-              <ColorPicker label="눈 색" colors={COLOR_PRESETS.eye} value={config.eyeColor} onChange={v => updateColor('eyeColor', v)} />
-              <ColorPicker label="의상 색" colors={COLOR_PRESETS.outfit} value={config.outfitColor} onChange={v => updateColor('outfitColor', v)} />
+              <ColorPicker label="Skin Color" colors={COLOR_PRESETS.skin} value={config.skinColor} onChange={v => updateColor('skinColor', v)} />
+              <ColorPicker label="Hair Color" colors={COLOR_PRESETS.hair} value={config.hairColor} onChange={v => updateColor('hairColor', v)} />
+              <ColorPicker label="Eye Color" colors={COLOR_PRESETS.eye} value={config.eyeColor} onChange={v => updateColor('eyeColor', v)} />
+              <ColorPicker label="Outfit Color" colors={COLOR_PRESETS.outfit} value={config.outfitColor} onChange={v => updateColor('outfitColor', v)} />
             </>
           )}
 
@@ -223,7 +223,7 @@ function SliderRow({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-sm text-gray-600 dark:text-gray-400 w-40 shrink-0">
+      <span className="text-sm text-muted-foreground w-40 shrink-0">
         {label}
       </span>
       <input
@@ -233,9 +233,9 @@ function SliderRow({
         step={step}
         value={value}
         onChange={e => onChange(parseFloat(e.target.value))}
-        className="flex-1 h-1.5 accent-blue-500"
+        className="flex-1 h-1.5 accent-primary"
       />
-      <span className="text-xs text-gray-500 w-10 text-right font-mono">
+      <span className="text-xs text-muted-foreground w-10 text-right font-mono">
         {value.toFixed(2)}
       </span>
     </div>
@@ -255,14 +255,14 @@ function ColorPicker({
 }) {
   return (
     <div className="space-y-1.5">
-      <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
+      <span className="text-sm text-muted-foreground">{label}</span>
       <div className="flex gap-2 flex-wrap">
         {colors.map(color => (
           <button
             key={color}
             onClick={() => onChange(color)}
             className={`w-8 h-8 rounded-full border-2 transition-transform ${
-              value === color ? 'border-blue-500 scale-110' : 'border-gray-300 dark:border-gray-600'
+              value === color ? 'border-primary scale-110' : 'border-border'
             }`}
             style={{ backgroundColor: color }}
           />

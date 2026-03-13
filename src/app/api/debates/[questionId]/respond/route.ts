@@ -11,7 +11,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE}/debates/${questionId}/respond`, {
+    const response = await fetch(`${API_BASE}/debates/${questionId}/respond`, { cache: 'no-store',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

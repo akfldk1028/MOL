@@ -6,6 +6,8 @@
 const { queryOne, queryAll, transaction } = require('../config/database');
 const { generateApiKey, generateClaimToken, generateVerificationCode, hashToken } = require('../utils/auth');
 const { BadRequestError, NotFoundError, ConflictError } = require('../utils/errors');
+const { getAvatarUrl } = require('../utils/avatar-generator');
+const { generateUniqueUsername } = require('../utils/username-generator');
 const config = require('../config');
 
 class AgentService {
@@ -18,47 +20,53 @@ class AgentService {
    * @returns {Promise<Object>} Registration result with API key
    */
   static async register({ name, description = '' }) {
-    // Validate name
-    if (!name || typeof name !== 'string') {
-      throw new BadRequestError('Name is required');
-    }
-    
-    const normalizedName = name.toLowerCase().trim();
-    
-    if (normalizedName.length < 2 || normalizedName.length > 32) {
-      throw new BadRequestError('Name must be 2-32 characters');
-    }
-    
-    if (!/^[a-z0-9_]+$/i.test(normalizedName)) {
-      throw new BadRequestError(
-        'Name can only contain letters, numbers, and underscores'
+    let normalizedName;
+
+    if (name && typeof name === 'string' && name.trim()) {
+      // User provided a name — validate it
+      normalizedName = name.toLowerCase().trim();
+
+      if (normalizedName.length < 2 || normalizedName.length > 32) {
+        throw new BadRequestError('Name must be 2-32 characters');
+      }
+
+      if (!/^[a-z0-9_]+$/i.test(normalizedName)) {
+        throw new BadRequestError(
+          'Name can only contain letters, numbers, and underscores'
+        );
+      }
+
+      const existing = await queryOne(
+        'SELECT id FROM agents WHERE name = $1',
+        [normalizedName]
       );
+
+      if (existing) {
+        throw new ConflictError('Name already taken', 'Try a different name');
+      }
+    } else {
+      // Auto-generate a unique username
+      normalizedName = await generateUniqueUsername(async (candidate) => {
+        const row = await queryOne('SELECT id FROM agents WHERE name = $1', [candidate]);
+        return !!row;
+      });
     }
-    
-    // Check if name exists
-    const existing = await queryOne(
-      'SELECT id FROM agents WHERE name = $1',
-      [normalizedName]
-    );
-    
-    if (existing) {
-      throw new ConflictError('Name already taken', 'Try a different name');
-    }
-    
+
     // Generate credentials
     const apiKey = generateApiKey();
     const claimToken = generateClaimToken();
     const verificationCode = generateVerificationCode();
     const apiKeyHash = hashToken(apiKey);
-    
+    const avatarUrl = getAvatarUrl(normalizedName);
+
     // Create agent
     const agent = await queryOne(
-      `INSERT INTO agents (id, name, display_name, description, api_key_hash, claim_token, verification_code, status, created_at, updated_at, last_active)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'pending_claim', NOW(), NOW(), NOW())
+      `INSERT INTO agents (id, name, display_name, description, api_key_hash, claim_token, verification_code, avatar_url, status, created_at, updated_at, last_active)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, 'pending_claim', NOW(), NOW(), NOW())
        RETURNING id, name, display_name, created_at`,
-      [normalizedName, name.trim(), description, apiKeyHash, claimToken, verificationCode]
+      [normalizedName, normalizedName, description, apiKeyHash, claimToken, verificationCode, avatarUrl]
     );
-    
+
     return {
       agent: {
         api_key: apiKey,
@@ -385,12 +393,13 @@ class AgentService {
 
     const apiKey = generateApiKey();
     const apiKeyHash = hashToken(apiKey);
+    const avatarUrl = getAvatarUrl(normalizedName);
 
     const agent = await queryOne(
-      `INSERT INTO agents (id, name, display_name, description, api_key_hash, status, is_claimed, is_personal, owner_user_id, created_at, updated_at, last_active)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, 'active', true, true, $5, NOW(), NOW(), NOW())
+      `INSERT INTO agents (id, name, display_name, description, api_key_hash, avatar_url, status, is_claimed, is_personal, owner_user_id, created_at, updated_at, last_active)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'active', true, true, $6, NOW(), NOW(), NOW())
        RETURNING id, name, display_name, description, status, is_claimed, is_personal, owner_user_id, created_at`,
-      [normalizedName, displayName || name.trim(), description, apiKeyHash, userId]
+      [normalizedName, displayName || name.trim(), description, apiKeyHash, avatarUrl, userId]
     );
 
     return { agent, apiKey };

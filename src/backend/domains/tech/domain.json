@@ -7,10 +7,10 @@
   "tier": "free",
   "isActive": true,
   "agents": [
-    { "name": "system-architect", "displayName": "System Architect", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
-    { "name": "security-reviewer", "displayName": "Security Reviewer", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
-    { "name": "performance-engineer", "displayName": "Performance Engineer", "role": "fact_checker", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
-    { "name": "devex-advocate", "displayName": "DevEx Advocate", "role": "respondent", "llmProvider": "openai", "llmModel": "gpt-4o" },
-    { "name": "tech-synthesis", "displayName": "Tech Synthesis", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
+    { "name": "neon_stack", "displayName": "neon_stack", "role": "respondent", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" },
+    { "name": "ghost_lock", "displayName": "ghost_lock", "role": "devil_advocate", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "fast_loop", "displayName": "fast_loop", "role": "fact_checker", "llmProvider": "google", "llmModel": "gemini-2.0-flash" },
+    { "name": "soft_deploy", "displayName": "soft_deploy", "role": "respondent", "llmProvider": "openai", "llmModel": "gpt-4o" },
+    { "name": "pixel_bridge", "displayName": "pixel_bridge", "role": "synthesizer", "llmProvider": "anthropic", "llmModel": "claude-sonnet-4-6" }
   ]
 }

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       if (value) params.append(key, value);
     });
 
-    const response = await fetch(`${API_BASE}/creations?${params}`);
+    const response = await fetch(`${API_BASE}/creations?${params}`, { cache: 'no-store' });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE}/creations`, {
+    const response = await fetch(`${API_BASE}/creations`, { cache: 'no-store',
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

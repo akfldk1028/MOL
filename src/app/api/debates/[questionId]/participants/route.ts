@@ -4,7 +4,7 @@ import { API_BASE } from '@/app/api/_config';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ questionId: string }> }) {
   try {
     const { questionId } = await params;
-    const response = await fetch(`${API_BASE}/debates/${questionId}/participants`);
+    const response = await fetch(`${API_BASE}/debates/${questionId}/participants`, { cache: 'no-store' });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {

@@ -29,25 +29,25 @@ export function PopularSubmoltsPanel() {
   if (loading) return null;
 
   return (
-    <div className="bg-white border border-[#e0e0e0] rounded-lg overflow-hidden">
-      <div className="bg-gradient-to-r from-[#00d4aa] to-[#e01b24] px-4 py-3 flex items-center justify-between">
-        <h2 className="text-white font-bold text-sm">🌊 커뮤니티</h2>
-        <Link href="/m" className="text-white/90 text-xs font-medium hover:text-white">
-          전체 보기 →
+    <div className="bg-card border border-border rounded-lg overflow-hidden">
+      <div className="bg-gradient-to-r from-primary to-destructive px-4 py-3 flex items-center justify-between">
+        <h2 className="text-primary-foreground font-bold text-sm">🌊 Communities</h2>
+        <Link href="/m" className="text-primary-foreground/90 text-xs font-medium hover:text-primary-foreground">
+          View All →
         </Link>
       </div>
-      <div className="divide-y divide-[#e0e0e0]">
+      <div className="divide-y divide-border">
         {submolts.map(submolt => (
           <Link
             key={submolt.id}
             href={`/m/${submolt.name}`}
-            className="flex items-center gap-3 p-3 hover:bg-[#fafafa] transition-colors"
+            className="flex items-center gap-3 p-3 hover:bg-muted transition-colors"
           >
             <span className="text-lg">🦞</span>
             <div className="flex-1 min-w-0">
-              <span className="text-sm font-medium text-[#1a1a1b]">m/{submolt.name}</span>
+              <span className="text-sm font-medium text-foreground">m/{submolt.name}</span>
             </div>
-            <span className="text-xs text-[#7c7c7c]">{submolt.subscriber_count} 멤버</span>
+            <span className="text-xs text-muted-foreground">{submolt.subscriber_count} members</span>
           </Link>
         ))}
       </div>

@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * AgentCanvas — React Canvas 컴포넌트
+ * AgentCanvas — React Canvas component
  *
- * AgentVisualState를 받아 Canvas 2D로 에이전트 캐릭터 렌더링
- * framer-motion useSpring으로 ExpressionParameters 보간
- * requestAnimationFrame 루프로 60fps idle 애니메이션
+ * Receives AgentVisualState and renders agent character via Canvas 2D
+ * Interpolates ExpressionParameters using framer-motion useSpring
+ * Runs idle animation at 60fps via requestAnimationFrame loop
  */
 
 import { useRef, useEffect, useCallback } from 'react';
@@ -31,7 +31,7 @@ interface AgentCanvasProps {
   className?: string;
 }
 
-// ExpressionParameters의 모든 키
+// All keys of ExpressionParameters
 const EXPR_KEYS: (keyof ExpressionParameters)[] = [
   'eyeOpenness', 'pupilDilation', 'browRaise', 'browFurrow',
   'mouthCurve', 'mouthOpen', 'cheekPuff',

@@ -36,7 +36,7 @@ export function SubmoltCard({ submolt, variant = 'default' }: SubmoltCardProps) 
         addSubscription(submolt.name);
       }
     } catch (err) {
-      console.error('구독 실패:', err);
+      console.error('Subscription failed:', err);
     } finally {
       setSubscribing(false);
     }
@@ -51,7 +51,7 @@ export function SubmoltCard({ submolt, variant = 'default' }: SubmoltCardProps) 
         </Avatar>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm truncate">{submolt.displayName || submolt.name}</p>
-          <p className="text-xs text-muted-foreground">{formatScore(submolt.subscriberCount)} 멤버</p>
+          <p className="text-xs text-muted-foreground">{formatScore(submolt.subscriberCount)} members</p>
         </div>
         {isAuthenticated && (
           <Button size="sm" variant={subscribed ? 'secondary' : 'default'} onClick={handleSubscribe} disabled={subscribing} className="h-7 px-2">
@@ -82,13 +82,13 @@ export function SubmoltCard({ submolt, variant = 'default' }: SubmoltCardProps) 
             )}
             <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
               <Users className="h-3 w-3" />
-              {formatScore(submolt.subscriberCount)} 멤버
+              {formatScore(submolt.subscriberCount)} members
             </div>
           </div>
           
           {isAuthenticated && (
             <Button size="sm" variant={subscribed ? 'secondary' : 'default'} onClick={handleSubscribe} disabled={subscribing}>
-              {subscribed ? '가입됨' : '가입'}
+              {subscribed ? 'Joined' : 'Join'}
             </Button>
           )}
         </div>
@@ -113,7 +113,7 @@ export function SubmoltList({ submolts, isLoading, variant = 'default' }: { subm
     return (
       <div className="text-center py-8">
         <Hash className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-        <p className="text-muted-foreground">커뮤니티를 찾을 수 없습니다</p>
+        <p className="text-muted-foreground">No communities found</p>
       </div>
     );
   }
@@ -159,7 +159,7 @@ export function SubmoltCardSkeleton({ variant = 'default' }: { variant?: 'defaul
 }
 
 // Sidebar Submolt Widget
-export function SidebarSubmolts({ submolts, title = '커뮤니티' }: { submolts: Submolt[]; title?: string }) {
+export function SidebarSubmolts({ submolts, title = 'Communities' }: { submolts: Submolt[]; title?: string }) {
   return (
     <Card>
       <div className="p-4 border-b">
@@ -170,7 +170,7 @@ export function SidebarSubmolts({ submolts, title = '커뮤니티' }: { submolts
       </div>
       <div className="p-2 border-t">
         <Link href="/submolts">
-          <Button variant="ghost" className="w-full text-sm">모든 커뮤니티 보기</Button>
+          <Button variant="ghost" className="w-full text-sm">View All Communities</Button>
         </Link>
       </div>
     </Card>
@@ -187,7 +187,7 @@ export function CreateSubmoltButton() {
     <Link href="/submolts/create">
       <Button className="w-full gap-2">
         <Plus className="h-4 w-4" />
-        커뮤니티 만들기
+        Create Community
       </Button>
     </Link>
   );

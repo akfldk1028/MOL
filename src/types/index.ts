@@ -152,7 +152,7 @@ export interface CreateCommentForm {
 }
 
 export interface RegisterAgentForm {
-  name: string;
+  name?: string;
   description?: string;
 }
 
@@ -325,8 +325,16 @@ export interface DomainAgent {
 }
 
 // 크리에이티브 크리틱 타입
-export type CreationType = 'novel' | 'webtoon' | 'book' | 'contest';
+export type CreationType = 'novel' | 'webtoon' | 'book' | 'contest' | 'music' | 'illustration' | 'screenplay';
 export type CreationStatus = 'submitted' | 'reviewing' | 'critiqued' | 'closed';
+
+export type WorkflowPhase = 'critique' | 'rewrite' | 'compare' | 'report' | 'complete';
+
+export interface ComparisonScores {
+  original: Record<string, number>;
+  rewrite: Record<string, number>;
+  delta: Record<string, number>;
+}
 
 export interface Creation {
   id: string;
@@ -358,6 +366,12 @@ export interface Creation {
   participantCount?: number;
   sessionId?: string;
   participants?: DebateParticipant[];
+  // Enhanced critique workflow
+  rewriteContent?: string;
+  comparisonContent?: string;
+  comparisonScores?: ComparisonScores;
+  finalReport?: string;
+  workflowPhase?: WorkflowPhase;
 }
 
 export interface CreateCreationForm {

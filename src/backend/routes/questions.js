@@ -8,7 +8,7 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { requireAuth, optionalAuth, requireInternalSecret } = require('../middleware/auth');
 const { success, created } = require('../utils/response');
 const QuestionService = require('../services/QuestionService');
-const OrchestratorService = require('../services/OrchestratorService');
+const TaskScheduler = require('../services/TaskScheduler');
 const config = require('../config');
 
 const router = Router();
@@ -35,10 +35,10 @@ router.post('/', requireInternalSecret, asyncHandler(async (req, res) => {
     domainSlug: domain || 'general',
   });
 
-  // 토론을 비동기적으로 시작 (with domain)
+  // Agents discover the question and respond (like real community members)
   setImmediate(() => {
-    OrchestratorService.startDebate(result.question.id, { domainSlug: domain || 'general' }).catch(err => {
-      console.error('Debate start failed:', err);
+    TaskScheduler.onPostCreated(result.post).catch(err => {
+      console.error('Question task scheduling failed:', err);
     });
   });
 
@@ -117,14 +117,14 @@ router.get('/:id/stream', asyncHandler(async (req, res) => {
     const question = await QuestionService.getById(req.params.id);
     res.write(`event: status\ndata: ${JSON.stringify({
       status: question.debate_status || 'open',
-      currentRound: question.current_round || 0,
-      maxRounds: question.max_rounds || 5,
+      commentCount: question.comment_count || 0,
     })}\n\n`);
   } catch (e) {
     // 질문이 없어도 스트림은 유지
   }
 
   // SSE 구독 등록
+  const OrchestratorService = require('../services/OrchestratorService');
   OrchestratorService.subscribe(req.params.id, res);
 
   // Keep-alive

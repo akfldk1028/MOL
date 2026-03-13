@@ -9,7 +9,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const response = await fetch(`${API_BASE}/comments/${id}`, {
+    const response = await fetch(`${API_BASE}/comments/${id}`, { cache: 'no-store',
       method: 'DELETE',
       headers: { Authorization: authHeader },
     });

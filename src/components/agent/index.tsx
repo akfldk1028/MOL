@@ -37,7 +37,7 @@ export function AgentCard({ agent, variant = 'default', showFollowButton = true 
         setIsFollowing(true);
       }
     } catch (err) {
-      console.error('팔로우 실패:', err);
+      console.error('Follow failed:', err);
     } finally {
       setIsLoading(false);
     }
@@ -52,7 +52,7 @@ export function AgentCard({ agent, variant = 'default', showFollowButton = true 
         </Avatar>
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm truncate">{agent.displayName || agent.name}</p>
-          <p className="text-xs text-muted-foreground">{formatScore(agent.karma)} 카르마</p>
+          <p className="text-xs text-muted-foreground">{formatScore(agent.karma)} karma</p>
         </div>
         {showFollowButton && isAuthenticated && !isOwnProfile && (
           <Button size="sm" variant={isFollowing ? 'secondary' : 'default'} onClick={handleFollow} disabled={isLoading} className="h-7 px-2">
@@ -76,7 +76,7 @@ export function AgentCard({ agent, variant = 'default', showFollowButton = true 
             <div className="flex items-center gap-2">
               <h3 className="font-semibold truncate">{agent.displayName || agent.name}</h3>
               {agent.status === 'active' && (
-                <Badge variant="secondary" className="text-xs">인증됨</Badge>
+                <Badge variant="secondary" className="text-xs">Verified</Badge>
               )}
             </div>
             <p className="text-sm text-muted-foreground">u/{agent.name}</p>
@@ -86,18 +86,18 @@ export function AgentCard({ agent, variant = 'default', showFollowButton = true 
             <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Award className="h-3 w-3" />
-                <span className={cn(agent.karma > 0 && 'text-upvote')}>{formatScore(agent.karma)}</span> 카르마
+                <span className={cn(agent.karma > 0 && 'text-upvote')}>{formatScore(agent.karma)}</span> karma
               </span>
               <span className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
-                {formatScore(agent.followerCount)} 팔로워
+                {formatScore(agent.followerCount)} followers
               </span>
             </div>
           </div>
           
           {showFollowButton && isAuthenticated && !isOwnProfile && (
             <Button size="sm" variant={isFollowing ? 'secondary' : 'default'} onClick={handleFollow} disabled={isLoading}>
-              {isFollowing ? '팔로잉' : '팔로우'}
+              {isFollowing ? 'Following' : 'Follow'}
             </Button>
           )}
         </div>
@@ -106,7 +106,7 @@ export function AgentCard({ agent, variant = 'default', showFollowButton = true 
   );
 }
 
-// 에이전트 목록
+// Agent list
 export function AgentList({ agents, isLoading, variant = 'default', showFollowButton = true }: { agents: Agent[]; isLoading?: boolean; variant?: 'default' | 'compact'; showFollowButton?: boolean }) {
   if (isLoading) {
     return (
@@ -122,7 +122,7 @@ export function AgentList({ agents, isLoading, variant = 'default', showFollowBu
     return (
       <div className="text-center py-8">
         <Users className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-        <p className="text-muted-foreground">에이전트를 찾을 수 없습니다</p>
+        <p className="text-muted-foreground">No agents found</p>
       </div>
     );
   }
@@ -136,7 +136,7 @@ export function AgentList({ agents, isLoading, variant = 'default', showFollowBu
   );
 }
 
-// 에이전트 카드 스켈레톤
+// Agent card skeleton
 export function AgentCardSkeleton({ variant = 'default' }: { variant?: 'default' | 'compact' }) {
   if (variant === 'compact') {
     return (
@@ -170,7 +170,7 @@ export function AgentCardSkeleton({ variant = 'default' }: { variant?: 'default'
   );
 }
 
-// 에이전트 미니 카드 (목록 표시용)
+// Agent mini card (for list display)
 export function AgentMiniCard({ agent }: { agent: Pick<Agent, 'name' | 'displayName' | 'avatarUrl' | 'karma'> }) {
   return (
     <Link href={getAgentUrl(agent.name)} className="flex items-center gap-2 p-1.5 rounded hover:bg-muted transition-colors">
@@ -186,7 +186,7 @@ export function AgentMiniCard({ agent }: { agent: Pick<Agent, 'name' | 'displayN
   );
 }
 
-// 링크가 포함된 에이전트 아바타
+// Agent avatar with link
 export function AgentAvatar({ agent, size = 'default' }: { agent: Pick<Agent, 'name' | 'avatarUrl'>; size?: 'sm' | 'default' | 'lg' }) {
   const sizeClasses = {
     sm: 'h-6 w-6',
@@ -206,8 +206,8 @@ export function AgentAvatar({ agent, size = 'default' }: { agent: Pick<Agent, 'n
   );
 }
 
-// 리더보드
-export function AgentLeaderboard({ agents, title = '상위 에이전트' }: { agents: Agent[]; title?: string }) {
+// Leaderboard
+export function AgentLeaderboard({ agents, title = 'Top Agents' }: { agents: Agent[]; title?: string }) {
   return (
     <Card>
       <div className="p-4 border-b">

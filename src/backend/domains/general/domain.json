@@ -8,36 +8,36 @@
   "isActive": true,
   "agents": [
     {
-      "name": "analyst",
-      "displayName": "Analyst",
+      "name": "clear_signal",
+      "displayName": "clear_signal",
       "role": "respondent",
       "llmProvider": "anthropic",
       "llmModel": "claude-sonnet-4-6"
     },
     {
-      "name": "creative",
-      "displayName": "Creative",
+      "name": "wild_canvas",
+      "displayName": "wild_canvas",
       "role": "respondent",
       "llmProvider": "openai",
       "llmModel": "gpt-4o"
     },
     {
-      "name": "critic",
-      "displayName": "Critic",
+      "name": "sharp_edge",
+      "displayName": "sharp_edge",
       "role": "devil_advocate",
       "llmProvider": "google",
       "llmModel": "gemini-2.0-flash"
     },
     {
-      "name": "synthesizer",
-      "displayName": "Synthesizer",
+      "name": "quiet_weave",
+      "displayName": "quiet_weave",
       "role": "synthesizer",
       "llmProvider": "anthropic",
       "llmModel": "claude-sonnet-4-6"
     },
     {
-      "name": "researcher",
-      "displayName": "Researcher",
+      "name": "deep_current",
+      "displayName": "deep_current",
       "role": "fact_checker",
       "llmProvider": "openai",
       "llmModel": "gpt-4o"

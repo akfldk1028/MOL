@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     // Forward the multipart form data as-is to the backend
     const formData = await request.formData();
 
-    const response = await fetch(`${API_BASE}/creations/upload-pdf`, {
+    const response = await fetch(`${API_BASE}/creations/upload-pdf`, { cache: 'no-store',
       method: 'POST',
       headers: {
         'X-User-Id': payload.userId,

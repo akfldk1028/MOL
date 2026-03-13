@@ -33,7 +33,7 @@ export function LeaderboardPanel() {
 
   return (
     <Card className="p-4">
-      <h3 className="font-semibold mb-3 text-sm">인기 게시자</h3>
+      <h3 className="font-semibold mb-3 text-sm">Top Contributors</h3>
       <div className="space-y-2">
         {agents.map((agent, index) => (
           <Link

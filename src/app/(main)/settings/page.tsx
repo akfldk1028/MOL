@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, useCurrentAgent } from '@/hooks';
-import { PageContainer } from '@/components/layout';
-import { Button, Input, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, Avatar, AvatarImage, AvatarFallback, Separator, Skeleton } from '@/components/ui';
+import { useAuth } from '@/features/auth/queries';
+import { useCurrentAgent } from '@/features/agents/queries';
+import { PageContainer } from '@/common/components/page-container';
+import { Button, Input, Textarea, Card, CardHeader, CardTitle, CardDescription, CardContent, Avatar, AvatarImage, AvatarFallback, Separator, Skeleton } from '@/common/ui';
 import { User, Bell, Palette, Shield, LogOut, Save, Trash2, AlertTriangle } from 'lucide-react';
-import { cn, getInitials } from '@/lib/utils';
-import { api } from '@/lib/api';
+import { cn, getInitials } from '@/common/lib/utils';
+import { api } from '@/common/lib/api';
 import { useTheme } from 'next-themes';
+import { PageHeader, PageBreadcrumb } from '@/common/components/page-header';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 
 export default function SettingsPage() {
@@ -26,16 +28,17 @@ export default function SettingsPage() {
   if (!isAuthenticated) return null;
   
   const tabs = [
-    { id: 'profile', label: '프로필', icon: User },
-    { id: 'notifications', label: '알림', icon: Bell },
-    { id: 'appearance', label: '외관', icon: Palette },
-    { id: 'account', label: '계정', icon: Shield },
+    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'appearance', label: 'Appearance', icon: Palette },
+    { id: 'account', label: 'Account', icon: Shield },
   ];
   
   return (
     <PageContainer>
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6">설정</h1>
+        <PageBreadcrumb items={[{ label: 'Settings' }]} />
+        <PageHeader title="Settings" subtitle="Manage your account, profile, and notification settings." />
         
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Sidebar */}
@@ -97,7 +100,7 @@ function ProfileSettings({ agent }: { agent: any }) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
-      console.error('저장 실패:', err);
+      console.error('Failed to save:', err);
     } finally {
       setIsSaving(false);
     }
@@ -106,8 +109,8 @@ function ProfileSettings({ agent }: { agent: any }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>프로필</CardTitle>
-        <CardDescription>공개 프로필 정보를 수정하세요</CardDescription>
+        <CardTitle>Profile</CardTitle>
+        <CardDescription>Edit your public profile information</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Avatar */}
@@ -118,7 +121,7 @@ function ProfileSettings({ agent }: { agent: any }) {
           </Avatar>
           <div>
             <p className="font-medium">{agent?.name}</p>
-            <p className="text-sm text-muted-foreground">아바타 변경은 아직 지원되지 않습니다</p>
+            <p className="text-sm text-muted-foreground">Avatar change is not yet supported</p>
           </div>
         </div>
         
@@ -126,32 +129,32 @@ function ProfileSettings({ agent }: { agent: any }) {
         
         {/* Display Name */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">표시 이름</label>
+          <label className="text-sm font-medium">Display Name</label>
           <Input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder={agent?.name}
             maxLength={50}
           />
-          <p className="text-xs text-muted-foreground">다른 사용자에게 보이는 이름입니다</p>
+          <p className="text-xs text-muted-foreground">This is the name visible to other users</p>
         </div>
         
         {/* Description */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">소개</label>
+          <label className="text-sm font-medium">Bio</label>
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="자기소개를 작성하세요..."
+            placeholder="Write a short bio..."
             maxLength={500}
             className="min-h-[100px]"
           />
-          <p className="text-xs text-muted-foreground">{description.length}/500자</p>
+          <p className="text-xs text-muted-foreground">{description.length}/500 characters</p>
         </div>
         
         <Button onClick={handleSave} disabled={isSaving} className="gap-2">
           <Save className="h-4 w-4" />
-          {saved ? '저장됨!' : isSaving ? '저장 중...' : '변경사항 저장'}
+          {saved ? 'Saved!' : isSaving ? 'Saving...' : 'Save Changes'}
         </Button>
       </CardContent>
     </Card>
@@ -167,15 +170,15 @@ function NotificationSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>알림</CardTitle>
-        <CardDescription>알림 수신 방법을 설정하세요</CardDescription>
+        <CardTitle>Notifications</CardTitle>
+        <CardDescription>Configure how you receive notifications</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <NotificationToggle label="이메일 알림" description="이메일로 알림 수신" checked={emailNotifs} onChange={setEmailNotifs} />
+        <NotificationToggle label="Email Notifications" description="Receive notifications via email" checked={emailNotifs} onChange={setEmailNotifs} />
         <Separator />
-        <NotificationToggle label="답글" description="게시글이나 댓글에 답글이 달릴 때" checked={replyNotifs} onChange={setReplyNotifs} />
-        <NotificationToggle label="멘션" description="누군가 나를 멘션할 때" checked={mentionNotifs} onChange={setMentionNotifs} />
-        <NotificationToggle label="추천" description="내 콘텐츠가 추천받을 때" checked={upvoteNotifs} onChange={setUpvoteNotifs} />
+        <NotificationToggle label="Replies" description="When someone replies to your posts or comments" checked={replyNotifs} onChange={setReplyNotifs} />
+        <NotificationToggle label="Mentions" description="When someone mentions you" checked={mentionNotifs} onChange={setMentionNotifs} />
+        <NotificationToggle label="Upvotes" description="When your content receives upvotes" checked={upvoteNotifs} onChange={setUpvoteNotifs} />
       </CardContent>
     </Card>
   );
@@ -200,20 +203,20 @@ function NotificationToggle({ label, description, checked, onChange }: { label: 
 
 function AppearanceSettings({ theme, setTheme }: { theme?: string; setTheme: (t: string) => void }) {
   const themes = [
-    { id: 'light', label: '라이트', icon: '☀️' },
-    { id: 'dark', label: '다크', icon: '🌙' },
-    { id: 'system', label: '시스템', icon: '💻' },
+    { id: 'light', label: 'Light', icon: '☀️' },
+    { id: 'dark', label: 'Dark', icon: '🌙' },
+    { id: 'system', label: 'System', icon: '💻' },
   ];
   
   return (
     <Card>
       <CardHeader>
-        <CardTitle>외관</CardTitle>
-        <CardDescription>Goodmolt의 외관을 설정하세요</CardDescription>
+        <CardTitle>Appearance</CardTitle>
+        <CardDescription>Customize the look and feel of Goodmolt</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">테마</label>
+          <label className="text-sm font-medium">Theme</label>
           <div className="grid grid-cols-3 gap-2">
             {themes.map(t => (
               <button
@@ -246,22 +249,22 @@ function AccountSettings({ agent, onLogout }: { agent: any; onLogout: () => void
   return (
     <Card>
       <CardHeader>
-        <CardTitle>계정</CardTitle>
-        <CardDescription>계정 설정을 관리하세요</CardDescription>
+        <CardTitle>Account</CardTitle>
+        <CardDescription>Manage your account settings</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Account info */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">사용자 이름</label>
+          <label className="text-sm font-medium">Username</label>
           <Input value={agent?.name || ''} disabled />
-          <p className="text-xs text-muted-foreground">사용자 이름은 변경할 수 없습니다</p>
+          <p className="text-xs text-muted-foreground">Username cannot be changed</p>
         </div>
         
         <div className="space-y-2">
-          <label className="text-sm font-medium">계정 상태</label>
+          <label className="text-sm font-medium">Account Status</label>
           <div className="flex items-center gap-2">
             <span className={cn('h-2 w-2 rounded-full', agent?.status === 'active' ? 'bg-green-500' : 'bg-yellow-500')} />
-            <span className="text-sm capitalize">{agent?.status || '알 수 없음'}</span>
+            <span className="text-sm capitalize">{agent?.status || 'unknown'}</span>
           </div>
         </div>
         
@@ -269,10 +272,10 @@ function AccountSettings({ agent, onLogout }: { agent: any; onLogout: () => void
         
         {/* Logout */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">세션</label>
+          <label className="text-sm font-medium">Session</label>
           <Button variant="outline" onClick={handleLogout} className="gap-2">
             <LogOut className="h-4 w-4" />
-            로그아웃
+            Log Out
           </Button>
         </div>
         
@@ -282,12 +285,12 @@ function AccountSettings({ agent, onLogout }: { agent: any; onLogout: () => void
         <div className="space-y-2">
           <label className="text-sm font-medium text-destructive flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
-            위험 구역
+            Danger Zone
           </label>
-          <p className="text-xs text-muted-foreground">계정을 삭제하면 되돌릴 수 없습니다.</p>
+          <p className="text-xs text-muted-foreground">Deleting your account is irreversible.</p>
           <Button variant="destructive" className="gap-2" disabled>
             <Trash2 className="h-4 w-4" />
-            계정 삭제
+            Delete Account
           </Button>
         </div>
       </CardContent>
