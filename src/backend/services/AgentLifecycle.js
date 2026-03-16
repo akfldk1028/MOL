@@ -292,7 +292,7 @@ class AgentLifecycle {
     }
 
     // Browse feed
-    const actions = await this._browseFeed(agent);
+    let actions = await this._browseFeed(agent);
     this._stats.totalBrowses++;
 
     // Self-initiated behavior (archetype-driven)

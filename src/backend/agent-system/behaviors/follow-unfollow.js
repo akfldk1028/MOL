@@ -3,26 +3,23 @@
  * Agent decides to follow or unfollow another agent based on affinity
  */
 
-const { queryOne, queryAll } = require('../../config/database');
+const { queryOne } = require('../../config/database');
 const RelationshipGraph = require('../relationships');
 
-const FOLLOW_THRESHOLD = 0.15;   // Follow if affinity > this
-const UNFOLLOW_THRESHOLD = -0.2; // Unfollow if affinity < this
+const FOLLOW_THRESHOLD = 0.15;
+const UNFOLLOW_THRESHOLD = -0.2;
 
 /**
  * Evaluate and execute follow/unfollow decisions after interaction
- * @param {string} agentId - The agent making the decision
- * @param {string} targetId - The agent being evaluated
  */
 async function evaluateAndAct(agentId, targetId) {
   if (agentId === targetId) return;
 
   const rel = await RelationshipGraph.get(agentId, targetId);
-  if (!rel || rel.interaction_count < 2) return; // Need at least 2 interactions before deciding
+  if (!rel || rel.interaction_count < 2) return;
 
-  // Check current follow status
   const existingFollow = await queryOne(
-    `SELECT id FROM subscriptions WHERE user_id = $1 AND target_id = $2 AND target_type = 'agent'`,
+    `SELECT id FROM follows WHERE follower_id = $1 AND followed_id = $2`,
     [agentId, targetId]
   );
 
@@ -30,32 +27,29 @@ async function evaluateAndAct(agentId, targetId) {
   const affinity = rel.affinity;
 
   if (!isFollowing && affinity > FOLLOW_THRESHOLD) {
-    // Follow
-    try {
-      await queryOne(
-        `INSERT INTO subscriptions (id, user_id, target_id, target_type, created_at)
-         VALUES (gen_random_uuid()::text, $1, $2, 'agent', NOW())
-         ON CONFLICT DO NOTHING`,
-        [agentId, targetId]
-      );
-      await RelationshipGraph.updateFromInteraction(agentId, targetId, 'follow');
-      console.log(`[Follow] Agent ${agentId.slice(0, 8)} followed ${targetId.slice(0, 8)} (affinity: ${affinity.toFixed(2)})`);
-    } catch (err) {
-      // subscriptions table might not have this schema — skip silently
-      if (!err.message.includes('does not exist')) throw err;
-    }
+    await queryOne(
+      `INSERT INTO follows (id, follower_id, followed_id, created_at)
+       VALUES (gen_random_uuid()::text, $1, $2, NOW())
+       ON CONFLICT (follower_id, followed_id) DO NOTHING`,
+      [agentId, targetId]
+    );
+    await queryOne(
+      `UPDATE agents SET follower_count = follower_count + 1 WHERE id = $1`,
+      [targetId]
+    );
+    await RelationshipGraph.updateFromInteraction(agentId, targetId, 'follow');
+    console.log(`[Follow] ${agentId.slice(0, 8)} → ${targetId.slice(0, 8)} (affinity: ${affinity.toFixed(2)})`);
   } else if (isFollowing && affinity < UNFOLLOW_THRESHOLD) {
-    // Unfollow
-    try {
-      await queryOne(
-        `DELETE FROM subscriptions WHERE user_id = $1 AND target_id = $2 AND target_type = 'agent'`,
-        [agentId, targetId]
-      );
-      await RelationshipGraph.updateFromInteraction(agentId, targetId, 'unfollow');
-      console.log(`[Unfollow] Agent ${agentId.slice(0, 8)} unfollowed ${targetId.slice(0, 8)} (affinity: ${affinity.toFixed(2)})`);
-    } catch (err) {
-      if (!err.message.includes('does not exist')) throw err;
-    }
+    await queryOne(
+      `DELETE FROM follows WHERE follower_id = $1 AND followed_id = $2`,
+      [agentId, targetId]
+    );
+    await queryOne(
+      `UPDATE agents SET follower_count = GREATEST(0, follower_count - 1) WHERE id = $1`,
+      [targetId]
+    );
+    await RelationshipGraph.updateFromInteraction(agentId, targetId, 'unfollow');
+    console.log(`[Unfollow] ${agentId.slice(0, 8)} → ${targetId.slice(0, 8)} (affinity: ${affinity.toFixed(2)})`);
   }
 }
 

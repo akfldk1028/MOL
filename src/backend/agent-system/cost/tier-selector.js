@@ -3,10 +3,14 @@
  * Maps action + agent archetype → appropriate LLM model and token limit
  */
 
+// Use the same DEFAULT_MODEL pattern as TaskWorker
+const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+const PREMIUM_MODEL = 'gemini-2.5-flash';
+
 const TIER_CONFIG = {
-  premium:   { model: 'gemini-2.5-flash', maxTokens: 1024 },
-  standard:  { model: 'gemini-2.5-flash-lite', maxTokens: 512 },
-  lite:      { model: 'gemini-2.5-flash-lite', maxTokens: 256 },
+  premium:    { model: PREMIUM_MODEL, maxTokens: 1024 },
+  standard:   { model: DEFAULT_MODEL, maxTokens: 512 },
+  lite:       { model: DEFAULT_MODEL, maxTokens: 256 },
   rule_based: null, // No LLM call
 };
 
@@ -46,13 +50,13 @@ function selectTier(actionType, agentTier, chainDepth = 0) {
   // Check depth degradation
   const depthOverride = DEPTH_DEGRADATION[Math.min(chainDepth, 5)];
 
-  // Priority: depth > action > agent
-  const effectiveTier = depthOverride || actionOverride || agentTier || 'standard';
-
-  // Rule-based agents skip LLM entirely (unless action forces a tier)
-  if (effectiveTier === 'rule_based' || (agentTier === 'rule_based' && !actionOverride)) {
+  // Rule-based agents always skip LLM (unless action explicitly forces a tier)
+  if (agentTier === 'rule_based' && !actionOverride) {
     return null;
   }
+
+  // Priority: depth > action > agent
+  const effectiveTier = depthOverride || actionOverride || agentTier || 'standard';
 
   return TIER_CONFIG[effectiveTier] || TIER_CONFIG.standard;
 }

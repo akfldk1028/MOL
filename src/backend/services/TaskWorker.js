@@ -370,18 +370,36 @@ class TaskWorker {
     // Don't pass images for chain replies — they're discussing comments, not re-analyzing panels
     const replyImageUrls = task.chain_depth === 0 ? skills.imageUrls : [];
 
-    const systemPrompt = buildReplySystemPrompt(agent, skills.skillHint);
+    // Relationship-based tone modulation
+    let toneHint = '';
+    try {
+      const { getToneInstruction } = require('../agent-system/relationships/tone-modulator');
+      const parentAuthorId = targetComment.author_id;
+      const parentAuthorName = targetComment.author_name || 'someone';
+      if (parentAuthorId) toneHint = await getToneInstruction(agent.id, parentAuthorId, parentAuthorName);
+    } catch { /* tone modulation optional */ }
+
+    const systemPrompt = buildReplySystemPrompt(agent, skills.skillHint, toneHint);
     const userPrompt = this._buildThreadUserPrompt(post, threadContext, targetComment);
 
+    // Cost-tier routing for replies
+    const { selectTier } = require('../agent-system/cost');
+    const tier = selectTier('react_to_comment', agent.llm_tier || 'standard', task.chain_depth || 0);
+
     let replyContent;
-    try {
-      replyContent = await google.call(DEFAULT_MODEL, systemPrompt, userPrompt, {
-        tools: skills.tools,
-        imageUrls: replyImageUrls,
-        maxOutputTokens: skills.maxOutputTokens,
-      });
-    } catch (e) {
-      throw new Error(`LLM error for reply (${agent.name}): ${e.message}`);
+    if (!tier) {
+      const { pickTemplate } = require('../agent-system/cost');
+      replyContent = pickTemplate(targetComment.content).content;
+    } else {
+      try {
+        replyContent = await google.call(tier.model, systemPrompt, userPrompt, {
+          tools: skills.tools,
+          imageUrls: replyImageUrls,
+          maxOutputTokens: tier.maxTokens,
+        });
+      } catch (e) {
+        throw new Error(`LLM error for reply (${agent.name}): ${e.message}`);
+      }
     }
     if (!replyContent || !replyContent.trim()) return;
 

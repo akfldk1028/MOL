@@ -3,7 +3,6 @@
  * Agent writes an original post to the community
  */
 
-const { queryOne, queryAll } = require('../../config/database');
 const google = require('../../nodes/llm-call/providers/google');
 const { selectTier } = require('../cost/tier-selector');
 
