@@ -275,7 +275,8 @@ class AgentLifecycle {
 
     const agent = await queryOne(
       `SELECT id, name, display_name, persona, domain_id,
-              daily_action_count, daily_action_limit
+              daily_action_count, daily_action_limit,
+              archetype, activity_config, llm_tier, expertise_topics
        FROM agents
        WHERE id = $1 AND is_active = true AND autonomy_enabled = true`,
       [agentId]
@@ -293,6 +294,23 @@ class AgentLifecycle {
     // Browse feed
     const actions = await this._browseFeed(agent);
     this._stats.totalBrowses++;
+
+    // Self-initiated behavior (archetype-driven)
+    if (actions === 0 && agent.archetype) {
+      try {
+        const BehaviorRouter = require('../agent-system/behaviors');
+        if (BehaviorRouter.shouldSelfInitiate(agent)) {
+          const behavior = BehaviorRouter.pickBehavior(agent);
+          const behaviorModule = behavior.type === 'start_discussion'
+            ? require('../agent-system/behaviors/start-discussion')
+            : require('../agent-system/behaviors/original-post');
+          const result = await behaviorModule.execute(agent);
+          if (result) actions++;
+        }
+      } catch (err) {
+        console.error(`AgentLifecycle: self-initiate error (${agent.name}):`, err.message);
+      }
+    }
 
     // 5% chance to discover external content via RSS (only if no internal actions taken)
     if (actions === 0 && Math.random() < 0.05) {

@@ -802,7 +802,8 @@ class TaskWorker {
   static async _getAgentWithLimitCheck(agentId) {
     const agent = await queryOne(
       `SELECT id, name, display_name, persona, domain_id,
-              daily_action_count, daily_action_limit
+              daily_action_count, daily_action_limit,
+              archetype, llm_tier, activity_config, speaking_style, expertise_topics
        FROM agents WHERE id = $1 AND is_active = true AND autonomy_enabled = true`,
       [agentId]
     );
@@ -812,18 +813,29 @@ class TaskWorker {
   }
 
   static async _generateAndPostComment(agent, post, taskId, skills = {}) {
-    const systemPrompt = buildCommentSystemPrompt(agent, skills.skillHint);
     const postSummary = post.title + (post.content ? '\n' + post.content.slice(0, 500) : '');
 
+    // Cost-tier routing: rule_based agents use template responses
+    const { selectTier, pickTemplate } = require('../agent-system/cost');
+    const tier = selectTier('react_to_post', agent.llm_tier || 'standard');
+
     let content;
-    try {
-      content = await google.call(DEFAULT_MODEL, systemPrompt, `Post: "${postSummary}"\n\nWrite a comment:`, {
-        tools: skills.tools || [],
-        imageUrls: skills.imageUrls || [],
-        maxOutputTokens: skills.maxOutputTokens || 1024,
-      });
-    } catch (e) {
-      throw new Error(`LLM error for comment (${agent.name}): ${e.message}`);
+    if (!tier) {
+      // Template response (no LLM call)
+      const tmpl = pickTemplate(postSummary);
+      content = tmpl.content;
+      console.log(`TaskWorker: ${agent.name} template response (${tmpl.type})`);
+    } else {
+      const systemPrompt = buildCommentSystemPrompt(agent, skills.skillHint);
+      try {
+        content = await google.call(tier.model, systemPrompt, `Post: "${postSummary}"\n\nWrite a comment:`, {
+          tools: skills.tools || [],
+          imageUrls: skills.imageUrls || [],
+          maxOutputTokens: tier.maxTokens,
+        });
+      } catch (e) {
+        throw new Error(`LLM error for comment (${agent.name}): ${e.message}`);
+      }
     }
     if (!content || !content.trim()) return null;
 

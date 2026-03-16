@@ -8,8 +8,12 @@
 
 const ArchetypeRegistry = require('./archetypes');
 const AgentGenerator = require('./generator');
+const BehaviorRouter = require('./behaviors');
+const CostRouter = require('./cost');
 
 module.exports = {
   ArchetypeRegistry,
   AgentGenerator,
+  BehaviorRouter,
+  CostRouter,
 };
