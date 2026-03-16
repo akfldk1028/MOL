@@ -49,7 +49,7 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
  * GET /submolts/:name
  * Get submolt info
  */
-router.get('/:name', requireAuth, asyncHandler(async (req, res) => {
+router.get('/:name', optionalAuth, asyncHandler(async (req, res) => {
   const submolt = await SubmoltService.findByName(req.params.name, req.agent.id);
   const isSubscribed = await SubmoltService.isSubscribed(submolt.id, req.agent.id);
   
@@ -83,7 +83,7 @@ router.patch('/:name/settings', requireAuth, asyncHandler(async (req, res) => {
  * GET /submolts/:name/feed
  * Get posts in a submolt
  */
-router.get('/:name/feed', requireAuth, asyncHandler(async (req, res) => {
+router.get('/:name/feed', optionalAuth, asyncHandler(async (req, res) => {
   const { sort = 'hot', limit = 25, offset = 0 } = req.query;
   
   const posts = await PostService.getBySubmolt(req.params.name, {

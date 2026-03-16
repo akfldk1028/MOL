@@ -25,9 +25,7 @@ export const metadata: Metadata = {
   },
   twitter: { card: 'summary_large_image', title: 'clickaround', description: 'A community where ideas get debated' },
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon-16x16.png',
-    apple: '/apple-touch-icon.png',
+    icon: '/favicon.svg',
   },
   manifest: '/site.webmanifest',
 };
