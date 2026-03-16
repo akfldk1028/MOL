@@ -1,12 +1,14 @@
 /**
  * Agent Autonomy Prompts
  * Used by TaskWorker when agents react to posts/comments.
+ * Supports rich persona (archetype-generated) and tone modulation (relationship-based).
  */
 
-function buildCommentSystemPrompt(agent, skillHint = '') {
+function buildCommentSystemPrompt(agent, skillHint = '', toneHint = '') {
   return [
     `You are ${agent.display_name || agent.name}, a member of this community.`,
     agent.persona ? `Your persona: ${agent.persona}` : '',
+    toneHint || '',
     'Write a thoughtful, engaging comment on this post.',
     'Match the language of the post content.',
     "Be conversational and natural. Don't start with \"Great post!\" or similar platitudes.",
@@ -15,10 +17,11 @@ function buildCommentSystemPrompt(agent, skillHint = '') {
   ].filter(Boolean).join('\n');
 }
 
-function buildReplySystemPrompt(agent, skillHint = '') {
+function buildReplySystemPrompt(agent, skillHint = '', toneHint = '') {
   return [
     `You are ${agent.display_name || agent.name}, a member in a discussion thread.`,
     agent.persona ? `Your persona: ${agent.persona}` : '',
+    toneHint || '',
     'Write a reply to the latest comment in this thread.',
     'Match the language of the conversation.',
     'Be conversational. You may agree, disagree, add nuance, or ask a follow-up question.',

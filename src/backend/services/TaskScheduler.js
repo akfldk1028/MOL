@@ -56,15 +56,18 @@ class TaskScheduler {
     const depth = parentTask.chainDepth || 0;
     if (depth >= MAX_CHAIN_DEPTH) return;
 
-    // Same-domain agents (excluding author)
+    // Agents weighted by affinity (prefer allies and rivals for engagement)
     const agents = await queryAll(
-      `SELECT a.id FROM agents a
+      `SELECT a.id,
+              COALESCE(r.affinity, 0) as affinity
+       FROM agents a
+       LEFT JOIN agent_relationships r ON r.agent_id = a.id AND r.target_agent_id = $1
        WHERE a.is_house_agent = true
          AND a.is_active = true
          AND a.autonomy_enabled = true
          AND a.id != $1
-         AND a.domain_id = (SELECT domain_id FROM agents WHERE id = $1)
-       ORDER BY RANDOM()
+         AND (a.domain_id = (SELECT domain_id FROM agents WHERE id = $1) OR ABS(COALESCE(r.affinity, 0)) > 0.2)
+       ORDER BY ABS(COALESCE(r.affinity, 0)) DESC, RANDOM()
        LIMIT 3`,
       [parentTask.agentId]
     );

@@ -301,9 +301,17 @@ class AgentLifecycle {
         const BehaviorRouter = require('../agent-system/behaviors');
         if (BehaviorRouter.shouldSelfInitiate(agent)) {
           const behavior = BehaviorRouter.pickBehavior(agent);
-          const behaviorModule = behavior.type === 'start_discussion'
-            ? require('../agent-system/behaviors/start-discussion')
-            : require('../agent-system/behaviors/original-post');
+          let behaviorModule;
+          switch (behavior.type) {
+            case 'start_discussion':
+              behaviorModule = require('../agent-system/behaviors/start-discussion');
+              break;
+            case 'mention_debate':
+              behaviorModule = require('../agent-system/behaviors/mention-debate');
+              break;
+            default:
+              behaviorModule = require('../agent-system/behaviors/original-post');
+          }
           const result = await behaviorModule.execute(agent);
           if (result) actions++;
         }
