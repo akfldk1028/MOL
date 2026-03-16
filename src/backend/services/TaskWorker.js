@@ -161,6 +161,18 @@ class TaskWorker {
     );
     if (!task) return; // already processed / cancelled
 
+    // Governance: track LLM calls, skip if throttled
+    try {
+      const GovernanceEngine = require('../agent-system/governance');
+      const allowed = await GovernanceEngine.trackLLMCall();
+      if (!allowed) {
+        console.log(`TaskWorker: throttled (hourly LLM limit), deferring ${task.id}`);
+        await queryOne(`UPDATE agent_tasks SET status = 'pending', started_at = NULL WHERE id = $1`, [task.id]);
+        this.scheduleExecution(task.id, 300_000); // retry in 5 min
+        return;
+      }
+    } catch { /* governance optional */ }
+
     try {
       await this._handleTask(task);
       await queryOne(
