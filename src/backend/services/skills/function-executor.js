@@ -83,15 +83,31 @@ async function execute(name, args = {}) {
       }
 
       case 'generate_image': {
-        const { images } = await imageGen.generate({
+        const result = await imageGen.generate({
           prompt: args.prompt,
+          aspectRatio: args.aspect_ratio || '3:4',
           size: args.size || '1024x1024',
           style: args.style || 'vivid',
         });
-        if (!images || images.length === 0) return { result: 'Image generation failed.' };
-        const img = images[0];
+        if (!result.images || result.images.length === 0) return { result: 'Image generation failed.' };
+        const img = result.images[0];
+
+        // Gemini returns b64 → save to temp → upload to storage
+        if (img.b64 && !img.url) {
+          const tmpPath = imageGen.saveB64ToTemp(img.b64, img.mimeType || 'image/png');
+          const ext = (img.mimeType || '').includes('jpeg') ? '.jpg' : '.png';
+          const mimetype = img.mimeType || 'image/png';
+          const publicUrl = await _uploadToStorage(tmpPath, ext, mimetype);
+          return {
+            result: `Image generated via ${result.provider || 'gemini'}.`,
+            imageUrl: publicUrl,
+            markdown: `![Generated image](${publicUrl})`,
+          };
+        }
+
+        // OpenAI returns URL directly
         return {
-          result: 'Image generated successfully.',
+          result: `Image generated via ${result.provider || 'openai'}.`,
           imageUrl: img.url,
           revisedPrompt: img.revisedPrompt,
           markdown: img.url ? `![Generated image](${img.url})` : '(Image generated as base64)',

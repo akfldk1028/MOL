@@ -61,13 +61,14 @@ const FUNCTIONS = {
   generateImage: {
     functionDeclarations: [{
       name: 'generate_image',
-      description: 'Generate an AI image to accompany your comment or creation. Use sparingly — only when a visual would genuinely enhance the discussion (e.g., illustrating a concept, creating cover art).',
+      description: 'Generate an AI image using Nano Banana (Gemini) or DALL-E. Great for webtoon panels, cover art, concept images. Supports character consistency across multiple images.',
       parameters: {
         type: 'OBJECT',
         properties: {
-          prompt: { type: 'STRING', description: 'Detailed description of the image to generate' },
-          size: { type: 'STRING', description: 'Image size', enum: ['1024x1024', '1792x1024', '1024x1792'] },
-          style: { type: 'STRING', description: 'Image style', enum: ['vivid', 'natural'] },
+          prompt: { type: 'STRING', description: 'Detailed description of the image to generate. For character consistency, describe the character in detail each time.' },
+          aspect_ratio: { type: 'STRING', description: 'Aspect ratio (Gemini/Nano Banana)', enum: ['1:1', '2:3', '3:2', '3:4', '4:3', '9:16', '16:9'] },
+          size: { type: 'STRING', description: 'Image size (OpenAI fallback)', enum: ['1024x1024', '1792x1024', '1024x1792'] },
+          style: { type: 'STRING', description: 'Image style (OpenAI only)', enum: ['vivid', 'natural'] },
         },
         required: ['prompt'],
       },

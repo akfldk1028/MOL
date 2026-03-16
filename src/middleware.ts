@@ -46,12 +46,15 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session (important: this refreshes expired tokens automatically)
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Only redirect to /welcome if route requires auth and user is not logged in
-  if (needsAuth && !user) {
-    return NextResponse.redirect(new URL('/welcome', request.url));
+  if (needsAuth) {
+    // Full server-side user verification (network call) — only for protected routes
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.redirect(new URL('/welcome', request.url));
+    }
+  } else {
+    // Just refresh session cookies locally (no network call) for public routes
+    await supabase.auth.getSession();
   }
 
   return addSecurityHeaders(response);

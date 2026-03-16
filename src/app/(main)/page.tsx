@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { PageContainer } from '@/common/components/page-container';
 import { RightSidebar } from '@/features/sidebar/components/right-sidebar';
 import { Spinner } from '@/common/ui';
-import { MagicCard } from '@/common/ui/magic-card';
 import { BlurFade } from '@/common/ui/blur-fade';
 import { ShimmerButton } from '@/common/ui/shimmer-button';
 import { Bot, MessageCircle, BookOpen, Image, FileText, Trophy, Sparkles, Users, Globe } from 'lucide-react';
@@ -129,58 +128,54 @@ export default function HomePage() {
               </div>
             ) : creations.length > 0 ? (
               <div className="mt-2 space-y-2">
-                {creations.map((creation, i) => {
+                {creations.map((creation) => {
                   const type = (creation as any).creation_type || creation.creationType || 'novel';
                   const t = TYPE_ICON[type] || TYPE_ICON.novel;
                   const Icon = t.icon;
                   return (
-                    <BlurFade key={creation.id} delay={0.03 * i} inView>
-                      <MagicCard
-                        className="border"
-                        gradientSize={150}
-                        gradientOpacity={0.6}
-                        gradientColor="hsl(var(--muted))"
+                    <div
+                      key={creation.id}
+                      className="border rounded-lg bg-card transition-transform transition-shadow duration-200 hover:scale-[1.01] hover:shadow-md"
+                    >
+                      <Link
+                        href={`/c/${creation.id}`}
+                        className="flex items-center gap-3 px-4 py-3 transition-colors"
                       >
-                        <Link
-                          href={`/c/${creation.id}`}
-                          className="flex items-center gap-3 px-4 py-3 transition-colors"
-                        >
-                          <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${t.bg} transition-shadow hover:${t.glow}`}>
-                            <Icon className={`h-5 w-5 ${t.color}`} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium leading-snug line-clamp-1">{creation.title}</div>
-                            <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-                              <span>{t.label}</span>
-                              <span className="text-border">·</span>
-                              <span>{creation.createdByName || 'anonymous'}</span>
-                              <span className="text-border">·</span>
-                              <span>{timeAgo(creation.createdAt)}</span>
-                              {creation.genre && (
-                                <>
-                                  <span className="text-border">·</span>
-                                  <span>{creation.genre}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="shrink-0 flex items-center gap-3 text-xs text-muted-foreground">
-                            {creation.agentCount > 0 && (
-                              <span className="flex items-center gap-1">
-                                <Bot className="h-3.5 w-3.5" />
-                                {creation.agentCount}
-                              </span>
-                            )}
-                            {(creation.commentCount ?? 0) > 0 && (
-                              <span className="flex items-center gap-1">
-                                <MessageCircle className="h-3.5 w-3.5" />
-                                {creation.commentCount}
-                              </span>
+                        <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${t.bg}`}>
+                          <Icon className={`h-5 w-5 ${t.color}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium leading-snug line-clamp-1">{creation.title}</div>
+                          <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                            <span>{t.label}</span>
+                            <span className="text-border">·</span>
+                            <span>{(creation as any).created_by_name || creation.createdByName || 'anonymous'}</span>
+                            <span className="text-border">·</span>
+                            <span>{timeAgo((creation as any).created_at || creation.createdAt)}</span>
+                            {creation.genre && (
+                              <>
+                                <span className="text-border">·</span>
+                                <span>{creation.genre}</span>
+                              </>
                             )}
                           </div>
-                        </Link>
-                      </MagicCard>
-                    </BlurFade>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-3 text-xs text-muted-foreground">
+                          {((creation as any).agent_count ?? creation.agentCount ?? 0) > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Bot className="h-3.5 w-3.5" />
+                              {(creation as any).agent_count ?? creation.agentCount}
+                            </span>
+                          )}
+                          {((creation as any).comment_count ?? creation.commentCount ?? 0) > 0 && (
+                            <span className="flex items-center gap-1">
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              {(creation as any).comment_count ?? creation.commentCount}
+                            </span>
+                          )}
+                        </div>
+                      </Link>
+                    </div>
                   );
                 })}
               </div>

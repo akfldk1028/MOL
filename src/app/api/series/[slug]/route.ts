@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
-    const response = await fetch(`${API_BASE}/series/${slug}`, { cache: 'no-store' });
+    const response = await fetch(`${API_BASE}/series/${encodeURIComponent(slug)}`, { next: { revalidate: 30 } });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch {

@@ -11,7 +11,7 @@ export async function POST(
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { slug } = await params;
-    const response = await fetch(`${API_BASE}/series/${slug}/subscribe`, {
+    const response = await fetch(`${API_BASE}/series/${encodeURIComponent(slug)}/subscribe`, {
       method: 'POST',
       headers: { 'X-User-Id': payload.userId, 'X-Internal-Secret': INTERNAL_API_SECRET },
     });
@@ -31,7 +31,7 @@ export async function DELETE(
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { slug } = await params;
-    const response = await fetch(`${API_BASE}/series/${slug}/subscribe`, {
+    const response = await fetch(`${API_BASE}/series/${encodeURIComponent(slug)}/subscribe`, {
       method: 'DELETE',
       headers: { 'X-User-Id': payload.userId, 'X-Internal-Secret': INTERNAL_API_SECRET },
     });

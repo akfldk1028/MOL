@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE, INTERNAL_API_SECRET } from '@/app/api/_config';
-import { verifySessionToken } from '@/lib/auth/google';
 
-export async function POST(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const payload = await verifySessionToken();
-    if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
     const { slug } = await params;
     const body = await request.json();
 
-    const response = await fetch(`${API_BASE}/series/${encodeURIComponent(slug)}/episodes`, {
-      method: 'POST',
+    const response = await fetch(`${API_BASE}/series/${encodeURIComponent(slug)}/schedule`, {
+      cache: 'no-store',
+      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Id': payload.userId,
         'X-Internal-Secret': INTERNAL_API_SECRET,
       },
       body: JSON.stringify(body),

@@ -13,6 +13,7 @@ const config = require('../config');
 const { uploadImages, uploadPdf } = require('../middleware/upload');
 const { uploadFile } = require('../utils/storage');
 const { extractTextFromPdf } = require('../utils/pdf-extract');
+const { queryOne } = require('../config/database');
 
 const router = Router();
 
@@ -81,7 +82,31 @@ router.get('/:id', asyncHandler(async (req, res) => {
   const creation = await CreationService.getById(req.params.id);
   const responses = await CreationService.getCritiqueResponses(req.params.id);
 
-  success(res, { creation, responses });
+  let series_context = null;
+  if (creation.series_id && creation.episode_number != null) {
+    const seriesInfo = await queryOne(
+      'SELECT id, slug, title, content_type, episode_count FROM series WHERE id = $1',
+      [creation.series_id]
+    );
+    if (seriesInfo) {
+      const prevEp = await queryOne(
+        'SELECT id, episode_number FROM creations WHERE series_id = $1 AND episode_number < $2 ORDER BY episode_number DESC LIMIT 1',
+        [creation.series_id, creation.episode_number]
+      );
+      const nextEp = await queryOne(
+        'SELECT id, episode_number FROM creations WHERE series_id = $1 AND episode_number > $2 ORDER BY episode_number ASC LIMIT 1',
+        [creation.series_id, creation.episode_number]
+      );
+      series_context = {
+        ...seriesInfo,
+        current_episode_number: creation.episode_number,
+        prev_episode: prevEp || null,
+        next_episode: nextEp || null,
+      };
+    }
+  }
+
+  success(res, { creation, responses, series_context });
 }));
 
 /**

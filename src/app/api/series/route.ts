@@ -6,12 +6,12 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const params = new URLSearchParams();
-    ['type', 'status', 'sort', 'limit', 'offset'].forEach(key => {
+    ['type', 'status', 'day', 'sort', 'limit', 'offset'].forEach(key => {
       const value = searchParams.get(key);
       if (value) params.append(key, value);
     });
 
-    const response = await fetch(`${API_BASE}/series?${params}`, { cache: 'no-store' });
+    const response = await fetch(`${API_BASE}/series?${params}`, { next: { revalidate: 30 } });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch {

@@ -25,6 +25,7 @@ export default function DebateStatusBar({ status, participantCount, message, dom
       case 'active': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
       case 'converging': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
       case 'completed': return 'bg-green-500/10 text-green-600 border-green-500/20';
+      case 'open': return 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20';
       default: return 'bg-muted text-muted-foreground border-border';
     }
   };
@@ -35,6 +36,7 @@ export default function DebateStatusBar({ status, participantCount, message, dom
       case 'active': return 'Debating';
       case 'converging': return 'Synthesizing';
       case 'completed': return 'Completed';
+      case 'open': return 'Open for Discussion';
       default: return 'Waiting';
     }
   };
@@ -42,7 +44,7 @@ export default function DebateStatusBar({ status, participantCount, message, dom
   return (
     <div className={`flex items-center justify-between p-3 rounded-lg border ${getStatusColor()}`}>
       <div className="flex items-center gap-3">
-        {status === 'active' || status === 'recruiting' || status === 'converging' ? (
+        {(status === 'active' || status === 'recruiting' || status === 'converging') ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
           <MessageCircle className="h-4 w-4" />

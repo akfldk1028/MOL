@@ -11,7 +11,10 @@ import WorkflowPhaseIndicator from '@/features/creations/components/workflow-pha
 import RewriteCard from '@/features/creations/components/rewrite-card';
 import ComparisonCard from '@/features/creations/components/comparison-card';
 import FinalReportCard from '@/features/creations/components/final-report-card';
-import type { Creation, DebateResponse, WorkflowPhase, ComparisonScores } from '@/types';
+import { WebtoonViewer, EpisodeNavigation, EpisodeLikeButton } from '@/features/series/components';
+import { CommentList, CommentForm, CommentSort } from '@/components/comment/index';
+import { useComments } from '@/hooks';
+import type { Creation, DebateResponse, WorkflowPhase, ComparisonScores, CommentSort as CommentSortType } from '@/types';
 
 const TYPE_CONFIG: Record<string, { icon: typeof BookOpen; color: string; label: string; listHref: string; listLabel: string }> = {
   novel: { icon: BookOpen, color: '#8b5cf6', label: 'Novel', listHref: '/novels', listLabel: 'Novels' },
@@ -19,6 +22,17 @@ const TYPE_CONFIG: Record<string, { icon: typeof BookOpen; color: string; label:
   book: { icon: FileText, color: '#0ea5e9', label: 'Book Analysis', listHref: '/books', listLabel: 'Books' },
   contest: { icon: Trophy, color: '#f59e0b', label: 'Contest Submission', listHref: '/contests', listLabel: 'Contests' },
 };
+
+interface SeriesContext {
+  id: string;
+  slug: string;
+  title: string;
+  content_type: string;
+  episode_count: number;
+  current_episode_number: number;
+  prev_episode: { id: string; episode_number: number } | null;
+  next_episode: { id: string; episode_number: number } | null;
+}
 
 export default function CritiqueDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
@@ -40,6 +54,10 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
   const [comparisonContent, setComparisonContent] = useState<string | null>(null);
   const [comparisonScores, setComparisonScores] = useState<ComparisonScores | null>(null);
   const [finalReport, setFinalReport] = useState<string | null>(null);
+  const [seriesContext, setSeriesContext] = useState<SeriesContext | null>(null);
+  const [commentSort, setCommentSort] = useState<CommentSortType>('top');
+  const postId = (creation as any)?.post_id || creation?.postId || '';
+  const { data: comments, isLoading: commentsLoading, mutate: mutateComments } = useComments(postId, { sort: commentSort });
 
   useEffect(() => {
     loadCreation();
@@ -56,7 +74,9 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
 
       const c = data.creation;
       setCreation(c);
-      setDebateStatus(c.debate_status || c.debateStatus || 'recruiting');
+      // Autonomous episodes (no debate session) → treat as 'open'
+      const rawStatus = c.debate_status || c.debateStatus;
+      setDebateStatus(rawStatus || (c.status === 'published' ? 'open' : 'recruiting'));
       setParticipantCount(c.participants?.length || c.participant_count || 0);
 
       // Load enhanced workflow data
@@ -82,6 +102,8 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
         if (synthResp) setSynthesis(synthResp.content);
       }
 
+      if (data.series_context) setSeriesContext(data.series_context);
+
       if (c.summary_content) setSynthesis(c.summary_content);
 
       // Connect SSE if critique in progress
@@ -101,25 +123,28 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
 
     const es = new EventSource(`/api/creations/${id}/stream`);
     eventSourceRef.current = es;
+    let errorCount = 0;
+
+    const safeParse = (raw: string) => { try { return JSON.parse(raw); } catch { return null; } };
 
     es.addEventListener('status', (e) => {
-      const data = JSON.parse(e.data);
+      const data = safeParse(e.data); if (!data) return;
       setDebateStatus(data.status);
       if (data.message) setStatusMessage(data.message);
     });
 
     es.addEventListener('agents_selected', (e) => {
-      const data = JSON.parse(e.data);
+      const data = safeParse(e.data); if (!data) return;
       setParticipantCount(data.agents.length);
     });
 
     es.addEventListener('agent_thinking', (e) => {
-      const data = JSON.parse(e.data);
+      const data = safeParse(e.data); if (!data) return;
       setStatusMessage(`${data.agent} is analyzing...`);
     });
 
     es.addEventListener('agent_response', (e) => {
-      const data = JSON.parse(e.data) as DebateResponse;
+      const data = safeParse(e.data) as DebateResponse; if (!data) return;
       setResponses(prev => [...prev, data]);
       setNewResponseIds(prev => new Set(prev).add(data.commentId));
       setStatusMessage('');
@@ -130,32 +155,32 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
     });
 
     es.addEventListener('synthesis', (e) => {
-      const data = JSON.parse(e.data);
+      const data = safeParse(e.data); if (!data) return;
       setSynthesis(data.content);
     });
 
     // Enhanced workflow SSE events
     es.addEventListener('phase_change', (e) => {
-      const data = JSON.parse(e.data);
+      const data = safeParse(e.data); if (!data) return;
       setWorkflowPhase(data.phase);
       setStatusMessage('');
     });
 
     es.addEventListener('rewrite_complete', (e) => {
-      const data = JSON.parse(e.data);
+      const data = safeParse(e.data); if (!data) return;
       setRewriteContent(data.content);
       setStatusMessage('');
     });
 
     es.addEventListener('comparison_complete', (e) => {
-      const data = JSON.parse(e.data);
+      const data = safeParse(e.data); if (!data) return;
       setComparisonContent(data.content);
       if (data.scores) setComparisonScores(data.scores);
       setStatusMessage('');
     });
 
     es.addEventListener('final_report', (e) => {
-      const data = JSON.parse(e.data);
+      const data = safeParse(e.data); if (!data) return;
       setFinalReport(data.content);
       setStatusMessage('');
     });
@@ -168,7 +193,8 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
     });
 
     es.onerror = () => {
-      // EventSource handles auto-reconnect
+      errorCount++;
+      if (errorCount >= 5) es.close();
     };
   };
 
@@ -197,7 +223,11 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
     <div className="max-w-3xl mx-auto py-6 px-4">
       {/* Header */}
       <div className="mb-6">
-        <PageBreadcrumb items={[{ label: typeConfig.listLabel, href: typeConfig.listHref }, { label: creation.title }]} />
+        <PageBreadcrumb items={[
+          { label: typeConfig.listLabel, href: typeConfig.listHref },
+          ...(seriesContext ? [{ label: seriesContext.title, href: `/series/${seriesContext.slug}` }] : []),
+          { label: creation.title },
+        ]} />
         <div className="flex items-center gap-2 mb-2">
           <span
             className="text-xs px-2 py-0.5 rounded-full font-medium"
@@ -213,9 +243,9 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
           )}
         </div>
         <h1 className="text-xl font-bold">{creation.title}</h1>
-        {creation.wordCount > 0 && (
+        {((creation as any).word_count ?? creation.wordCount ?? 0) > 0 && (
           <p className="text-xs text-muted-foreground mt-1">
-            {creation.wordCount.toLocaleString()} words
+            {((creation as any).word_count ?? creation.wordCount ?? 0).toLocaleString()} words
           </p>
         )}
         {creation.tags && creation.tags.length > 0 && (
@@ -226,9 +256,16 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
           </div>
         )}
         <div className="text-xs text-muted-foreground mt-2">
-          by {creation.createdByName || 'Anonymous'}
+          by {(creation as any).created_by_name || creation.createdByName || 'Anonymous'}
         </div>
       </div>
+
+      {/* Webtoon Content Viewer — vertical scroll panels */}
+      {creation.content && (
+        <div className="mb-6">
+          <WebtoonViewer content={(creation as any).content || ''} imageUrls={(creation as any).image_urls || creation.imageUrls || []} />
+        </div>
+      )}
 
       {/* Workflow Phase Indicator */}
       {hasEnhancedWorkflow && (
@@ -260,6 +297,10 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
               </div>
             )}
           </>
+        ) : debateStatus === 'open' ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>No critiques yet. Community members can comment below.</p>
+          </div>
         ) : debateStatus !== 'completed' ? (
           <div className="text-center py-12 text-muted-foreground">
             <p>Waiting for critique agents to start analyzing...</p>
@@ -294,6 +335,35 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
         <div className="mt-6">
           <FinalReportCard content={finalReport} />
         </div>
+      )}
+
+      {/* Like Button */}
+      {postId && (
+        <div className="flex justify-center mt-8">
+          <EpisodeLikeButton postId={postId} initialCount={(creation as any)?.upvotes || (creation as any)?.like_count || 0} />
+        </div>
+      )}
+
+      {/* Comments Section */}
+      {postId && (
+        <div className="mt-8 border-t pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold">Comments</h2>
+            <CommentSort value={commentSort} onChange={(v) => setCommentSort(v as CommentSortType)} />
+          </div>
+          <CommentForm postId={postId} onSubmit={() => mutateComments()} />
+          <div className="mt-4">
+            <CommentList comments={comments || []} postId={postId} isLoading={commentsLoading} />
+          </div>
+        </div>
+      )}
+
+      {seriesContext && (
+        <EpisodeNavigation
+          seriesSlug={seriesContext.slug}
+          prevEpisode={seriesContext.prev_episode}
+          nextEpisode={seriesContext.next_episode}
+        />
       )}
     </div>
   );

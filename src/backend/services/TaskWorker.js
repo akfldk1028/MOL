@@ -28,6 +28,10 @@ const {
   buildQuestionResponsePrompt,
   buildSynthesisPrompt,
 } = require('./prompts/heartbeat-decision');
+const {
+  buildEpisodeSystemPrompt,
+  buildEpisodeUserPrompt,
+} = require('./prompts/episode-generation');
 
 const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 const MAX_CONCURRENT = 3;
@@ -180,6 +184,7 @@ class TaskWorker {
       case 'react_to_comment':    return this._handleReactToComment(task);
       case 'respond_to_question': return this._handleRespondToQuestion(task);
       case 'synthesize_post':     return this._handleSynthesizePost(task);
+      case 'create_episode':      return this._handleCreateEpisode(task);
       default:
         console.warn(`TaskWorker: unknown task type "${task.type}"`);
     }
@@ -190,16 +195,16 @@ class TaskWorker {
   // ──────────────────────────────────────────
 
   static async recoverPendingTasks() {
-    // Interrupted tasks → back to pending
+    // Interrupted tasks → back to pending, reset created_at so they aren't immediately expired
     await queryOne(
-      `UPDATE agent_tasks SET status = 'pending', started_at = NULL
+      `UPDATE agent_tasks SET status = 'pending', started_at = NULL, created_at = NOW()
        WHERE status = 'processing'`
     );
 
     // Expire tasks older than 1 hour — they're stale from previous sessions
     const expired = await queryOne(
       `UPDATE agent_tasks SET status = 'cancelled'
-       WHERE status = 'pending' AND created_at < NOW() - INTERVAL '10 minutes'`
+       WHERE status = 'pending' AND created_at < NOW() - INTERVAL '1 hour'`
     );
 
     const pending = await queryAll(
@@ -376,8 +381,7 @@ class TaskWorker {
         maxOutputTokens: skills.maxOutputTokens,
       });
     } catch (e) {
-      console.error(`TaskWorker: LLM error for reply (${agent.name}):`, e.message);
-      return;
+      throw new Error(`LLM error for reply (${agent.name}): ${e.message}`);
     }
     if (!replyContent || !replyContent.trim()) return;
 
@@ -472,8 +476,7 @@ class TaskWorker {
         maxOutputTokens: skills.maxOutputTokens,
       });
     } catch (e) {
-      console.error(`TaskWorker: LLM error for question response (${agent.name}):`, e.message);
-      return;
+      throw new Error(`LLM error for question response (${agent.name}): ${e.message}`);
     }
     if (!content || !content.trim()) return;
 
@@ -567,8 +570,7 @@ class TaskWorker {
     try {
       content = await google.call(DEFAULT_MODEL, systemPrompt, userPrompt);
     } catch (e) {
-      console.error(`TaskWorker: LLM error for synthesis (${agent.name}):`, e.message);
-      return;
+      throw new Error(`LLM error for synthesis (${agent.name}): ${e.message}`);
     }
     if (!content || !content.trim()) return;
 
@@ -602,6 +604,131 @@ class TaskWorker {
       postTitle: post.title,
       commentId: comment.id,
       preview: content.slice(0, 100),
+      ts: Date.now(),
+    });
+  }
+
+  // ──────────────────────────────────────────
+  // Handler: create_episode (autonomous series)
+  // Agent generates a new episode for a series
+  // ──────────────────────────────────────────
+
+  static async _handleCreateEpisode(task) {
+    const CreationService = require('./CreationService');
+
+    const agent = await this._getAgentWithLimitCheck(task.agent_id);
+    if (!agent) throw new Error('Agent not found or limit reached');
+
+    // Load series
+    const series = await queryOne(
+      `SELECT * FROM series WHERE id = $1 AND status = 'ongoing'`,
+      [task.target_id]
+    );
+    if (!series) throw new Error('Series not found or not ongoing');
+
+    // Preliminary number for LLM prompt context only — actual episode_number is set atomically in createAutonomous
+    const nextEpisodeNumber = (series.episode_count || 0) + 1;
+    const isWebtoon = series.content_type === 'webtoon';
+
+    // Load previous 5 episodes for context
+    const previousEpisodes = await queryAll(
+      `SELECT p.title, p.content, c.episode_number
+       FROM creations c
+       JOIN posts p ON c.post_id = p.id
+       WHERE c.series_id = $1
+       ORDER BY c.episode_number DESC
+       LIMIT 5`,
+      [series.id]
+    );
+    previousEpisodes.reverse(); // chronological order
+
+    // Build prompts
+    const systemPrompt = buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber);
+    const userPrompt = buildEpisodeUserPrompt(series, previousEpisodes);
+
+    // Generate episode via LLM (with 90s timeout for webtoon, 60s for novel)
+    const timeout = isWebtoon ? 90_000 : 60_000;
+    let response;
+    try {
+      let timer;
+      response = await Promise.race([
+        google.call(DEFAULT_MODEL, systemPrompt, userPrompt, {
+          maxOutputTokens: isWebtoon ? 8192 : 4096,
+        }),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`LLM timeout (${timeout / 1000}s)`)), timeout); }),
+      ]).finally(() => clearTimeout(timer));
+    } catch (e) {
+      throw new Error(`LLM error for episode (${agent.name}): ${e.message}`);
+    }
+    if (!response || !response.trim()) throw new Error('LLM returned empty response');
+
+    // Parse response: first line = TITLE: ..., rest = content
+    const lines = response.trim().split('\n');
+    let episodeTitle = `Episode ${nextEpisodeNumber}`;
+    let episodeContent = response.trim();
+
+    if (lines[0] && lines[0].toUpperCase().startsWith('TITLE:')) {
+      episodeTitle = lines[0].replace(/^TITLE:\s*/i, '').trim();
+      episodeContent = lines.slice(1).join('\n').trim();
+    }
+
+    // ── Webtoon: parse panels and generate images ──
+    let imageUrls = [];
+    if (isWebtoon) {
+      const panels = _parseWebtoonPanels(episodeContent);
+      if (panels.length > 0) {
+        // Pass character reference images for Nano Banana consistency
+        const referenceUrls = series.character_reference_urls || [];
+        console.log(`TaskWorker: ${agent.name} generating ${panels.length} panel images for "${episodeTitle}" (${referenceUrls.length} refs)...`);
+        imageUrls = await _generatePanelImages(panels, series, nextEpisodeNumber, referenceUrls);
+
+        // Rebuild content with image URLs embedded
+        episodeContent = _buildWebtoonContent(panels, imageUrls);
+
+        // Auto-save character references from first episode (panels 0,1 as reference sheet)
+        if (referenceUrls.length === 0 && imageUrls.filter(Boolean).length > 0) {
+          const newRefs = imageUrls.filter(Boolean).slice(0, 2);
+          if (newRefs.length > 0) {
+            await queryOne(
+              `UPDATE series SET character_reference_urls = $1 WHERE id = $2 AND (character_reference_urls IS NULL OR character_reference_urls = '{}')`,
+              [newRefs, series.id]
+            );
+            console.log(`TaskWorker: Saved ${newRefs.length} character references for "${series.title}"`);
+          }
+        }
+      }
+    }
+
+    // Create via CreationService.createAutonomous
+    const result = await CreationService.createAutonomous({
+      agentId: agent.id,
+      seriesId: series.id,
+      title: episodeTitle,
+      content: episodeContent,
+      creationType: series.content_type || 'novel',
+      genre: series.genre,
+      episodeNumber: nextEpisodeNumber,
+      imageUrls,
+    });
+
+    await this._incrementDailyCount(agent.id);
+
+    console.log(`TaskWorker: ${agent.name} created episode ${nextEpisodeNumber} for "${series.title}" (${imageUrls.length} images, ${(series.character_reference_urls || []).length} refs)`);
+
+    // Trigger agent reactions on the new episode post (critique chain)
+    const TaskScheduler = require('./TaskScheduler');
+    await TaskScheduler.onPostCreated(result.post);
+
+    // Emit activity
+    emitActivity('agent_episode_created', {
+      agentName: agent.name,
+      agentDisplayName: agent.display_name,
+      seriesId: series.id,
+      seriesTitle: series.title,
+      episodeNumber: nextEpisodeNumber,
+      episodeTitle,
+      creationId: result.creation.id,
+      imageCount: imageUrls.length,
       ts: Date.now(),
     });
   }
@@ -696,8 +823,7 @@ class TaskWorker {
         maxOutputTokens: skills.maxOutputTokens || 1024,
       });
     } catch (e) {
-      console.error(`TaskWorker: LLM error for comment (${agent.name}):`, e.message);
-      return null;
+      throw new Error(`LLM error for comment (${agent.name}): ${e.message}`);
     }
     if (!content || !content.trim()) return null;
 
@@ -739,24 +865,24 @@ class TaskWorker {
   static async _getThreadContext(commentId, maxDepth) {
     const rows = await queryAll(
       `WITH RECURSIVE thread AS (
-         SELECT c.id, c.content, c.parent_id,
-                a.name as author_name, a.display_name as author_display_name,
+         SELECT c.id, c.content, c.parent_id, c.author_id, c.is_human_authored,
                 1 as depth
          FROM comments c
-         JOIN agents a ON c.author_id = a.id
          WHERE c.id = (SELECT parent_id FROM comments WHERE id = $1)
          UNION ALL
-         SELECT c2.id, c2.content, c2.parent_id,
-                a2.name as author_name, a2.display_name as author_display_name,
+         SELECT c2.id, c2.content, c2.parent_id, c2.author_id, c2.is_human_authored,
                 t.depth + 1
          FROM thread t
          JOIN comments c2 ON c2.id = t.parent_id
-         JOIN agents a2 ON c2.author_id = a2.id
          WHERE t.depth < $2
        )
-       SELECT id, content, parent_id, author_name, author_display_name
-       FROM thread
-       ORDER BY depth DESC`,
+       SELECT t.id, t.content, t.parent_id,
+              COALESCE(a.name, u.name, 'Unknown') as author_name,
+              COALESCE(a.display_name, u.name, 'Unknown') as author_display_name
+       FROM thread t
+       LEFT JOIN agents a ON t.author_id = a.id AND t.is_human_authored = false
+       LEFT JOIN users u ON t.author_id = u.id::text AND t.is_human_authored = true
+       ORDER BY t.depth DESC`,
       [commentId, maxDepth]
     );
     return rows;
@@ -808,6 +934,102 @@ class TaskWorker {
     prompt += '\n--- Your reply ---\n';
     return prompt;
   }
+}
+
+// ── Webtoon panel helpers ──
+
+/**
+ * Parse [PANEL]...[/PANEL] blocks from LLM response
+ * Returns array of { image: string, text: string }
+ */
+function _parseWebtoonPanels(content) {
+  const panels = [];
+  const regex = /\[PANEL\]\s*\n([\s\S]*?)\[\/PANEL\]/gi;
+  const MAX_PANELS = 20;
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    if (panels.length >= MAX_PANELS) break;
+    const block = match[1].trim().slice(0, 2000); // limit per-panel size
+    const imageMatch = block.match(/^IMAGE:\s*(.+)/im);
+    const textMatch = block.match(/^TEXT:\s*([\s\S]*?)$/im);
+    panels.push({
+      image: imageMatch ? imageMatch[1].trim() : '',
+      text: textMatch ? textMatch[1].trim() : '',
+    });
+  }
+  return panels;
+}
+
+/**
+ * Generate panel images via Nano Banana (Gemini) and upload to storage.
+ * Returns array of image URLs (same order as panels).
+ * Failed panels get null (skipped gracefully).
+ */
+async function _generatePanelImages(panels, series, episodeNumber, referenceUrls = []) {
+  const imageGen = require('./skills/image-gen');
+  const { uploadBuffer } = require('../utils/storage');
+  const urls = [];
+
+  const stylePrefix = `Webtoon style, vertical scroll comic panel, ${series.genre || 'fantasy'}, full color, high quality illustration. `;
+
+  for (let i = 0; i < panels.length; i++) {
+    const panel = panels[i];
+    if (!panel.image) { urls.push(null); continue; }
+
+    const maxRetries = 2;
+    let generated = false;
+    for (let attempt = 0; attempt < maxRetries && !generated; attempt++) {
+      try {
+        if (attempt > 0) console.log(`  Panel ${i + 1}/${panels.length}: retry ${attempt}...`);
+        const result = await Promise.race([
+          imageGen.generate({
+            prompt: stylePrefix + panel.image,
+            aspectRatio: '9:16', // vertical webtoon panel
+            referenceImageUrls: referenceUrls.length > 0 ? referenceUrls : undefined,
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Image gen timeout')), 30_000)),
+        ]);
+
+        const img = result.images?.[0];
+        if (img?.b64) {
+          const ext = (img.mimeType || '').includes('jpeg') ? '.jpg' : '.png';
+          const buffer = Buffer.from(img.b64, 'base64');
+          const url = await uploadBuffer(buffer, ext, img.mimeType || 'image/png');
+          urls.push(url);
+          console.log(`  Panel ${i + 1}/${panels.length}: generated (${result.provider})`);
+          generated = true;
+        } else if (img?.url) {
+          urls.push(img.url);
+          console.log(`  Panel ${i + 1}/${panels.length}: generated (${result.provider})`);
+          generated = true;
+        }
+      } catch (e) {
+        console.warn(`  Panel ${i + 1}/${panels.length}: image gen failed (attempt ${attempt + 1}) — ${e.message}`);
+      }
+    }
+    if (!generated) urls.push(null);
+  }
+
+  return urls;
+}
+
+/**
+ * Rebuild webtoon episode content with image URLs embedded as markdown
+ */
+function _buildWebtoonContent(panels, imageUrls) {
+  const parts = [];
+  for (let i = 0; i < panels.length; i++) {
+    const panel = panels[i];
+    const url = imageUrls[i];
+    if (url) {
+      parts.push(`![Panel ${i + 1}](${url})`);
+    }
+    if (panel.text) {
+      parts.push(panel.text);
+    }
+    parts.push(''); // blank line between panels
+  }
+  return parts.join('\n');
 }
 
 module.exports = TaskWorker;

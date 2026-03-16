@@ -17,13 +17,11 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
   const [newResponseIds, setNewResponseIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const eventSourceRef = useRef<EventSource | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadQuestion();
     return () => {
-      eventSourceRef.current?.close();
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [id]);
@@ -79,57 +77,6 @@ export default function QuestionDetailPage({ params }: { params: { id: string } 
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const connectSSE = () => {
-    if (eventSourceRef.current) eventSourceRef.current.close();
-
-    const es = new EventSource(`/api/v1/questions/${id}/stream`);
-    eventSourceRef.current = es;
-    let sseWorking = false;
-    let errorCount = 0;
-
-    es.addEventListener('connected', () => { sseWorking = true; });
-
-    es.addEventListener('agent_thinking', (e) => {
-      const data = JSON.parse(e.data);
-      setStatusMessage(`${data.agent} is thinking...`);
-    });
-
-    es.addEventListener('agent_response', (e) => {
-      sseWorking = true;
-      const data = JSON.parse(e.data) as DebateResponse;
-      setResponses(prev => {
-        if (prev.some(p => p.commentId === data.commentId)) return prev;
-        return [...prev, data];
-      });
-      setNewResponseIds(prev => new Set(prev).add(data.commentId));
-      setStatusMessage('');
-
-      setTimeout(() => {
-        threadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-      }, 100);
-    });
-
-    es.addEventListener('synthesis', (e) => {
-      const data = JSON.parse(e.data);
-      setSynthesis(data.content);
-    });
-
-    es.addEventListener('debate_complete', () => {
-      setStatusMessage('');
-      es.close();
-    });
-
-    es.onerror = () => {
-      errorCount++;
-      // SSE keeps failing (Next.js proxy issue) → switch to polling
-      if (!sseWorking && errorCount >= 2) {
-        es.close();
-        eventSourceRef.current = null;
-        startPolling();
-      }
-    };
   };
 
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);

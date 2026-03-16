@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PageContainer } from '@/common/components/page-container';
 import { Spinner } from '@/common/ui';
-import { BookOpen, Image, Music, Palette, Film, FileText, Trophy, Users, Eye, Plus } from 'lucide-react';
+import { BookOpen, Image, Music, Palette, Film, FileText, Trophy, Users, Eye, Plus, Bot } from 'lucide-react';
 
 interface Series {
   id: string;
@@ -17,6 +17,7 @@ interface Series {
   status: string;
   author_name: string | null;
   agent_name: string | null;
+  created_by_agent_id: string | null;
   episode_count: number;
   subscriber_count: number;
   total_views: number;
@@ -49,22 +50,38 @@ const TABS = [
   { label: 'Scripts', value: 'screenplay' },
 ];
 
+const DAY_TABS = [
+  { label: '전체', value: '' },
+  { label: '월', value: 'mon' },
+  { label: '화', value: 'tue' },
+  { label: '수', value: 'wed' },
+  { label: '목', value: 'thu' },
+  { label: '금', value: 'fri' },
+  { label: '토', value: 'sat' },
+  { label: '일', value: 'sun' },
+  { label: '완결', value: 'completed' },
+];
+
 export default function SeriesListPage() {
   const [series, setSeries] = useState<Series[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [activeType, setActiveType] = useState('');
+  const [activeDay, setActiveDay] = useState('');
 
   useEffect(() => {
     setLoading(true);
+    setError('');
     const params = new URLSearchParams({ limit: '30' });
     if (activeType) params.set('type', activeType);
+    if (activeDay) params.set('day', activeDay);
 
     fetch(`/api/series?${params}`)
       .then(res => res.ok ? res.json() : { series: [] })
       .then(data => setSeries(data.series || []))
-      .catch(() => {})
+      .catch(() => setError('Failed to load series'))
       .finally(() => setLoading(false));
-  }, [activeType]);
+  }, [activeType, activeDay]);
 
   return (
     <PageContainer>
@@ -100,9 +117,28 @@ export default function SeriesListPage() {
           ))}
         </div>
 
+        {/* Day tabs */}
+        <div className="flex items-center gap-0.5 border-b text-sm">
+          {DAY_TABS.map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveDay(tab.value)}
+              className={`px-3 py-2.5 font-medium border-b-2 -mb-px transition-colors ${
+                activeDay === tab.value
+                  ? 'border-foreground text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
         {/* Series list */}
         {loading ? (
           <div className="flex justify-center py-12"><Spinner /></div>
+        ) : error ? (
+          <div className="border-x border-b rounded-b-lg bg-card text-center py-16 text-sm text-destructive">{error}</div>
         ) : series.length > 0 ? (
           <div className="border-x border-b rounded-b-lg bg-card divide-y">
             {series.map(s => {
@@ -123,6 +159,12 @@ export default function SeriesListPage() {
                       <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${STATUS_BADGE[s.status] || STATUS_BADGE.ongoing}`}>
                         {s.status}
                       </span>
+                      {s.created_by_agent_id && (
+                        <span className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400">
+                          <Bot className="h-3 w-3" />
+                          AI Author
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
                       <span>{s.author_name || s.agent_name || 'anonymous'}</span>

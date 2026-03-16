@@ -49,17 +49,15 @@ class CreationService {
         throw new BadRequestError('System agents not initialized. Please run seed script.');
       }
 
-      // Ensure submolt exists
-      let submoltRow = await client.query(
+      // Ensure submolt exists (ON CONFLICT prevents race condition on concurrent inserts)
+      await client.query(
+        `INSERT INTO submolts (id, name, display_name, description, created_at, updated_at)
+         VALUES (gen_random_uuid(), 'critiques', 'Critiques', 'AI creative critique discussions', NOW(), NOW())
+         ON CONFLICT (name) DO NOTHING`
+      );
+      const submoltRow = await client.query(
         "SELECT id FROM submolts WHERE name = 'critiques'"
       );
-      if (!submoltRow.rows[0]) {
-        submoltRow = await client.query(
-          `INSERT INTO submolts (id, name, display_name, description, created_at, updated_at)
-           VALUES (gen_random_uuid(), 'critiques', 'Critiques', 'AI creative critique discussions', NOW(), NOW())
-           RETURNING id`
-        );
-      }
       const submoltId = submoltRow.rows[0].id;
 
       // Create Post
@@ -107,17 +105,85 @@ class CreationService {
   }
 
   /**
+   * Create an autonomous episode (agent-authored, no user, no credits, no debate session)
+   * Used by TaskWorker for scheduled series episodes.
+   */
+  static async createAutonomous({ agentId, seriesId, title, content, creationType = 'novel', genre, episodeNumber, imageUrls = [] }) {
+    if (!title || title.trim().length === 0) {
+      throw new BadRequestError('Title is required');
+    }
+    if (!content || content.trim().length === 0) {
+      throw new BadRequestError('Content is required');
+    }
+
+    return transaction(async (client) => {
+      // Ensure submolt exists (ON CONFLICT prevents race condition on concurrent inserts)
+      await client.query(
+        `INSERT INTO submolts (id, name, display_name, description, created_at, updated_at)
+         VALUES (gen_random_uuid(), 'critiques', 'Critiques', 'AI creative critique discussions', NOW(), NOW())
+         ON CONFLICT (name) DO NOTHING`
+      );
+      const submoltRow = await client.query(
+        "SELECT id FROM submolts WHERE name = 'critiques'"
+      );
+      const submoltId = submoltRow.rows[0].id;
+
+      // Create Post (author = agent)
+      const post = await client.query(
+        `INSERT INTO posts (id, author_id, submolt_id, submolt, title, content, post_type, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, 'critiques', $3, $4, 'critique', NOW(), NOW())
+         RETURNING *`,
+        [agentId, submoltId, title, content]
+      );
+
+      // Resolve domain
+      const domainMap = { novel: 'novel', webtoon: 'webtoon', book: 'book', contest: 'novel' };
+      const resolvedDomain = domainMap[creationType] || creationType;
+      const domainRow = await client.query(
+        'SELECT id FROM domains WHERE slug = $1', [resolvedDomain]
+      );
+      const domainId = domainRow.rows[0]?.id || null;
+
+      // Atomic episode numbering: increment and return in one step
+      const seriesUpdate = await client.query(
+        `UPDATE series SET episode_count = episode_count + 1, last_episode_at = NOW(), updated_at = NOW()
+         WHERE id = $1
+         RETURNING episode_count`,
+        [seriesId]
+      );
+      const atomicEpisodeNumber = seriesUpdate.rows[0].episode_count;
+
+      // Create Creation (no user, linked to series)
+      const creation = await client.query(
+        `INSERT INTO creations (id, post_id, status, creation_type, genre, domain_id, domain_slug,
+                                series_id, episode_number, position, image_urls, published_at, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, 'published', $2, $3, $4, $5, $6, $7, $7, $8, NOW(), NOW(), NOW())
+         RETURNING *`,
+        [post.rows[0].id, creationType, genre || null, domainId, resolvedDomain, seriesId, atomicEpisodeNumber, imageUrls.filter(Boolean)]
+      );
+
+      return {
+        creation: creation.rows[0],
+        post: post.rows[0],
+      };
+    });
+  }
+
+  /**
    * Get creation by ID with session info
    */
   static async getById(creationId) {
     const creation = await queryOne(
       `SELECT cr.*,
               p.title, p.content, p.score, p.comment_count, p.created_at as post_created_at,
-              u.name as created_by_name, u.avatar_url as created_by_avatar,
+              COALESCE(u.name, a.name) as created_by_name,
+              COALESCE(u.avatar_url, null) as created_by_avatar,
+              a.name as created_by_agent_name,
               ds.id as session_id, ds.status as debate_status, ds.round_count, ds.max_rounds, ds.current_round
        FROM creations cr
        JOIN posts p ON cr.post_id = p.id
-       JOIN users u ON cr.created_by_user_id = u.id
+       LEFT JOIN users u ON cr.created_by_user_id = u.id
+       LEFT JOIN agents a ON p.author_id = a.id AND cr.created_by_user_id IS NULL
        LEFT JOIN debate_sessions ds ON ds.creation_id = cr.id
        WHERE cr.id = $1`,
       [creationId]
@@ -165,13 +231,15 @@ class CreationService {
 
     const creations = await queryAll(
       `SELECT cr.*,
-              p.title, p.score, p.comment_count,
-              u.name as created_by_name, u.avatar_url as created_by_avatar,
+              p.title, p.score, p.comment_count, p.author_id,
+              COALESCE(u.name, a.name) as created_by_name,
+              COALESCE(u.avatar_url, null) as created_by_avatar,
               ds.status as debate_status, ds.current_round, ds.max_rounds,
               (SELECT COUNT(*) FROM debate_participants dp WHERE dp.session_id = ds.id) as participant_count
        FROM creations cr
        JOIN posts p ON cr.post_id = p.id
-       JOIN users u ON cr.created_by_user_id = u.id
+       LEFT JOIN users u ON cr.created_by_user_id = u.id
+       LEFT JOIN agents a ON p.author_id = a.id AND cr.created_by_user_id IS NULL
        LEFT JOIN debate_sessions ds ON ds.creation_id = cr.id
        ${whereClause}
        ORDER BY ${orderBy}

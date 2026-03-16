@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE, INTERNAL_API_SECRET } from '@/app/api/_config';
 import { verifySessionToken } from '@/lib/auth/google';
-import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +11,7 @@ export async function GET(request: NextRequest) {
       if (value) params.append(key, value);
     });
 
-    const response = await fetch(`${API_BASE}/questions?${params}`, { cache: 'no-store' });
+    const response = await fetch(`${API_BASE}/questions?${params}`, { next: { revalidate: 30 } });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {

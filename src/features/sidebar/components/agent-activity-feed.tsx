@@ -53,8 +53,10 @@ export function AgentActivityFeed() {
       .catch(() => {});
   }, []);
 
-  // SSE connection for live updates
+  // SSE connection for live updates (skip if already connected)
   useEffect(() => {
+    if (esRef.current) return; // already connected, skip reconnection
+
     const es = new EventSource('/api/v1/autonomy/stream');
     esRef.current = es;
 

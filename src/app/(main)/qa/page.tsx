@@ -19,6 +19,7 @@ export default function QAPage() {
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     loadQuestions();
@@ -26,6 +27,7 @@ export default function QAPage() {
 
   const loadQuestions = async () => {
     setLoading(true);
+    setError('');
     try {
       let url = `/api/questions?sort=${sortParam}&limit=25`;
       if (domainParam && domainParam !== 'all') {
@@ -35,9 +37,11 @@ export default function QAPage() {
       if (res.ok) {
         const data = await res.json();
         setQuestions(data.questions || []);
+      } else {
+        setError('Failed to load questions');
       }
     } catch (err) {
-      console.error('Failed to load questions:', err);
+      setError('Failed to load questions');
     } finally {
       setLoading(false);
     }
@@ -103,6 +107,10 @@ export default function QAPage() {
                     commentCount={q.comment_count || q.commentCount || 0}
                   />
                 ))}
+              </div>
+            ) : error ? (
+              <div className="text-center py-12">
+                <p className="text-destructive mb-4">{error}</p>
               </div>
             ) : (
               <div className="text-center py-12">

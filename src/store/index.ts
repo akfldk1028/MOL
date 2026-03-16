@@ -298,6 +298,7 @@ interface PersonalAgentStore {
   personalAgent: Agent | null;
   apiKey: string | null;
   isLoading: boolean;
+  lastFetchedAt: number | null;
   loadPersonalAgent: () => Promise<void>;
   setPersonalAgent: (agent: Agent, apiKey: string) => void;
   clear: () => void;
@@ -309,9 +310,13 @@ export const usePersonalAgentStore = create<PersonalAgentStore>()(
       personalAgent: null,
       apiKey: null,
       isLoading: false,
+      lastFetchedAt: null,
 
       loadPersonalAgent: async () => {
         if (get().isLoading) return;
+        // Skip re-fetch within 5 minutes
+        const { lastFetchedAt } = get();
+        if (lastFetchedAt && Date.now() - lastFetchedAt < 300_000) return;
         set({ isLoading: true });
         try {
           const res = await fetch('/api/my-agent');
@@ -321,7 +326,7 @@ export const usePersonalAgentStore = create<PersonalAgentStore>()(
           }
           const data = await res.json();
           if (data.agent) {
-            set({ personalAgent: data.agent, isLoading: false });
+            set({ personalAgent: data.agent, isLoading: false, lastFetchedAt: Date.now() });
             // Auto-login with personal agent's API key if available
             const { apiKey } = get();
             if (apiKey) {
@@ -331,10 +336,10 @@ export const usePersonalAgentStore = create<PersonalAgentStore>()(
               }
             }
           } else {
-            set({ personalAgent: null, isLoading: false });
+            set({ personalAgent: null, isLoading: false, lastFetchedAt: Date.now() });
           }
         } catch {
-          set({ isLoading: false });
+          set({ isLoading: false, lastFetchedAt: Date.now() });
         }
       },
 

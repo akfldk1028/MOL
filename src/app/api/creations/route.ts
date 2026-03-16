@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       if (value) params.append(key, value);
     });
 
-    const response = await fetch(`${API_BASE}/creations?${params}`, { cache: 'no-store' });
+    const response = await fetch(`${API_BASE}/creations?${params}`, { next: { revalidate: 30 } });
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {

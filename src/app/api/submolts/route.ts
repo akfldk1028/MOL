@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
       if (value) params.append(key, value);
     });
     
-    const response = await fetch(`${API_BASE}/submolts?${params}`, { cache: 'no-store',
+    const response = await fetch(`${API_BASE}/submolts?${params}`, {
+      next: { revalidate: 30 },
       headers: authHeader ? { Authorization: authHeader } : {},
     });
     

@@ -18,6 +18,7 @@ const STATUS_TEXT: Record<string, string> = {
   submitted: 'Pending',
   reviewing: 'Reviewing',
   critiqued: 'Done',
+  published: 'Published',
   closed: 'Closed',
 };
 
@@ -34,9 +35,15 @@ function timeAgo(dateStr: string) {
 }
 
 export default function CreationCard({ creation }: { creation: Creation }) {
-  const type = (creation as any).creation_type || creation.creationType || 'novel';
+  const c = creation as any;
+  const type = c.creation_type || creation.creationType || 'novel';
   const { icon: Icon, bg, color } = TYPE_ICON[type] || TYPE_ICON.novel;
   const status = STATUS_TEXT[creation.status] || creation.status;
+  const authorName = c.created_by_name || creation.createdByName || 'anonymous';
+  const createdAt = c.created_at || creation.createdAt;
+  const wordCount = c.word_count ?? creation.wordCount ?? 0;
+  const agentCount = c.agent_count ?? creation.agentCount ?? 0;
+  const commentCount = c.comment_count ?? creation.commentCount ?? 0;
 
   return (
     <Link
@@ -54,19 +61,19 @@ export default function CreationCard({ creation }: { creation: Creation }) {
           {creation.title}
         </div>
         <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-          <span>{creation.createdByName || 'anonymous'}</span>
+          <span>{authorName}</span>
           <span className="text-border">·</span>
-          <span>{timeAgo(creation.createdAt)}</span>
+          <span>{createdAt ? timeAgo(createdAt) : ''}</span>
           {creation.genre && (
             <>
               <span className="text-border">·</span>
               <span>{creation.genre}</span>
             </>
           )}
-          {creation.wordCount > 0 && (
+          {wordCount > 0 && (
             <>
               <span className="text-border">·</span>
-              <span>{creation.wordCount >= 1000 ? `${(creation.wordCount / 1000).toFixed(1)}k` : creation.wordCount} words</span>
+              <span>{wordCount >= 1000 ? `${(wordCount / 1000).toFixed(1)}k` : wordCount} words</span>
             </>
           )}
         </div>
@@ -74,21 +81,21 @@ export default function CreationCard({ creation }: { creation: Creation }) {
 
       {/* Right side — engagement counts */}
       <div className="shrink-0 flex items-center gap-3 text-xs text-muted-foreground">
-        {creation.agentCount > 0 && (
+        {agentCount > 0 && (
           <span className="flex items-center gap-1">
             <Bot className="h-3.5 w-3.5" />
-            {creation.agentCount}
+            {agentCount}
           </span>
         )}
-        {(creation.commentCount ?? 0) > 0 && (
+        {commentCount > 0 && (
           <span className="flex items-center gap-1">
             <MessageCircle className="h-3.5 w-3.5" />
-            {creation.commentCount}
+            {commentCount}
           </span>
         )}
         <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
           status === 'Reviewing' ? 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400' :
-          status === 'Done' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400' :
+          status === 'Done' || status === 'Published' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400' :
           'bg-muted text-muted-foreground'
         }`}>
           {status}
