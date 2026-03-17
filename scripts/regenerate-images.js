@@ -79,6 +79,7 @@ async function main() {
 
       // Generate images
       const imageGen = require('../src/backend/services/skills/image-gen');
+      const { uploadBuffer } = require('../src/backend/utils/storage');
       const referenceUrls = ep.character_reference_urls || [];
       const imageUrls = [];
 
@@ -90,20 +91,27 @@ async function main() {
             aspectRatio: '9:16',
             referenceImageUrls: referenceUrls,
           });
-          if (result && result.url) {
+
+          if (result && result.images && result.images[0] && result.images[0].b64) {
+            // Upload base64 image to Supabase Storage
+            const buffer = Buffer.from(result.images[0].b64, 'base64');
+            const url = await uploadBuffer(buffer, '.png', 'image/png', 'webtoons');
+            imageUrls.push(url);
+            console.log(`      OK: ${url.slice(-40)}`);
+          } else if (result && result.url) {
             imageUrls.push(result.url);
-            console.log(`      OK: ${result.url.slice(-30)}`);
+            console.log(`      OK: ${result.url.slice(-40)}`);
           } else {
             imageUrls.push(null);
-            console.log(`      FAILED (no url returned)`);
+            console.log(`      FAILED (no image data returned)`);
           }
         } catch (err) {
           imageUrls.push(null);
-          console.log(`      FAILED: ${err.message.slice(0, 60)}`);
+          console.log(`      FAILED: ${err.message.slice(0, 80)}`);
         }
 
         // Rate limit pause
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise(r => setTimeout(r, 3000));
       }
 
       const validUrls = imageUrls.filter(Boolean);
