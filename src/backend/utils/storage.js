@@ -12,6 +12,21 @@ const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'creations');
 const BUCKET = 'creations';
 
 /**
+ * Build a structured storage path
+ * Format: {category}/{YYYY-MM}/{filename}
+ * e.g., webtoons/2026-03/agent-1773456028729-8515efb9c35ee6b6.png
+ *        uploads/2026-03/1773456028729-8515efb9.pdf
+ * @param {string} filename - Base filename
+ * @param {string} [category] - Category folder (webtoons, novels, avatars, uploads)
+ * @returns {string} Structured storage path
+ */
+function buildStoragePath(filename, category = 'uploads') {
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return `${category}/${yearMonth}/${filename}`;
+}
+
+/**
  * Ensure the local upload directory exists (fallback for dev without Supabase)
  * @returns {string} Upload directory path
  */
@@ -42,7 +57,7 @@ async function uploadFile(file) {
   const { supabaseAdmin } = require('./supabase-admin');
   const uniqueId = crypto.randomBytes(8).toString('hex');
   const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
-  const storagePath = `${Date.now()}-${uniqueId}${ext}`;
+  const storagePath = buildStoragePath(`${Date.now()}-${uniqueId}${ext}`, 'uploads');
 
   const { error } = await supabaseAdmin.storage
     .from(BUCKET)
@@ -105,23 +120,25 @@ async function deleteFile(filename) {
  * @param {Buffer} buffer - File content
  * @param {string} ext - File extension (e.g., '.mp3', '.png')
  * @param {string} [mimetype] - MIME type
+ * @param {string} [category] - Storage folder category (webtoons, novels, avatars)
  * @returns {Promise<string>} Public URL
  */
-async function uploadBuffer(buffer, ext, mimetype) {
+async function uploadBuffer(buffer, ext, mimetype, category = 'webtoons') {
   const uniqueId = crypto.randomBytes(8).toString('hex');
-  const filename = `agent-${Date.now()}-${uniqueId}${ext}`;
+  const baseFilename = `agent-${Date.now()}-${uniqueId}${ext}`;
+  const storagePath = buildStoragePath(baseFilename, category);
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     ensureUploadDir();
-    const filePath = path.join(UPLOAD_DIR, filename);
+    const filePath = path.join(UPLOAD_DIR, baseFilename);
     fs.writeFileSync(filePath, buffer);
-    return getFileUrl(filename);
+    return getFileUrl(baseFilename);
   }
 
   const { supabaseAdmin } = require('./supabase-admin');
   const { error } = await supabaseAdmin.storage
     .from(BUCKET)
-    .upload(filename, buffer, {
+    .upload(storagePath, buffer, {
       contentType: mimetype || 'application/octet-stream',
       upsert: false,
     });
@@ -130,7 +147,7 @@ async function uploadBuffer(buffer, ext, mimetype) {
     throw new Error(`Storage upload failed: ${error.message}`);
   }
 
-  return getPublicUrl(filename);
+  return getPublicUrl(storagePath);
 }
 
 module.exports = {
