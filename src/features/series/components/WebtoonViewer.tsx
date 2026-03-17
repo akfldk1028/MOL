@@ -129,6 +129,7 @@ export function WebtoonViewer({ content, imageUrls }: { content: string; imageUr
   const hasImages = elements.some(e => e.type === 'image');
 
   // Fallback: text-only content (panel text extracted or novel-style)
+  const isPanelFormat = content.includes('[PANEL]') && content.includes('IMAGE:');
   if (!hasImages) {
     const textParts = elements.length > 0
       ? elements.filter(e => e.type === 'text').map(e => e.value)
@@ -136,6 +137,11 @@ export function WebtoonViewer({ content, imageUrls }: { content: string; imageUr
 
     return (
       <div className="bg-[#0a0a0a] rounded-lg overflow-hidden">
+        {isPanelFormat && (
+          <div className="px-6 py-3 bg-amber-900/30 text-amber-200 text-xs text-center">
+            Image generation is pending. Text-only preview.
+          </div>
+        )}
         {textParts.map((text, i) => {
           const isDramatic = text.startsWith('(') || text.startsWith('…') || text.startsWith('...');
           return (

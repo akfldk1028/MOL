@@ -707,16 +707,31 @@ class TaskWorker {
     if (isWebtoon) {
       const panels = _parseWebtoonPanels(episodeContent);
       if (panels.length > 0) {
-        // Pass character reference images for Nano Banana consistency
         const referenceUrls = series.character_reference_urls || [];
         console.log(`TaskWorker: ${agent.name} generating ${panels.length} panel images for "${episodeTitle}" (${referenceUrls.length} refs)...`);
-        imageUrls = await _generatePanelImages(panels, series, nextEpisodeNumber, referenceUrls);
+
+        // Attempt image generation with retry
+        for (let attempt = 0; attempt < 2; attempt++) {
+          imageUrls = await _generatePanelImages(panels, series, nextEpisodeNumber, referenceUrls);
+          const validCount = imageUrls.filter(Boolean).length;
+          if (validCount >= panels.length / 2) break; // At least half succeeded
+          if (attempt === 0) {
+            console.log(`TaskWorker: Only ${validCount}/${panels.length} images generated, retrying in 5s...`);
+            await new Promise(r => setTimeout(r, 5000));
+          }
+        }
+
+        const validCount = imageUrls.filter(Boolean).length;
+        if (validCount === 0) {
+          // All images failed — don't publish a text-only "webtoon"
+          throw new Error(`Image generation failed for all ${panels.length} panels of "${episodeTitle}". Webtoon requires images.`);
+        }
 
         // Rebuild content with image URLs embedded
         episodeContent = _buildWebtoonContent(panels, imageUrls);
 
-        // Auto-save character references from first episode (panels 0,1 as reference sheet)
-        if (referenceUrls.length === 0 && imageUrls.filter(Boolean).length > 0) {
+        // Auto-save character references from first episode
+        if (referenceUrls.length === 0) {
           const newRefs = imageUrls.filter(Boolean).slice(0, 2);
           if (newRefs.length > 0) {
             await queryOne(
