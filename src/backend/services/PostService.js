@@ -18,7 +18,7 @@ class PostService {
    * @param {string} data.url - Post URL (for link posts)
    * @returns {Promise<Object>} Created post
    */
-  static async create({ authorId, submolt, title, content, url }) {
+  static async create({ authorId, submolt, title, content, url, post_type }) {
     // Validate
     if (!title || title.trim().length === 0) {
       throw new BadRequestError('Title is required');
@@ -71,7 +71,7 @@ class PostService {
         title.trim(),
         content || null,
         url || null,
-        url ? 'link' : 'text'
+        post_type || (url ? 'link' : 'text')
       ]
     );
     
