@@ -17,7 +17,35 @@ interface PanelElement {
   emphasis?: 'full' | 'standard' | 'narrow';
 }
 
+/**
+ * Parse [PANEL] blocks into text elements (for episodes where image generation failed)
+ * Format: [PANEL]\nIMAGE: ...\nTEXT: ...\n\n[PANEL]\n...
+ */
+function parsePanelBlocks(content: string): PanelElement[] {
+  const elements: PanelElement[] = [];
+  const lines = content.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('TEXT:')) {
+      const text = trimmed.slice(5).trim();
+      if (text) elements.push({ type: 'text', value: text });
+    }
+    // Skip [PANEL], [/PANEL], IMAGE: lines
+  }
+
+  return elements;
+}
+
 function parseContent(content: string, imageUrls: string[]): PanelElement[] {
+  // Check if content uses [PANEL] format (image gen may have failed)
+  const hasPanelFormat = content.includes('[PANEL]') && content.includes('IMAGE:') && content.includes('TEXT:');
+
+  if (hasPanelFormat && imageUrls.length === 0) {
+    // Extract just the TEXT parts from [PANEL] blocks
+    return parsePanelBlocks(content);
+  }
+
   const lines = content.split('\n');
   const elements: PanelElement[] = [];
 
@@ -27,7 +55,10 @@ function parseContent(content: string, imageUrls: string[]): PanelElement[] {
     if (imgMatch) {
       elements.push({ type: 'image', value: imgMatch[1] });
     } else if (line.trim()) {
-      elements.push({ type: 'text', value: line.trim() });
+      // Skip raw [PANEL], IMAGE:, [/PANEL] lines if mixed with markdown images
+      const stripped = line.trim();
+      if (/^\[?\/?PANEL\]?$/.test(stripped) || /^IMAGE:/.test(stripped)) continue;
+      elements.push({ type: 'text', value: stripped });
     }
   }
 
@@ -97,13 +128,24 @@ export function WebtoonViewer({ content, imageUrls }: { content: string; imageUr
 
   const hasImages = elements.some(e => e.type === 'image');
 
-  // Fallback: plain text content (novel-style)
+  // Fallback: text-only content (panel text extracted or novel-style)
   if (!hasImages) {
+    const textParts = elements.length > 0
+      ? elements.filter(e => e.type === 'text').map(e => e.value)
+      : content.split('\n\n').map(p => p.trim()).filter(Boolean);
+
     return (
-      <div className="prose prose-sm dark:prose-invert max-w-none">
-        {content.split('\n\n').map((p, i) => (
-          <p key={`p-${i}`}>{p}</p>
-        ))}
+      <div className="bg-[#0a0a0a] rounded-lg overflow-hidden">
+        {textParts.map((text, i) => {
+          const isDramatic = text.startsWith('(') || text.startsWith('…') || text.startsWith('...');
+          return (
+            <div key={`txt-${i}`} className={`px-6 text-center bg-[#111] ${isDramatic ? 'py-8' : 'py-5'} ${i > 0 ? 'mt-1' : ''}`}>
+              <p className={`text-white leading-relaxed max-w-md mx-auto ${isDramatic ? 'text-base italic text-gray-300' : 'text-sm'}`}>
+                {text}
+              </p>
+            </div>
+          );
+        })}
       </div>
     );
   }
