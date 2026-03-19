@@ -274,4 +274,106 @@ router.post('/lifecycle/agent/:agentId/resume', asyncHandler(async (req, res) =>
   success(res, { message: `Agent ${req.params.agentId} resumed` });
 }));
 
+// ──────────────────────────────────────────
+// RL Feedback Loop monitoring
+// ──────────────────────────────────────────
+
+/**
+ * GET /autonomy/feedback
+ * Episode feedback data — critique distillation results + RL scores
+ */
+router.get('/feedback', asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+  const seriesId = req.query.seriesId;
+
+  let where = 'WHERE 1=1';
+  const params = [];
+
+  if (seriesId) {
+    params.push(seriesId);
+    where += ` AND ef.series_id = $${params.length}`;
+  }
+
+  params.push(limit);
+
+  const feedback = await queryAll(
+    `SELECT ef.*, s.title as series_title
+     FROM episode_feedback ef
+     LEFT JOIN series s ON ef.series_id = s.id
+     ${where}
+     ORDER BY ef.created_at DESC
+     LIMIT $${params.length}`,
+    params
+  );
+
+  success(res, { feedback });
+}));
+
+// ──────────────────────────────────────────
+// OpenClaw-RL monitoring
+// ──────────────────────────────────────────
+
+/**
+ * GET /autonomy/openclaw/status
+ * OpenClaw proxy health + training session stats
+ */
+router.get('/openclaw/status', asyncHandler(async (req, res) => {
+  const enabled = process.env.OPENCLAW_ENABLED === 'true';
+  const baseUrl = process.env.OPENCLAW_API_URL || 'http://localhost:30000';
+
+  // Proxy health
+  let proxyHealthy = false;
+  if (enabled) {
+    try {
+      const healthRes = await fetch(`${baseUrl}/healthz`, { signal: AbortSignal.timeout(3000) });
+      proxyHealthy = healthRes.ok;
+    } catch { /* not reachable */ }
+  }
+
+  // Session stats
+  const stats = await queryOne(
+    `SELECT
+       COUNT(*) as total,
+       COUNT(*) FILTER (WHERE status = 'open') as open,
+       COUNT(*) FILTER (WHERE status = 'closed') as closed,
+       COUNT(*) FILTER (WHERE status = 'failed') as failed,
+       AVG(prm_score) FILTER (WHERE prm_score IS NOT NULL) as avg_prm_score
+     FROM openclaw_training_sessions
+     WHERE created_at > NOW() - INTERVAL '7 days'`
+  ).catch(() => ({ total: 0, open: 0, closed: 0, failed: 0, avg_prm_score: null }));
+
+  success(res, {
+    enabled,
+    proxyUrl: baseUrl,
+    proxyHealthy,
+    model: process.env.OPENCLAW_MODEL || 'qwen3-8b',
+    sessions: {
+      total: parseInt(stats.total || 0),
+      open: parseInt(stats.open || 0),
+      closed: parseInt(stats.closed || 0),
+      failed: parseInt(stats.failed || 0),
+      avgPrmScore: stats.avg_prm_score ? parseFloat(stats.avg_prm_score) : null,
+    },
+  });
+}));
+
+/**
+ * GET /autonomy/openclaw/sessions
+ * Recent training sessions
+ */
+router.get('/openclaw/sessions', asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+
+  const sessions = await queryAll(
+    `SELECT ots.*, s.title as series_title
+     FROM openclaw_training_sessions ots
+     LEFT JOIN series s ON ots.series_id = s.id
+     ORDER BY ots.created_at DESC
+     LIMIT $1`,
+    [limit]
+  );
+
+  success(res, { sessions });
+}));
+
 module.exports = router;

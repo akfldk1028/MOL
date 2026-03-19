@@ -11,8 +11,9 @@ const openai = require('./providers/openai');
 const google = require('./providers/google');
 const groq = require('./providers/groq');
 const deepseek = require('./providers/deepseek');
+const openclaw = require('./providers/openclaw');
 
-const providers = { anthropic, openai, google, groq, deepseek };
+const providers = { anthropic, openai, google, groq, deepseek, openclaw };
 
 module.exports = {
   type: 'llm-call',

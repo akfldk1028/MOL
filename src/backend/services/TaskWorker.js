@@ -21,6 +21,7 @@ const { getRedis } = require('../config/redis');
 const CommentService = require('./CommentService');
 const { emitActivity } = require('./ActivityBus');
 const google = require('../nodes/llm-call/providers/google');
+const openclaw = require('../nodes/llm-call/providers/openclaw');
 const AgentSkills = require('./AgentSkills');
 const {
   buildCommentSystemPrompt,
@@ -691,19 +692,66 @@ class TaskWorker {
 
     // Generate episode via LLM (with 90s timeout for webtoon, 60s for novel)
     const timeout = isWebtoon ? 90_000 : 60_000;
+    const useOpenClaw = process.env.OPENCLAW_ENABLED === 'true';
+    const openClawModel = process.env.OPENCLAW_MODEL || 'qwen3-8b';
+    const sessionId = useOpenClaw ? `series-${series.id}-ep${nextEpisodeNumber}` : null;
+
     let response;
     try {
       let timer;
-      response = await Promise.race([
-        google.call(DEFAULT_MODEL, systemPrompt, userPrompt, {
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`LLM timeout (${timeout / 1000}s)`)), timeout);
+      });
+
+      let llmPromise;
+      if (useOpenClaw) {
+        // OpenClaw-RL: Turn 1 — generate episode, session stays open for critique
+        llmPromise = openclaw.call(openClawModel, systemPrompt, userPrompt, {
           maxOutputTokens: isWebtoon ? 8192 : 4096,
-        }),
-        new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`LLM timeout (${timeout / 1000}s)`)), timeout); }),
-      ]).finally(() => clearTimeout(timer));
+          sessionId,
+          turnType: 'main',
+          sessionDone: false,
+        });
+      } else {
+        llmPromise = google.call(DEFAULT_MODEL, systemPrompt, userPrompt, {
+          maxOutputTokens: isWebtoon ? 8192 : 4096,
+        });
+      }
+
+      response = await Promise.race([llmPromise, timeoutPromise]).finally(() => clearTimeout(timer));
     } catch (e) {
-      throw new Error(`LLM error for episode (${agent.name}): ${e.message}`);
+      // Fallback: if OpenClaw fails, try google
+      if (useOpenClaw) {
+        console.warn(`TaskWorker: OpenClaw failed for ${agent.name}, falling back to google: ${e.message}`);
+        try {
+          let timer;
+          response = await Promise.race([
+            google.call(DEFAULT_MODEL, systemPrompt, userPrompt, {
+              maxOutputTokens: isWebtoon ? 8192 : 4096,
+            }),
+            new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`LLM timeout (${timeout / 1000}s)`)), timeout); }),
+          ]).finally(() => clearTimeout(timer));
+        } catch (fallbackErr) {
+          throw new Error(`LLM error for episode (${agent.name}): OpenClaw failed (${e.message}), fallback also failed (${fallbackErr.message})`);
+        }
+      } else {
+        throw new Error(`LLM error for episode (${agent.name}): ${e.message}`);
+      }
     }
     if (!response || !response.trim()) throw new Error('LLM returned empty response');
+
+    // Log OpenClaw training session (Turn 1)
+    if (useOpenClaw && sessionId) {
+      try {
+        await queryOne(
+          `INSERT INTO openclaw_training_sessions (session_id, series_id, episode_number, model, turn_count, status)
+           VALUES ($1, $2, $3, $4, 1, 'open')`,
+          [sessionId, series.id, nextEpisodeNumber, openClawModel]
+        );
+      } catch (dbErr) {
+        console.warn('TaskWorker: OpenClaw session log failed:', dbErr.message);
+      }
+    }
 
     // Parse response: first line = TITLE: ..., rest = content
     const lines = response.trim().split('\n');
@@ -780,6 +828,46 @@ class TaskWorker {
         }
       } catch (err) {
         console.warn(`TaskWorker: cover generation failed for "${series.title}":`, err.message);
+      }
+    }
+
+    // OpenClaw Turn 2: send critique feedback to close the RL session
+    if (useOpenClaw && sessionId && critiqueFeedback.length > 0) {
+      try {
+        const feedbackText = critiqueFeedback
+          .flatMap(ep => ep.topComments)
+          .map(c => c.content)
+          .join('\n');
+
+        if (feedbackText.trim()) {
+          await openclaw.call(openClawModel,
+            'You are evaluating the previous episode based on reader feedback.',
+            `Critique feedback from previous episodes applied to episode ${nextEpisodeNumber}:\n${feedbackText}`,
+            {
+              sessionId,
+              turnType: 'feedback',
+              sessionDone: true,
+              maxOutputTokens: 256,
+            }
+          );
+
+          // Update session log
+          await queryOne(
+            `UPDATE openclaw_training_sessions
+             SET turn_count = 2, status = 'closed', closed_at = NOW()
+             WHERE session_id = $1`,
+            [sessionId]
+          ).catch(() => {});
+
+          console.log(`TaskWorker: OpenClaw session ${sessionId} closed with critique feedback`);
+        }
+      } catch (clawErr) {
+        console.warn(`TaskWorker: OpenClaw Turn 2 failed for ${sessionId}:`, clawErr.message);
+        await queryOne(
+          `UPDATE openclaw_training_sessions SET status = 'failed', metadata = jsonb_set(metadata, '{error}', $2::jsonb)
+           WHERE session_id = $1`,
+          [sessionId, JSON.stringify(clawErr.message)]
+        ).catch(() => {});
       }
     }
 
