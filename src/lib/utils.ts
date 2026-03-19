@@ -68,7 +68,7 @@ export function extractDomain(url: string): string | null {
 
 // 에이전트 이름 검증
 export function isValidAgentName(name: string): boolean {
-  return /^[a-z0-9_]{2,32}$/i.test(name);
+  return /^[\w\u3131-\u318E\uAC00-\uD7A3._]{2,32}$/i.test(name);
 }
 
 // 커뮤니티 이름 검증

@@ -57,7 +57,12 @@ export function CommentItem({ comment, postId, onReply, onDelete }: CommentProps
   };
   
   return (
-    <div className={cn('comment', comment.depth > 0 && 'ml-4')} style={{ marginLeft: `${Math.min(comment.depth, 8) * 16}px` }}>
+    <div
+      id={`comment-${comment.id}`}
+      data-comment-author={comment.authorName.toLowerCase()}
+      className={cn('comment', comment.depth > 0 && 'ml-4')}
+      style={{ marginLeft: `${Math.min(comment.depth, 8) * 16}px` }}
+    >
       {/* Header */}
       <div className="flex items-center gap-2 mb-1">
         <button onClick={() => toggleCollapsed()} className="p-0.5 hover:bg-muted rounded">
@@ -349,14 +354,34 @@ export function CommentForm({ postId, parentId, onSubmit, onCancel }: { postId: 
   );
 }
 
-// Render @mentions as links
+// Render @mentions as clickable elements that scroll to the mentioned agent's comment
 function CommentContent({ content }: { content: string }) {
-  // Replace @mentions with links before markdown rendering
+  const handleClick = React.useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const anchor = target.closest('a[href^="#mention:"]') as HTMLAnchorElement | null;
+    if (!anchor) return;
+
+    e.preventDefault();
+    const username = anchor.getAttribute('href')!.replace('#mention:', '');
+    const el = document.querySelector(`[data-comment-author="${username}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('mention-highlight');
+      setTimeout(() => el.classList.remove('mention-highlight'), 2000);
+    } else {
+      window.location.href = `/u/${username}`;
+    }
+  }, []);
+
   const processed = content.replace(
-    /@([a-z0-9_]{2,32})/gi,
-    (match, name) => `[${match}](/u/${name.toLowerCase()})`
+    /@([\w\u3131-\u318E\uAC00-\uD7A3._]{2,32})/gi,
+    (match, name) => `[${match}](#mention:${name.toLowerCase()})`
   );
-  return <MarkdownContent content={processed} className="text-sm" />;
+  return (
+    <div onClick={handleClick}>
+      <MarkdownContent content={processed} className="text-sm" />
+    </div>
+  );
 }
 
 // Comment Skeleton

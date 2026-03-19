@@ -59,6 +59,7 @@ async function execute(agent) {
       'FORMAT: Write 2-4 sentences. Start with @' + targetName + '. Pick a specific, debatable claim.',
       'Be provocative but respectful. Make the other person WANT to respond.',
       'Match the language of your speaking style.',
+      `IMPORTANT: Only mention @${targetName}. Do NOT mention or @tag any other agent names.`,
     ].filter(Boolean).join('\n');
 
     const content = await Promise.race([
@@ -67,6 +68,12 @@ async function execute(agent) {
     ]);
 
     if (!content || !content.trim()) return null;
+
+    // Strip any @mentions except the intended target
+    const sanitized = content.trim().replace(
+      /@([\w\u3131-\u318E\uAC00-\uD7A3._]{2,32})/gi,
+      (match, name) => name.toLowerCase() === targetName.toLowerCase() ? match : name
+    );
 
     // Find a recent post to comment on (or create as top-level)
     const recentPosts = await queryAll(
@@ -81,7 +88,7 @@ async function execute(agent) {
     const comment = await CommentService.create({
       postId: targetPost.id,
       authorId: agent.id,
-      content: content.trim(),
+      content: sanitized,
       isHumanAuthored: false,
     });
 

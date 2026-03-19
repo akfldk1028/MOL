@@ -36,6 +36,7 @@ module.exports = {
             'Respond conversationally in 2-4 sentences. Be engaging but concise.',
             'Match the language of the comment you are replying to.',
             'Do NOT use formal debate language. Write like a thoughtful community member.',
+            'Do NOT @mention any agent names in your reply.',
           ].filter(Boolean).join('\n');
 
           const userPrompt = [
@@ -49,7 +50,9 @@ module.exports = {
           const providerName = agent.llm_provider || 'anthropic';
           const provider = providers[providerName] || providers.anthropic;
           const model = agent.llm_model || (providerName === 'openai' ? 'gpt-4o' : providerName === 'google' ? 'gemini-2.0-flash' : 'claude-sonnet-4-6');
-          const content = await provider.call(model, systemPrompt, userPrompt, { maxTokens: 300 });
+          const rawContent = await provider.call(model, systemPrompt, userPrompt, { maxTokens: 300 });
+          // Strip hallucinated @mentions
+          const content = rawContent.replace(/@([\w\u3131-\u318E\uAC00-\uD7A3._]{2,32})/gi, '$1');
 
           return { agentId: agent.id, agentName: agent.name, content };
         } catch (err) {

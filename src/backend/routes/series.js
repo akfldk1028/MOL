@@ -22,17 +22,17 @@ router.post('/', requireInternalSecret, asyncHandler(async (req, res) => {
     return res.status(401).json({ success: false, error: 'User authentication required' });
   }
 
-  const { title, slug, description, contentType, genre, tags, domainSlug, coverImageUrl, scheduleDays } = req.body;
+  const { title, slug, description, contentType, genre, tags, domainSlug, coverImageUrl, scheduleDays, stylePreset } = req.body;
 
   if (!title || !slug) {
     return res.status(400).json({ success: false, error: 'title and slug are required' });
   }
 
   const series = await queryOne(
-    `INSERT INTO series (title, slug, description, content_type, genre, tags, domain_slug, cover_image_url, schedule_days, created_by_user_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `INSERT INTO series (title, slug, description, content_type, genre, tags, domain_slug, cover_image_url, schedule_days, created_by_user_id, style_preset)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
-    [title, slug, description, contentType || 'novel', genre, tags || [], domainSlug, coverImageUrl, scheduleDays || [], userId]
+    [title, slug, description, contentType || 'novel', genre, tags || [], domainSlug, coverImageUrl, scheduleDays || [], userId, stylePreset || null]
   );
 
   created(res, { series });
@@ -89,6 +89,16 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /series/style-presets
+ * List available webtoon art style presets
+ * MUST be before /:slug to avoid slug match
+ */
+router.get('/style-presets', asyncHandler(async (_req, res) => {
+  const { StylePresets } = require('../services/webtoon');
+  success(res, { presets: StylePresets.list() });
+}));
+
+/**
  * GET /series/:slug
  * Get series detail with episodes
  */
@@ -134,7 +144,7 @@ router.get('/:slug', asyncHandler(async (req, res) => {
  * Create an agent-authored autonomous series
  */
 router.post('/autonomous', requireInternalSecret, asyncHandler(async (req, res) => {
-  const { agentId, title, slug, description, synopsis, contentType, genre, tags, domainSlug, coverImageUrl, scheduleDays, episodePromptHint, targetWordCount } = req.body;
+  const { agentId, title, slug, description, synopsis, contentType, genre, tags, domainSlug, coverImageUrl, scheduleDays, episodePromptHint, targetWordCount, stylePreset } = req.body;
 
   if (!agentId || !title || !slug) {
     return res.status(400).json({ success: false, error: 'agentId, title, and slug are required' });
@@ -158,12 +168,12 @@ router.post('/autonomous', requireInternalSecret, asyncHandler(async (req, res) 
   const series = await queryOne(
     `INSERT INTO series (title, slug, description, content_type, genre, tags, domain_slug, cover_image_url,
                          schedule_days, created_by_agent_id, synopsis, episode_prompt_hint, target_word_count,
-                         next_episode_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                         next_episode_at, style_preset)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING *`,
     [title, slug, description, contentType || 'novel', genre, tags || [], domainSlug,
      coverImageUrl, scheduleDays || [], agentId, synopsis, episodePromptHint,
-     targetWordCount || 2000, nextEpisodeAt?.toISOString() || null]
+     targetWordCount || 2000, nextEpisodeAt?.toISOString() || null, stylePreset || null]
   );
 
   created(res, { series });
@@ -373,6 +383,21 @@ router.delete('/:slug/subscribe', requireInternalSecret, asyncHandler(async (req
   }
 
   success(res, { subscribed: false });
+}));
+
+/**
+ * GET /series/:slug/characters
+ * List characters for a series
+ */
+router.get('/:slug/characters', asyncHandler(async (req, res) => {
+  const series = await queryOne('SELECT id FROM series WHERE slug = $1', [req.params.slug]);
+  if (!series) {
+    return res.status(404).json({ success: false, error: 'Series not found' });
+  }
+
+  const { CharacterSheetService } = require('../services/webtoon');
+  const characters = await CharacterSheetService.getBySeriesId(series.id);
+  success(res, { characters });
 }));
 
 module.exports = router;

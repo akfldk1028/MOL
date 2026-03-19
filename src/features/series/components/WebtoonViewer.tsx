@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { PanelOverlay } from './PanelOverlay';
 
 /**
  * Webtoon vertical scroll viewer
@@ -8,6 +9,7 @@ import { useMemo } from 'react';
  * - Applies scroll rhythm: image→image tight, text panels get breathing room
  * - First/last images get emphasis (full width), mid panels get standard width
  * - Dramatic pause (large gap) before text that starts with special markers
+ * - Speech bubble overlay on panels with dialogue
  */
 
 interface PanelElement {
@@ -15,6 +17,8 @@ interface PanelElement {
   value: string;
   /** Panel position hint for width variation */
   emphasis?: 'full' | 'standard' | 'narrow';
+  /** Dialogue to overlay as speech bubble (for image panels) */
+  dialogue?: string;
 }
 
 /**
@@ -23,18 +27,54 @@ interface PanelElement {
  */
 function parsePanelBlocks(content: string): PanelElement[] {
   const elements: PanelElement[] = [];
-  const lines = content.split('\n');
+  const panelRegex = /\[PANEL\]\s*\n([\s\S]*?)\[\/PANEL\]/gi;
+  let match;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('TEXT:')) {
-      const text = trimmed.slice(5).trim();
-      if (text) elements.push({ type: 'text', value: text });
+  while ((match = panelRegex.exec(content)) !== null) {
+    const block = match[1].trim();
+    const textMatch = block.match(/^TEXT:\s*(.+)/im);
+    const text = textMatch ? textMatch[1].trim() : '';
+    if (text) elements.push({ type: 'text', value: text });
+  }
+
+  // Fallback: line-by-line parsing if regex found nothing
+  if (elements.length === 0) {
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('TEXT:')) {
+        const text = trimmed.slice(5).trim();
+        if (text) elements.push({ type: 'text', value: text });
+      }
     }
-    // Skip [PANEL], [/PANEL], IMAGE: lines
   }
 
   return elements;
+}
+
+/**
+ * Extract dialogue mapping from [PANEL] blocks for speech bubble overlay.
+ * Returns Map<imageIndex, dialogueText> based on panel order.
+ */
+function extractDialogueMap(content: string): Map<number, string> {
+  const dialogueMap = new Map<number, string>();
+  const panelRegex = /\[PANEL\]\s*\n([\s\S]*?)\[\/PANEL\]/gi;
+  let match;
+  let panelIdx = 0;
+
+  while ((match = panelRegex.exec(content)) !== null) {
+    const block = match[1].trim();
+    const textMatch = block.match(/^TEXT:\s*(.+)/im);
+    const imageMatch = block.match(/^IMAGE:\s*.+/im);
+
+    if (imageMatch && textMatch) {
+      const text = textMatch[1].trim();
+      if (text) dialogueMap.set(panelIdx, text);
+    }
+    if (imageMatch) panelIdx++;
+  }
+
+  return dialogueMap;
 }
 
 function parseContent(content: string, imageUrls: string[]): PanelElement[] {
@@ -46,18 +86,24 @@ function parseContent(content: string, imageUrls: string[]): PanelElement[] {
     return parsePanelBlocks(content);
   }
 
+  // Extract dialogue map for speech bubble overlay
+  const dialogueMap = hasPanelFormat ? extractDialogueMap(content) : new Map<number, string>();
+
   const lines = content.split('\n');
   const elements: PanelElement[] = [];
+  let imageIndex = 0;
 
   for (const line of lines) {
     // Match markdown images — handle URLs with special chars including )
     const imgMatch = line.match(/^!\[.*?\]\(([^)]+)\)$/);
     if (imgMatch) {
-      elements.push({ type: 'image', value: imgMatch[1] });
+      const dialogue = dialogueMap.get(imageIndex);
+      elements.push({ type: 'image', value: imgMatch[1], dialogue: dialogue || undefined });
+      imageIndex++;
     } else if (line.trim()) {
       // Skip raw [PANEL], IMAGE:, [/PANEL] lines if mixed with markdown images
       const stripped = line.trim();
-      if (/^\[?\/?PANEL\]?$/.test(stripped) || /^IMAGE:/.test(stripped)) continue;
+      if (/^\[?\/?PANEL\]?$/.test(stripped) || /^IMAGE:/.test(stripped) || /^TEXT:/.test(stripped)) continue;
       elements.push({ type: 'text', value: stripped });
     }
   }
@@ -67,7 +113,10 @@ function parseContent(content: string, imageUrls: string[]): PanelElement[] {
     const textElements = elements.filter(e => e.type === 'text');
     const merged: PanelElement[] = [];
     for (let i = 0; i < Math.max(imageUrls.length, textElements.length); i++) {
-      if (i < imageUrls.length) merged.push({ type: 'image', value: imageUrls[i] });
+      if (i < imageUrls.length) {
+        const dialogue = dialogueMap.get(i);
+        merged.push({ type: 'image', value: imageUrls[i], dialogue: dialogue || undefined });
+      }
       if (i < textElements.length) merged.push(textElements[i]);
     }
     return merged;
@@ -163,6 +212,22 @@ export function WebtoonViewer({ content, imageUrls }: { content: string; imageUr
 
         if (el.type === 'image') {
           const widthClass = getImageWidthClass(el.emphasis);
+
+          // Use PanelOverlay if panel has dialogue for speech bubble
+          if (el.dialogue) {
+            return (
+              <div key={`img-${i}`} className={`${gap} bg-black`}>
+                <PanelOverlay
+                  imageUrl={el.value}
+                  altText={`Panel ${i + 1}`}
+                  widthClass={widthClass}
+                  dialogues={[{ text: el.dialogue }]}
+                  loading="lazy"
+                />
+              </div>
+            );
+          }
+
           return (
             <div key={`img-${i}`} className={`${gap} bg-black`}>
               <img

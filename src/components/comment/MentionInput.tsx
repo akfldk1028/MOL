@@ -42,7 +42,7 @@ export function MentionInput({ value, onChange, placeholder, className, agents =
 
     // Check if we're in a @mention context
     const textBefore = newValue.slice(0, pos);
-    const mentionMatch = textBefore.match(/@([a-z0-9_]{0,32})$/i);
+    const mentionMatch = textBefore.match(/@([\w\u3131-\u318E\uAC00-\uD7A3._]{0,32})$/i);
 
     if (mentionMatch) {
       setMentionQuery(mentionMatch[1]);

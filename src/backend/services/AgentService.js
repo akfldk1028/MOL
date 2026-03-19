@@ -19,7 +19,8 @@ class AgentService {
    * @param {string} data.description - Agent description
    * @returns {Promise<Object>} Registration result with API key
    */
-  static async register({ name, description = '' }) {
+  static async register({ name, description = '', persona, domain, archetype, llm_provider, llm_model }) {
+    const isExternal = !!(persona || domain || archetype || llm_provider || llm_model);
     let normalizedName;
 
     if (name && typeof name === 'string' && name.trim()) {
@@ -52,6 +53,25 @@ class AgentService {
       });
     }
 
+    // Validate archetype if provided
+    const ExternalAgentService = require('./ExternalAgentService');
+    const validArchetype = archetype && ExternalAgentService.isValidArchetype(archetype)
+      ? archetype : 'utility';
+
+    // Resolve domain_id
+    let domainId = null;
+    if (domain) {
+      const domainRow = await queryOne(
+        'SELECT id FROM domains WHERE slug = $1',
+        [domain.toLowerCase()]
+      );
+      domainId = domainRow?.id || null;
+    }
+    if (!domainId) {
+      const generalDomain = await queryOne("SELECT id FROM domains WHERE slug = 'general'");
+      domainId = generalDomain?.id || null;
+    }
+
     // Generate credentials
     const apiKey = generateApiKey();
     const claimToken = generateClaimToken();
@@ -59,7 +79,34 @@ class AgentService {
     const apiKeyHash = hashToken(apiKey);
     const avatarUrl = getAvatarUrl(normalizedName);
 
-    // Create agent
+    if (isExternal) {
+      // External agent: active immediately, higher daily limit
+      const agent = await queryOne(
+        `INSERT INTO agents (id, name, display_name, description, api_key_hash, claim_token, verification_code, avatar_url,
+                             status, is_external, persona, domain_id, archetype, llm_provider, llm_model,
+                             autonomy_enabled, daily_action_limit, daily_action_count,
+                             created_at, updated_at, last_active)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7,
+                 'active', true, $8, $9, $10, $11, $12,
+                 false, 50, 0,
+                 NOW(), NOW(), NOW())
+         RETURNING id, name, display_name, created_at`,
+        [normalizedName, normalizedName, description, apiKeyHash, claimToken, verificationCode, avatarUrl,
+         persona || null, domainId, validArchetype, llm_provider || null, llm_model || null]
+      );
+
+      return {
+        agent: {
+          id: agent.id,
+          name: agent.name,
+          api_key: apiKey,
+          claim_url: `${config.goodmolt.baseUrl}/claim/${claimToken}`,
+        },
+        important: 'Save your API key! You will not see it again.'
+      };
+    }
+
+    // House/legacy agent: pending_claim
     const agent = await queryOne(
       `INSERT INTO agents (id, name, display_name, description, api_key_hash, claim_token, verification_code, avatar_url, status, created_at, updated_at, last_active)
        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, 'pending_claim', NOW(), NOW(), NOW())
@@ -87,7 +134,7 @@ class AgentService {
     const apiKeyHash = hashToken(apiKey);
     
     return queryOne(
-      `SELECT id, name, display_name, description, karma, status, is_claimed, is_personal, created_at, updated_at
+      `SELECT id, name, display_name, description, karma, status, is_claimed, is_personal, is_external, created_at, updated_at
        FROM agents WHERE api_key_hash = $1`,
       [apiKeyHash]
     );

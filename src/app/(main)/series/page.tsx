@@ -150,9 +150,13 @@ export default function SeriesListPage() {
                   href={`/series/${s.slug}`}
                   className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
                 >
-                  <div className={`shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${t.bg}`}>
-                    <Icon className={`h-6 w-6 ${t.color}`} />
-                  </div>
+                  {s.cover_image_url ? (
+                    <img src={s.cover_image_url} alt={s.title} className="shrink-0 w-12 h-16 rounded-lg object-cover" />
+                  ) : (
+                    <div className={`shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${t.bg}`}>
+                      <Icon className={`h-6 w-6 ${t.color}`} />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium line-clamp-1">{s.title}</span>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Avatar, AvatarFallback } from '@/common/ui';
 import MarkdownContent from '@/common/components/markdown-content';
 
@@ -40,8 +40,36 @@ export default function AgentResponseCard({
 
   const avatar = avatarUrl || getAvatarUrl(agentName);
 
+  const handleMentionClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const anchor = target.closest('a[href^="#mention:"]') as HTMLAnchorElement | null;
+    if (!anchor) return;
+    e.preventDefault();
+    const username = anchor.getAttribute('href')!.replace('#mention:', '');
+    const el = document.querySelector(`[data-comment-author="${username}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('mention-highlight');
+      setTimeout(() => el.classList.remove('mention-highlight'), 2000);
+    } else {
+      window.location.href = `/u/${username}`;
+    }
+  }, []);
+
+  // Process @mentions into clickable anchors (only after typing animation completes)
+  const isTyping = isNew && displayed !== content;
+  const processedContent = isTyping
+    ? displayed
+    : displayed.replace(
+        /@([\w\u3131-\u318E\uAC00-\uD7A3._]{2,32})/gi,
+        (match, name) => `[${match}](#mention:${name.toLowerCase()})`
+      );
+
   return (
-    <div className={`p-4 rounded-lg border transition-all ${isNew ? 'animate-fade-in border-primary/30 bg-primary/5' : 'border-border'}`}>
+    <div
+      data-comment-author={agentName.toLowerCase()}
+      className={`p-4 rounded-lg border transition-all ${isNew ? 'animate-fade-in border-primary/30 bg-primary/5' : 'border-border'}`}
+    >
       <div className="flex items-start gap-3">
         <Avatar className="h-10 w-10 border-2 border-primary/20">
           <img src={avatar} alt={agentName} className="rounded-full" />
@@ -56,7 +84,9 @@ export default function AgentResponseCard({
               <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">External</span>
             )}
           </div>
-          <MarkdownContent content={displayed} className="text-sm mt-2" />
+          <div onClick={handleMentionClick}>
+            <MarkdownContent content={processedContent} className="text-sm mt-2" />
+          </div>
         </div>
       </div>
     </div>

@@ -21,7 +21,7 @@ async function generateAgentResponse({ agent, ctx, previousResponses, round }) {
   OrchestratorService.emit(channelId, 'agent_thinking', { agent: agent.name, round });
 
   // Call LLM
-  const { content } = await llmCallNode.execute(ctx, {
+  const { content: rawContent } = await llmCallNode.execute(ctx, {
     agent,
     role: agent.role,
     round,
@@ -31,6 +31,9 @@ async function generateAgentResponse({ agent, ctx, previousResponses, round }) {
       content: r.content,
     })),
   });
+
+  // Strip hallucinated @mentions (only mention-debate system should produce @mentions)
+  const content = rawContent.replace(/@([\w\u3131-\u318E\uAC00-\uD7A3._]{2,32})/gi, '$1');
 
   // Save as comment
   const comment = await queryOne(

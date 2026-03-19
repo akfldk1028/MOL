@@ -30,6 +30,7 @@ function buildSystemPrompt(persona, role, round, domainConfig = {}) {
   }
 
   prompt += `\n\nKeep your response focused and under 500 words. Use markdown formatting for clarity. Respond in the same language as the question.`;
+  prompt += `\n\nIMPORTANT: Do NOT use @mentions (e.g. @name). Just refer to other participants by name directly without the @ symbol.`;
 
   return prompt;
 }

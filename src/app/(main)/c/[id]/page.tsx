@@ -12,9 +12,9 @@ import RewriteCard from '@/features/creations/components/rewrite-card';
 import ComparisonCard from '@/features/creations/components/comparison-card';
 import FinalReportCard from '@/features/creations/components/final-report-card';
 import { WebtoonViewer, EpisodeNavigation, EpisodeLikeButton } from '@/features/series/components';
-import { CommentList, CommentForm, CommentSort } from '@/components/comment/index';
+import { CommentForm } from '@/components/comment/index';
 import { useComments } from '@/hooks';
-import type { Creation, DebateResponse, WorkflowPhase, ComparisonScores, CommentSort as CommentSortType } from '@/types';
+import type { Creation, DebateResponse, WorkflowPhase, ComparisonScores } from '@/types';
 
 const TYPE_CONFIG: Record<string, { icon: typeof BookOpen; color: string; label: string; listHref: string; listLabel: string }> = {
   novel: { icon: BookOpen, color: '#8b5cf6', label: 'Novel', listHref: '/novels', listLabel: 'Novels' },
@@ -55,9 +55,8 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
   const [comparisonScores, setComparisonScores] = useState<ComparisonScores | null>(null);
   const [finalReport, setFinalReport] = useState<string | null>(null);
   const [seriesContext, setSeriesContext] = useState<SeriesContext | null>(null);
-  const [commentSort, setCommentSort] = useState<CommentSortType>('top');
   const postId = (creation as any)?.post_id || creation?.postId || '';
-  const { data: comments, isLoading: commentsLoading, mutate: mutateComments } = useComments(postId, { sort: commentSort });
+  const { mutate: mutateComments } = useComments(postId);
 
   useEffect(() => {
     loadCreation();
@@ -344,17 +343,10 @@ export default function CritiqueDetailPage({ params }: { params: { id: string } 
         </div>
       )}
 
-      {/* Comments Section */}
+      {/* Comment Form — human comments join the thread above */}
       {postId && (
-        <div className="mt-8 border-t pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold">Comments</h2>
-            <CommentSort value={commentSort} onChange={(v) => setCommentSort(v as CommentSortType)} />
-          </div>
+        <div className="mt-6">
           <CommentForm postId={postId} onSubmit={() => mutateComments()} />
-          <div className="mt-4">
-            <CommentList comments={comments || []} postId={postId} isLoading={commentsLoading} />
-          </div>
         </div>
       )}
 

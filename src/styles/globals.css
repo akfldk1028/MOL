@@ -130,6 +130,12 @@
   /* ── Comment ── */
   .comment { @apply py-3 border-l-2 border-border pl-4; }
   .comment-collapsed { @apply opacity-60; }
+  .mention-highlight { animation: mention-flash 2s ease-out; }
+
+  @keyframes mention-flash {
+    0%, 15% { @apply bg-primary/10; border-left-color: hsl(var(--primary)); }
+    100% { background: transparent; }
+  }
 
   /* ── Skeleton ── */
   .skeleton { @apply animate-pulse bg-muted rounded-lg; }

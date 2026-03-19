@@ -672,9 +672,22 @@ class TaskWorker {
     );
     previousEpisodes.reverse(); // chronological order
 
+    // Collect community critique feedback from recent episodes
+    const critiqueFeedback = await this._collectCritiqueFeedback(series.id, 3);
+
+    // Extract image-specific hints for webtoon system prompt
+    let imageFeedbackHints = null;
+    if (isWebtoon && critiqueFeedback.length > 0) {
+      imageFeedbackHints = critiqueFeedback
+        .flatMap(ep => ep.topComments)
+        .filter(c => /캐릭터|얼굴|배경|그림|이미지|패널|character|face|background|image|panel|style|art/i.test(c.content))
+        .map(c => c.content)
+        .slice(0, 3);
+    }
+
     // Build prompts
-    const systemPrompt = buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber);
-    const userPrompt = buildEpisodeUserPrompt(series, previousEpisodes);
+    const systemPrompt = buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber, imageFeedbackHints);
+    const userPrompt = buildEpisodeUserPrompt(series, previousEpisodes, critiqueFeedback);
 
     // Generate episode via LLM (with 90s timeout for webtoon, 60s for novel)
     const timeout = isWebtoon ? 90_000 : 60_000;
@@ -702,45 +715,30 @@ class TaskWorker {
       episodeContent = lines.slice(1).join('\n').trim();
     }
 
-    // ── Webtoon: parse panels and generate images ──
+    // ── Webtoon: use WebtoonPipeline for enhanced panel generation ──
     let imageUrls = [];
     if (isWebtoon) {
-      const panels = _parseWebtoonPanels(episodeContent);
-      if (panels.length > 0) {
-        const referenceUrls = series.character_reference_urls || [];
-        console.log(`TaskWorker: ${agent.name} generating ${panels.length} panel images for "${episodeTitle}" (${referenceUrls.length} refs)...`);
+      const { WebtoonPipeline } = require('./webtoon');
 
-        // Attempt image generation with retry
-        for (let attempt = 0; attempt < 2; attempt++) {
-          imageUrls = await _generatePanelImages(panels, series, nextEpisodeNumber, referenceUrls);
-          const validCount = imageUrls.filter(Boolean).length;
-          if (validCount >= panels.length / 2) break; // At least half succeeded
-          if (attempt === 0) {
-            console.log(`TaskWorker: Only ${validCount}/${panels.length} images generated, retrying in 5s...`);
-            await new Promise(r => setTimeout(r, 5000));
-          }
-        }
+      console.log(`TaskWorker: ${agent.name} generating webtoon panels for "${episodeTitle}"...`);
 
-        const validCount = imageUrls.filter(Boolean).length;
-        if (validCount === 0) {
-          // All images failed — don't publish a text-only "webtoon"
-          throw new Error(`Image generation failed for all ${panels.length} panels of "${episodeTitle}". Webtoon requires images.`);
-        }
+      const pipelineResult = await WebtoonPipeline.generate({
+        content: episodeContent,
+        series,
+        episodeNumber: nextEpisodeNumber,
+        enableQualityCheck: false, // Phase 3: enable later
+      });
 
-        // Rebuild content with image URLs embedded
-        episodeContent = _buildWebtoonContent(panels, imageUrls);
+      imageUrls = pipelineResult.imageUrls;
 
-        // Auto-save character references from first episode
-        if (referenceUrls.length === 0) {
-          const newRefs = imageUrls.filter(Boolean).slice(0, 2);
-          if (newRefs.length > 0) {
-            await queryOne(
-              `UPDATE series SET character_reference_urls = $1 WHERE id = $2 AND (character_reference_urls IS NULL OR character_reference_urls = '{}')`,
-              [newRefs, series.id]
-            );
-            console.log(`TaskWorker: Saved ${newRefs.length} character references for "${series.title}"`);
-          }
-        }
+      const validCount = imageUrls.filter(Boolean).length;
+      if (pipelineResult.panels.length > 0 && validCount === 0) {
+        throw new Error(`Image generation failed for all ${pipelineResult.panels.length} panels of "${episodeTitle}". Webtoon requires images.`);
+      }
+
+      // Use pipeline's rebuilt content (with embedded image URLs + dialogue structure)
+      if (validCount > 0) {
+        episodeContent = pipelineResult.content;
       }
     }
 
@@ -758,7 +756,46 @@ class TaskWorker {
 
     await this._incrementDailyCount(agent.id);
 
-    console.log(`TaskWorker: ${agent.name} created episode ${nextEpisodeNumber} for "${series.title}" (${imageUrls.length} images, ${(series.character_reference_urls || []).length} refs)`);
+    // Auto-set series cover if missing
+    if (!series.cover_image_url) {
+      try {
+        let coverUrl = imageUrls.find(Boolean); // webtoon: use first panel
+        if (!coverUrl) {
+          // novel/other: generate a cover image
+          const imageGen = require('./skills/image-gen');
+          const { uploadBuffer } = require('../utils/storage');
+          const coverPrompt = `Book cover illustration, ${series.genre || 'fiction'}, "${series.title}", cinematic lighting, high quality, no text`;
+          const result = await imageGen.generate({ prompt: coverPrompt, aspectRatio: '3:4' });
+          const img = result.images?.[0];
+          if (img?.b64) {
+            const ext = (img.mimeType || '').includes('jpeg') ? '.jpg' : '.png';
+            coverUrl = await uploadBuffer(Buffer.from(img.b64, 'base64'), ext, img.mimeType || 'image/png');
+          } else if (img?.url) {
+            coverUrl = img.url;
+          }
+        }
+        if (coverUrl) {
+          await queryOne('UPDATE series SET cover_image_url = $1 WHERE id = $2 AND cover_image_url IS NULL', [coverUrl, series.id]);
+          console.log(`TaskWorker: auto-generated cover for "${series.title}"`);
+        }
+      } catch (err) {
+        console.warn(`TaskWorker: cover generation failed for "${series.title}":`, err.message);
+      }
+    }
+
+    // Mark feedback as applied to this episode
+    if (critiqueFeedback.length > 0) {
+      const feedbackEp = critiqueFeedback[0]?.episodeNumber;
+      if (feedbackEp) {
+        await queryOne(
+          `UPDATE episode_feedback SET applied_to_episode = $1, applied_at = NOW()
+           WHERE series_id = $2 AND episode_number = $3 AND applied_to_episode IS NULL`,
+          [nextEpisodeNumber, series.id, feedbackEp]
+        ).catch(() => {}); // non-critical
+      }
+    }
+
+    console.log(`TaskWorker: ${agent.name} created episode ${nextEpisodeNumber} for "${series.title}" (${imageUrls.filter(Boolean).length} images)`);
 
     // Trigger agent reactions on the new episode post (critique chain)
     const TaskScheduler = require('./TaskScheduler');
@@ -838,6 +875,181 @@ class TaskWorker {
     });
 
     console.log(`TaskWorker: auto-synthesis scheduled for post ${postId}`);
+  }
+
+  // ──────────────────────────────────────────
+  // Critique Feedback Collection
+  // ──────────────────────────────────────────
+
+  /**
+   * Collect top-scored agent critique comments from recent episodes.
+   * Used to inject community feedback into the next episode generation prompt.
+   * @param {string} seriesId
+   * @param {number} limit - number of recent episodes to collect from
+   * @returns {Promise<Array<{ episodeNumber: number, topComments: Array<{ authorName: string, archetype: string, content: string, score: number }> }>>}
+   */
+  static async _collectCritiqueFeedback(seriesId, limit = 3) {
+    try {
+      const rows = await queryAll(
+        `SELECT c.episode_number, cm.content, cm.score, a.display_name, a.archetype
+         FROM creations c
+         JOIN comments cm ON cm.post_id = c.post_id
+         JOIN agents a ON cm.author_id = a.id
+         WHERE c.series_id = $1
+           AND cm.is_deleted = false
+           AND cm.is_human_authored = false
+           AND cm.parent_id IS NULL
+           AND cm.content NOT LIKE '@%'
+           AND LENGTH(cm.content) >= 20
+         ORDER BY c.episode_number DESC, cm.score DESC, LENGTH(cm.content) DESC`,
+        [seriesId]
+      );
+
+      if (rows.length === 0) return [];
+
+      // Group by episode, take top 3 per episode, limit to N episodes
+      const episodeMap = new Map();
+      for (const row of rows) {
+        if (episodeMap.size >= limit && !episodeMap.has(row.episode_number)) break;
+        if (!episodeMap.has(row.episode_number)) {
+          episodeMap.set(row.episode_number, []);
+        }
+        const comments = episodeMap.get(row.episode_number);
+        if (comments.length < 3) {
+          comments.push({
+            authorName: row.display_name || 'Agent',
+            archetype: row.archetype || 'unknown',
+            content: (row.content || '').slice(0, 150),
+            score: row.score || 0,
+          });
+        }
+      }
+
+      // Convert to array sorted by episode number
+      const raw = Array.from(episodeMap.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([episodeNumber, topComments]) => ({ episodeNumber, topComments }));
+
+      // Distill: extract actionable improvements + 5-axis scores via LLM
+      return this._distillFeedback(raw, seriesId);
+    } catch (err) {
+      console.warn('TaskWorker: critique feedback collection failed:', err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Distill raw critique comments into actionable improvement directives + 5-axis scores.
+   * Based on Diffusion-Sharpening MLLMGrader evaluation framework:
+   *   1. prompt_accuracy — 프롬프트/시놉시스 충실도
+   *   2. creativity — 창의성/독창성
+   *   3. quality — 글/이미지 품질
+   *   4. consistency — 캐릭터/설정 일관성
+   *   5. emotional_resonance — 감정/테마 전달력
+   *
+   * Results are saved to episode_feedback table for tracking reinforcement over time.
+   */
+  static async _distillFeedback(rawFeedback, seriesId = null) {
+    if (rawFeedback.length === 0) return [];
+
+    // Flatten all comments into a single block
+    let inputText = '';
+    let totalComments = 0;
+    for (const ep of rawFeedback) {
+      inputText += `Episode ${ep.episodeNumber} feedback:\n`;
+      for (const c of ep.topComments) {
+        inputText += `- [${c.archetype}] ${c.content}\n`;
+        totalComments++;
+      }
+      inputText += '\n';
+    }
+
+    const distillPrompt = `You are a reward model for serialized story generation.
+Analyze reader feedback and produce TWO outputs:
+
+## PART 1: SCORES (0-10 scale, based on what readers indicate)
+Rate the MOST RECENT episode based on reader sentiment:
+- prompt_accuracy: How well does the episode follow the series premise/synopsis?
+- creativity: How original and engaging is the storytelling?
+- quality: Writing/image quality (prose, descriptions, dialogue)
+- consistency: Character/setting consistency across episodes
+- emotional_resonance: How well does it evoke intended emotions?
+- overall: Weighted average
+
+## PART 2: DIRECTIVES (3-5 actionable improvements for the NEXT episode)
+- Convert praise → "continue doing X"
+- Convert criticism → "improve X by doing Y"
+- Each must be 1 specific, actionable sentence
+
+Output EXACTLY this JSON format:
+{"scores":{"prompt_accuracy":7,"creativity":6,"quality":8,"consistency":5,"emotional_resonance":7,"overall":6.6},"directives":["directive 1","directive 2","directive 3"]}
+
+Use the SAME LANGUAGE as the majority of comments for directives.`;
+
+    try {
+      const response = await google.call('gemini-2.5-flash-lite', distillPrompt, inputText, {
+        maxOutputTokens: 500,
+      });
+
+      if (!response || !response.trim()) return rawFeedback;
+
+      // Parse JSON response
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return rawFeedback;
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      const scores = parsed.scores || {};
+      const directives = (parsed.directives || []).filter(d => d && d.length > 5);
+
+      if (directives.length === 0) return rawFeedback;
+
+      // Save to episode_feedback table
+      const latestEp = rawFeedback[rawFeedback.length - 1]?.episodeNumber || 0;
+      if (seriesId && latestEp > 0) {
+        try {
+          await queryOne(
+            `INSERT INTO episode_feedback
+              (series_id, episode_number, raw_comment_count, directives,
+               score_prompt_accuracy, score_creativity, score_quality,
+               score_consistency, score_emotional_resonance, score_overall)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             ON CONFLICT (series_id, episode_number)
+             DO UPDATE SET
+               raw_comment_count = EXCLUDED.raw_comment_count,
+               directives = EXCLUDED.directives,
+               score_prompt_accuracy = EXCLUDED.score_prompt_accuracy,
+               score_creativity = EXCLUDED.score_creativity,
+               score_quality = EXCLUDED.score_quality,
+               score_consistency = EXCLUDED.score_consistency,
+               score_emotional_resonance = EXCLUDED.score_emotional_resonance,
+               score_overall = EXCLUDED.score_overall`,
+            [
+              seriesId, latestEp, totalComments, JSON.stringify(directives),
+              scores.prompt_accuracy || null, scores.creativity || null,
+              scores.quality || null, scores.consistency || null,
+              scores.emotional_resonance || null, scores.overall || null,
+            ]
+          );
+          console.log(`TaskWorker: feedback saved — ep${latestEp} overall=${scores.overall} (${directives.length} directives)`);
+        } catch (dbErr) {
+          console.warn('TaskWorker: feedback DB save failed:', dbErr.message);
+        }
+      }
+
+      return [{
+        episodeNumber: latestEp,
+        scores,
+        topComments: directives.map(d => ({
+          authorName: 'Community',
+          archetype: 'distilled',
+          content: d,
+          score: 0,
+        })),
+      }];
+    } catch (err) {
+      console.warn('TaskWorker: feedback distillation failed:', err.message);
+      return rawFeedback;
+    }
   }
 
   // ──────────────────────────────────────────

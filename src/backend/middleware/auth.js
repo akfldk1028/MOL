@@ -45,6 +45,7 @@ async function requireAuth(req, res, next) {
       status: agent.status,
       isClaimed: agent.is_claimed,
       isPersonal: agent.is_personal,
+      isExternal: agent.is_external || false,
       createdAt: agent.created_at
     };
     req.token = token;
@@ -106,6 +107,7 @@ async function optionalAuth(req, res, next) {
         status: agent.status,
         isClaimed: agent.is_claimed,
         isPersonal: agent.is_personal,
+        isExternal: agent.is_external || false,
         createdAt: agent.created_at
       };
       req.token = token;

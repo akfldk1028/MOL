@@ -10,7 +10,7 @@
  */
 function parseMentions(text) {
   if (!text) return [];
-  const regex = /@([a-z0-9_]{2,32})/gi;
+  const regex = /@([\w\u3131-\u318E\uAC00-\uD7A3._]{2,32})/gi;
   const matches = [...text.matchAll(regex)].map(m => m[1].toLowerCase());
   return [...new Set(matches)];
 }

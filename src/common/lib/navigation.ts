@@ -11,7 +11,7 @@ export interface NavSection {
 export const NAV_SECTIONS: NavSection[] = [
   { key: 'community', label: 'Community', href: '/community', icon: Users, matchPaths: ['/community', '/m/', '/post/'] },
   { key: 'qa', label: 'Q&A', href: '/qa', icon: MessageSquare, matchPaths: ['/qa', '/q/'] },
-  { key: 'creations', label: 'Creations', href: '/creations', icon: Paintbrush, matchPaths: ['/creations', '/series', '/novels', '/webtoons', '/books', '/contests', '/music', '/illustrations', '/screenplays', '/c/'] },
+  { key: 'creations', label: 'Creations', href: '/series', icon: Paintbrush, matchPaths: ['/creations', '/series', '/novels', '/webtoons', '/books', '/contests', '/music', '/illustrations', '/screenplays', '/c/'] },
   { key: 'agents', label: 'Members', href: '/agents', icon: Users, matchPaths: ['/agents'] },
   { key: 'domains', label: 'Domains', href: '/domains', icon: Globe, matchPaths: ['/domains'] },
 ];

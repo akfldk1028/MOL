@@ -4,7 +4,7 @@
  * Pattern follows heartbeat-decision.js
  */
 
-function buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber) {
+function buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber, imageFeedbackHints = null) {
   const isWebtoon = series.content_type === 'webtoon';
 
   const base = [
@@ -60,6 +60,19 @@ function buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber) {
     );
   }
 
+  // Inject image-specific feedback hints for webtoon
+  if (isWebtoon && imageFeedbackHints && imageFeedbackHints.length > 0) {
+    base.push(
+      '',
+      '=== FEEDBACK FROM PREVIOUS EPISODES ===',
+      'Community reviewers noted the following about recent images:',
+    );
+    for (const hint of imageFeedbackHints) {
+      base.push(`- ${hint}`);
+    }
+    base.push('Incorporate this feedback to improve image descriptions in this episode.');
+  }
+
   base.push(
     '',
     'Write naturally. Match the tone and style established in previous episodes.',
@@ -70,7 +83,7 @@ function buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber) {
   return base.filter(Boolean).join('\n');
 }
 
-function buildEpisodeUserPrompt(series, previousEpisodes) {
+function buildEpisodeUserPrompt(series, previousEpisodes, critiqueFeedback = []) {
   let prompt = '';
 
   if (series.synopsis) {
@@ -85,6 +98,30 @@ function buildEpisodeUserPrompt(series, previousEpisodes) {
     }
   } else {
     prompt += 'This is the first episode. Begin the story.\n';
+  }
+
+  // Inject community critique feedback (distilled into actionable directives)
+  if (critiqueFeedback.length > 0) {
+    const isDistilled = critiqueFeedback[0]?.topComments?.[0]?.archetype === 'distilled';
+    if (isDistilled) {
+      prompt += '--- Improvement Directives (반드시 반영) ---\n';
+      prompt += '커뮤니티 비평을 분석한 결과, 다음 사항을 반영하세요:\n';
+      for (const c of critiqueFeedback[0].topComments) {
+        prompt += `• ${c.content}\n`;
+      }
+      prompt += '\n위 지시사항을 스토리에 자연스럽게 녹여내세요.\n\n';
+    } else {
+      prompt += '--- Community Feedback (반영 필수) ---\n';
+      for (const ep of critiqueFeedback) {
+        prompt += `Episode ${ep.episodeNumber}에 대한 에이전트 비평:\n`;
+        for (const c of ep.topComments) {
+          const archetypeLabel = c.archetype ? `[${c.archetype}]` : '[Agent]';
+          prompt += `- ${archetypeLabel} ${c.content}${c.score ? ` (score: ${c.score})` : ''}\n`;
+        }
+        prompt += '\n';
+      }
+      prompt += '→ 다음 에피소드에서 위 피드백을 자연스럽게 반영하세요.\n\n';
+    }
   }
 
   prompt += '--- Continue the story naturally ---\n';

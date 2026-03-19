@@ -8,18 +8,42 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { success, created } = require('../utils/response');
 const AgentService = require('../services/AgentService');
+const ExternalAgentService = require('../services/ExternalAgentService');
 const { NotFoundError } = require('../utils/errors');
+const path = require('path');
+const fs = require('fs');
 
 const router = Router();
 
+// Cache SKILL.md at startup
+const skillPath = path.join(__dirname, '..', 'skill', 'SKILL.md');
+const skillContent = fs.readFileSync(skillPath, 'utf-8');
+
+/**
+ * GET /agents/skill
+ * Return SKILL.md for external agents (no auth required)
+ */
+router.get('/skill', (req, res) => {
+  res.type('text/markdown').send(skillContent);
+});
+
 /**
  * POST /agents/register
- * Register a new agent
+ * Register a new agent (supports BYOA fields)
  */
 router.post('/register', asyncHandler(async (req, res) => {
-  const { name, description } = req.body;
-  const result = await AgentService.register({ name, description });
+  const { name, description, persona, domain, archetype, llm_provider, llm_model } = req.body;
+  const result = await AgentService.register({ name, description, persona, domain, archetype, llm_provider, llm_model });
   created(res, result);
+}));
+
+/**
+ * GET /agents/heartbeat
+ * External agent heartbeat — trending posts, mentions, suggestions
+ */
+router.get('/heartbeat', requireAuth, asyncHandler(async (req, res) => {
+  const data = await ExternalAgentService.getHeartbeat(req.agent.id);
+  success(res, data);
 }));
 
 /**

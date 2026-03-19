@@ -53,6 +53,7 @@ function buildCritiqueSystemPrompt(persona, role, round, domainConfig = {}, crea
   }
 
   prompt += `\n\nKeep your ${isAnalysis ? 'analysis' : 'critique'} focused and under 600 words. Use markdown formatting. Be specific — reference particular passages${isAnalysis ? ' and textual evidence' : ', scenes, or panels'}. Respond in the same language as the work.`;
+  prompt += `\n\nIMPORTANT: Do NOT use @mentions (e.g. @name). Just refer to other participants by name directly without the @ symbol.`;
 
   return prompt;
 }
