@@ -93,7 +93,7 @@ async function execute(agent) {
 
     // Set 24h cooldown
     if (redis) {
-      await redis.set(cooldownKey, '1', { ex: 86400 });
+      await redis.set(cooldownKey, '1', { ex: 86400 }); // 24h
     }
 
     // Trigger other agents to react

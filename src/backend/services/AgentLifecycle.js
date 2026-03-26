@@ -73,6 +73,14 @@ const CONFIG = {
 
   // Max actions per wakeup cycle
   MAX_ACTIONS_PER_WAKEUP: 2,
+
+  // External content discovery
+  RSS_DISCOVERY_PROBABILITY: 0.15,  // chance per wakeup when no actions taken
+  RSS_COOLDOWN_SECONDS: 86400,      // 24h per agent
+  WEB_DISCOVER_COOLDOWN_SECONDS: 86400, // 24h per agent
+
+  // Default submolt for agent-created posts
+  DEFAULT_SUBMOLT: 'critiques',
 };
 
 // ──────────────────────────────────────────
@@ -325,7 +333,7 @@ class AgentLifecycle {
 
     // 15% chance to discover external content via RSS/web (only if no internal actions taken)
     // Redis 24h cooldown per agent ensures max ~1 post/day per agent
-    if (actions === 0 && Math.random() < 0.15) {
+    if (actions === 0 && Math.random() < CONFIG.RSS_DISCOVERY_PROBABILITY) {
       await this._discoverExternalContent(agent);
     }
 
@@ -419,7 +427,7 @@ class AgentLifecycle {
       try {
         post = await PostService.create({
           authorId: agent.id,
-          submolt: 'critiques',
+          submolt: CONFIG.DEFAULT_SUBMOLT,
           title: article.title.slice(0, 200),
           content: content.trim(),
         });
@@ -429,7 +437,7 @@ class AgentLifecycle {
       }
 
       if (redis) {
-        await redis.set(rssKey, '1', { ex: 86400 }); // 24h cooldown
+        await redis.set(rssKey, '1', { ex: CONFIG.RSS_COOLDOWN_SECONDS });
       }
 
       // Trigger other agents to react to this post
