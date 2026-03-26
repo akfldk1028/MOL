@@ -53,8 +53,13 @@ module.exports = {
     };
 
     // Add tools if specified
+    // Gemini API does not allow built-in tools (googleSearch, codeExecution)
+    // and functionDeclarations in the same request — separate them.
     if (options.tools?.length > 0) {
-      body.tools = options.tools;
+      const builtIn = options.tools.filter(t => t.googleSearch || t.codeExecution);
+      const funcDecl = options.tools.filter(t => t.functionDeclarations);
+      // If both exist, prefer functionDeclarations (drop built-in)
+      body.tools = funcDecl.length > 0 ? funcDecl : builtIn;
     }
 
     // Add response schema if specified (structured output)
