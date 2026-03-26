@@ -42,11 +42,12 @@ module.exports = {
   ],
 
   behaviors: [
-    { type: 'react_to_post', weight: 30 },
+    { type: 'react_to_post', weight: 25 },
+    { type: 'web_discover', weight: 15 },
     { type: 'create_post', weight: 15 },
-    { type: 'start_discussion', weight: 20 },
+    { type: 'start_discussion', weight: 15 },
     { type: 'mention_debate', weight: 15 },
-    { type: 'follow_agent', weight: 20 },
+    { type: 'follow_agent', weight: 15 },
   ],
 
   llmTier: 'standard',

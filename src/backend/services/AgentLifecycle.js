@@ -296,7 +296,7 @@ class AgentLifecycle {
     this._stats.totalBrowses++;
 
     // Self-initiated behavior (archetype-driven)
-    if (actions === 0 && agent.archetype) {
+    if (actions === 0) {
       try {
         const BehaviorRouter = require('../agent-system/behaviors');
         if (BehaviorRouter.shouldSelfInitiate(agent)) {
@@ -309,6 +309,9 @@ class AgentLifecycle {
             case 'mention_debate':
               behaviorModule = require('../agent-system/behaviors/mention-debate');
               break;
+            case 'web_discover':
+              behaviorModule = require('../agent-system/behaviors/web-discover');
+              break;
             default:
               behaviorModule = require('../agent-system/behaviors/original-post');
           }
@@ -320,8 +323,9 @@ class AgentLifecycle {
       }
     }
 
-    // 5% chance to discover external content via RSS (only if no internal actions taken)
-    if (actions === 0 && Math.random() < 0.05) {
+    // 15% chance to discover external content via RSS/web (only if no internal actions taken)
+    // Redis 24h cooldown per agent ensures max ~1 post/day per agent
+    if (actions === 0 && Math.random() < 0.15) {
       await this._discoverExternalContent(agent);
     }
 
@@ -361,18 +365,23 @@ class AgentLifecycle {
         if (already) return; // Already posted from RSS today
       }
 
-      // Resolve agent's domain for topic filtering
+      // Resolve agent's domain for topic filtering + domain-specific feeds
       const domain = await queryOne('SELECT slug, name FROM domains WHERE id = $1', [agent.domain_id]);
+      const domainSlug = domain?.slug || 'general';
       const topic = domain?.name || 'general';
 
-      // Scan feeds
-      const items = await blogWatch.scanFeeds();
+      // Pick domain-specific feeds
+      const feeds = blogWatch.getDomainFeeds(domainSlug);
+
+      // Scan feeds (must pass feeds array — scanFeeds expects it as first arg)
+      const results = await blogWatch.scanFeeds(feeds, { limit: 5 });
+      const items = results.flatMap(r => r.articles);
       if (!items || items.length === 0) return;
 
       // Filter by relevance to agent's domain
       const relevant = items.filter(item => {
         const text = `${item.title} ${item.summary || ''}`.toLowerCase();
-        return text.includes(topic.toLowerCase()) || text.includes((domain?.slug || '').toLowerCase());
+        return text.includes(topic.toLowerCase()) || text.includes(domainSlug);
       });
 
       const article = relevant.length > 0 ? relevant[0] : items[Math.floor(Math.random() * Math.min(5, items.length))];
@@ -402,15 +411,26 @@ class AgentLifecycle {
 
       if (!content || !content.trim()) return;
 
-      // Insert as community post
-      await queryOne(
+      // Create community post and trigger reactions
+      const post = await queryOne(
         `INSERT INTO posts (title, content, author_id, post_type, is_deleted)
-         VALUES ($1, $2, $3, 'general', false)`,
+         VALUES ($1, $2, $3, 'general', false)
+         RETURNING id, title, post_type, author_id`,
         [article.title.slice(0, 200), content.trim(), agent.id]
       );
 
       if (redis) {
         await redis.set(rssKey, '1', { ex: 86400 }); // 24h cooldown
+      }
+
+      // Trigger other agents to react to this post
+      if (post) {
+        const TaskScheduler = require('./TaskScheduler');
+        setImmediate(() => {
+          TaskScheduler.onPostCreated(post).catch(err =>
+            console.error('AgentLifecycle: onPostCreated error (RSS):', err.message)
+          );
+        });
       }
 
       console.log(`AgentLifecycle: ${agent.name} shared RSS article "${article.title.slice(0, 40)}"`);

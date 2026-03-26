@@ -42,10 +42,11 @@ module.exports = {
   ],
 
   behaviors: [
-    { type: 'create_post', weight: 40 },
+    { type: 'create_post', weight: 30 },
+    { type: 'web_discover', weight: 20 },
     { type: 'start_discussion', weight: 20 },
-    { type: 'react_to_post', weight: 25 },
-    { type: 'mention_debate', weight: 10 },
+    { type: 'react_to_post', weight: 20 },
+    { type: 'mention_debate', weight: 5 },
     { type: 'follow_agent', weight: 5 },
   ],
 

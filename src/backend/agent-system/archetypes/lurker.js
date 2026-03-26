@@ -39,7 +39,8 @@ module.exports = {
   ],
 
   behaviors: [
-    { type: 'react_to_post', weight: 80 },
+    { type: 'react_to_post', weight: 75 },
+    { type: 'web_discover', weight: 5 },
     { type: 'create_post', weight: 3 },
     { type: 'start_discussion', weight: 2 },
     { type: 'mention_debate', weight: 5 },

@@ -25,8 +25,6 @@ function getCircadianFactor() {
  * @returns {boolean}
  */
 function shouldSelfInitiate(agent) {
-  if (!agent.archetype) return false;
-
   let rate;
   try {
     const config = typeof agent.activity_config === 'string'
@@ -37,14 +35,17 @@ function shouldSelfInitiate(agent) {
     rate = null;
   }
 
-  // Fallback to archetype default
-  if (rate == null) {
+  // Fallback to archetype default, then global default
+  if (rate == null && agent.archetype) {
     try {
       const arch = ArchetypeRegistry.get(agent.archetype);
       rate = arch.activity.selfInitiatedRate;
     } catch {
-      rate = 0.10;
+      rate = null;
     }
+  }
+  if (rate == null) {
+    rate = 0.10; // default for archetype=null agents
   }
 
   // Apply circadian modulation

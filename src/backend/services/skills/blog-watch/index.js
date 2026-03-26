@@ -111,6 +111,48 @@ const DEFAULT_FEEDS = [
   { name: 'Reddit Writing', url: 'https://www.reddit.com/r/writing/.rss?limit=10' },
 ];
 
+// Domain-specific feeds — agents discover content relevant to their domain
+const DOMAIN_FEEDS = {
+  tech: [
+    { name: 'Hacker News', url: 'https://hnrss.org/newest?points=100' },
+    { name: 'Dev.to', url: 'https://dev.to/feed' },
+    { name: 'Reddit Programming', url: 'https://www.reddit.com/r/programming/.rss?limit=10' },
+  ],
+  medical: [
+    { name: 'Reddit Science', url: 'https://www.reddit.com/r/science/.rss?limit=10' },
+    { name: 'Reddit Health', url: 'https://www.reddit.com/r/health/.rss?limit=10' },
+  ],
+  investment: [
+    { name: 'Reddit Finance', url: 'https://www.reddit.com/r/finance/.rss?limit=10' },
+    { name: 'Reddit Investing', url: 'https://www.reddit.com/r/investing/.rss?limit=10' },
+  ],
+  book: [
+    { name: 'Reddit Books', url: 'https://www.reddit.com/r/books/.rss?limit=10' },
+    { name: 'Reddit Literature', url: 'https://www.reddit.com/r/literature/.rss?limit=10' },
+  ],
+  novel: [
+    { name: 'Reddit Writing', url: 'https://www.reddit.com/r/writing/.rss?limit=10' },
+    { name: 'Reddit Fantasy', url: 'https://www.reddit.com/r/Fantasy/.rss?limit=10' },
+  ],
+  webtoon: [
+    { name: 'Reddit Webtoons', url: 'https://www.reddit.com/r/webtoons/.rss?limit=10' },
+    { name: 'Reddit Manga', url: 'https://www.reddit.com/r/manga/.rss?limit=10' },
+  ],
+  legal: [
+    { name: 'Reddit Law', url: 'https://www.reddit.com/r/law/.rss?limit=10' },
+  ],
+  general: DEFAULT_FEEDS,
+};
+
+/**
+ * Get feeds for a specific domain slug
+ * @param {string} domainSlug
+ * @returns {Array<{name: string, url: string}>}
+ */
+function getDomainFeeds(domainSlug) {
+  return DOMAIN_FEEDS[domainSlug] || DOMAIN_FEEDS.general;
+}
+
 function resolve() {
   return {
     available: true,
@@ -119,4 +161,4 @@ function resolve() {
   };
 }
 
-module.exports = { fetchFeed, scanFeeds, resolve, DEFAULT_FEEDS };
+module.exports = { fetchFeed, scanFeeds, resolve, getDomainFeeds, DEFAULT_FEEDS, DOMAIN_FEEDS };
