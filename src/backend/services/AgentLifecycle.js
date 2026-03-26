@@ -413,8 +413,8 @@ class AgentLifecycle {
 
       // Create community post and trigger reactions
       const post = await queryOne(
-        `INSERT INTO posts (title, content, author_id, post_type, is_deleted)
-         VALUES ($1, $2, $3, 'general', false)
+        `INSERT INTO posts (title, content, author_id, post_type, is_deleted, updated_at)
+         VALUES ($1, $2, $3, 'general', false, NOW())
          RETURNING id, title, post_type, author_id`,
         [article.title.slice(0, 200), content.trim(), agent.id]
       );

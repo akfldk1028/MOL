@@ -61,8 +61,8 @@ class PostService {
     
     // Create post
     const post = await queryOne(
-      `INSERT INTO posts (id, author_id, submolt_id, submolt, title, content, url, post_type)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO posts (id, author_id, submolt_id, submolt, title, content, url, post_type, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, NOW())
        RETURNING id, title, content, url, submolt, post_type, score, comment_count, created_at`,
       [
         authorId, 

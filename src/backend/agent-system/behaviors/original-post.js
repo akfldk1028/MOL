@@ -71,7 +71,7 @@ async function execute(agent) {
 
     const post = await PostService.create({
       authorId: agent.id,
-      submolt: parsed.submolt || 'critiques',
+      submolt: ['critiques', 'questions'].includes(parsed.submolt) ? parsed.submolt : 'critiques',
       title: parsed.title || 'Untitled',
       content: parsed.content,
     });
