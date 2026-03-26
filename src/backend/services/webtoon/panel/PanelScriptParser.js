@@ -33,32 +33,57 @@ class PanelScriptParser {
    */
   static parse(content) {
     const panels = [];
-    const regex = /\[PANEL\]\s*\n([\s\S]*?)\[\/PANEL\]/gi;
     const MAX_PANELS = 20;
+
+    // Try closed [PANEL]...[/PANEL] first
+    const closedRegex = /\[PANEL\]\s*\n([\s\S]*?)\[\/PANEL\]/gi;
     let match;
-
-    while ((match = regex.exec(content)) !== null) {
+    while ((match = closedRegex.exec(content)) !== null) {
       if (panels.length >= MAX_PANELS) break;
-      const block = match[1].trim().slice(0, 3000);
+      const parsed = this._parseBlock(match[1]);
+      if (parsed) panels.push(parsed);
+    }
 
-      const imageMatch = block.match(/^IMAGE:\s*(.+)/im);
-      const textMatch = block.match(/^TEXT:\s*([\s\S]*?)$/im);
-
-      const sceneDescription = imageMatch ? imageMatch[1].trim() : '';
-      const dialogue = textMatch ? textMatch[1].trim() : '';
-
-      if (!sceneDescription && !dialogue) continue;
-
-      panels.push({
-        sceneDescription,
-        dialogue,
-        characters: this._extractCharacterNames(sceneDescription),
-        emotion: this._detectEmotion(sceneDescription),
-        cameraAngle: this._detectCameraAngle(sceneDescription),
-      });
+    // Fallback: [PANEL] without [/PANEL] — split on next [PANEL] or end of string
+    if (panels.length === 0) {
+      const openRegex = /\[PANEL\]\s*\n/gi;
+      const starts = [];
+      while ((match = openRegex.exec(content)) !== null) {
+        starts.push(match.index + match[0].length);
+      }
+      for (let i = 0; i < starts.length && panels.length < MAX_PANELS; i++) {
+        const end = i + 1 < starts.length
+          ? content.lastIndexOf('[PANEL]', starts[i + 1])
+          : content.length;
+        const block = content.slice(starts[i], end);
+        const parsed = this._parseBlock(block);
+        if (parsed) panels.push(parsed);
+      }
     }
 
     return panels;
+  }
+
+  /**
+   * Parse a single panel block into structured data
+   */
+  static _parseBlock(raw) {
+    const block = raw.trim().slice(0, 3000);
+    const imageMatch = block.match(/^IMAGE:\s*(.+)/im);
+    const textMatch = block.match(/^TEXT:\s*([\s\S]*?)$/im);
+
+    const sceneDescription = imageMatch ? imageMatch[1].trim() : '';
+    const dialogue = textMatch ? textMatch[1].trim() : '';
+
+    if (!sceneDescription && !dialogue) return null;
+
+    return {
+      sceneDescription,
+      dialogue,
+      characters: this._extractCharacterNames(sceneDescription),
+      emotion: this._detectEmotion(sceneDescription),
+      cameraAngle: this._detectCameraAngle(sceneDescription),
+    };
   }
 
   /**
