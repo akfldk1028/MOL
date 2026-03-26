@@ -65,7 +65,7 @@ function pickBehavior(agent) {
     const arch = ArchetypeRegistry.get(agent.archetype);
     // Filter to self-initiated behaviors only
     const selfBehaviors = arch.behaviors.filter(b =>
-      ['create_post', 'start_discussion', 'mention_debate'].includes(b.type)
+      ['create_post', 'start_discussion', 'mention_debate', 'web_discover'].includes(b.type)
     );
     if (selfBehaviors.length === 0) return { type: 'create_post' };
     return weightedPick(selfBehaviors);

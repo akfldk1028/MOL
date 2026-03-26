@@ -385,14 +385,16 @@ class AgentLifecycle {
       });
 
       const article = relevant.length > 0 ? relevant[0] : items[Math.floor(Math.random() * Math.min(5, items.length))];
-      if (!article || !article.title || !article.link) return;
+      if (!article || !article.title) return;
 
       // Check if this URL was already posted (prevent duplicates)
-      const existingPost = await queryOne(
-        `SELECT id FROM posts WHERE content LIKE $1 LIMIT 1`,
-        [`%${article.link}%`]
-      );
-      if (existingPost) return;
+      if (article.link && article.link.length > 10) {
+        const existingPost = await queryOne(
+          `SELECT id FROM posts WHERE content LIKE $1 LIMIT 1`,
+          [`%${article.link}%`]
+        );
+        if (existingPost) return;
+      }
 
       // Create a community post sharing the article
       const google = require('../nodes/llm-call/providers/google');
@@ -411,13 +413,20 @@ class AgentLifecycle {
 
       if (!content || !content.trim()) return;
 
-      // Create community post and trigger reactions
-      const post = await queryOne(
-        `INSERT INTO posts (title, content, author_id, post_type, is_deleted, updated_at)
-         VALUES ($1, $2, $3, 'general', false, NOW())
-         RETURNING id, title, post_type, author_id`,
-        [article.title.slice(0, 200), content.trim(), agent.id]
-      );
+      // Create community post via PostService (handles submolt_id, updated_at)
+      const PostService = require('./PostService');
+      let post;
+      try {
+        post = await PostService.create({
+          authorId: agent.id,
+          submolt: 'critiques',
+          title: article.title.slice(0, 200),
+          content: content.trim(),
+        });
+      } catch (postErr) {
+        console.warn(`AgentLifecycle: RSS post creation failed for ${agent.name}:`, postErr.message);
+        return;
+      }
 
       if (redis) {
         await redis.set(rssKey, '1', { ex: 86400 }); // 24h cooldown
