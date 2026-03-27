@@ -1,27 +1,37 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { useState, useEffect } from 'react';
-import { Globe, Stethoscope, Scale, TrendingUp, Code } from 'lucide-react';
 import { cn } from '@/common/lib/utils';
-import type { Domain } from '@/features/qa/types';
 import { PageHeader, PageBreadcrumb } from '@/common/components/page-header';
 
-const DOMAIN_ICONS: Record<string, ReactNode> = {
-  Globe: <Globe className="h-4 w-4" />,
-  Stethoscope: <Stethoscope className="h-4 w-4" />,
-  Scale: <Scale className="h-4 w-4" />,
-  TrendingUp: <TrendingUp className="h-4 w-4" />,
-  Code: <Code className="h-4 w-4" />,
+const ARCHETYPE_LABELS: Record<string, { label: string; color: string }> = {
+  creator:      { label: 'Creator',      color: 'bg-purple-100 text-purple-700' },
+  critic:       { label: 'Critic',       color: 'bg-red-100 text-red-700' },
+  provocateur:  { label: 'Provocateur',  color: 'bg-orange-100 text-orange-700' },
+  connector:    { label: 'Connector',    color: 'bg-blue-100 text-blue-700' },
+  expert:       { label: 'Expert',       color: 'bg-green-100 text-green-700' },
+  lurker:       { label: 'Lurker',       color: 'bg-gray-100 text-gray-600' },
+  character:    { label: 'Character',    color: 'bg-pink-100 text-pink-700' },
+  utility:      { label: 'Utility',      color: 'bg-slate-100 text-slate-600' },
 };
 
-interface DomainWithAgents extends Domain {
-  agents: Array<{
-    name: string;
-    display_name?: string;
-    description?: string;
-    avatar_url?: string;
-  }>;
+interface AgentData {
+  name: string;
+  displayName?: string;
+  description?: string;
+  avatarUrl?: string;
+  archetype?: string;
+  topics: string[];
+  karma: number;
+  followers: number;
+  personality?: Record<string, number>;
+  saju?: {
+    gyeokguk?: { name: string };
+    yongsin?: { yongsin: string };
+    dayGan?: string;
+    dayJi?: string;
+    oheng?: Record<string, number>;
+  } | null;
 }
 
 function getAvatarUrl(name: string) {
@@ -29,63 +39,54 @@ function getAvatarUrl(name: string) {
 }
 
 export default function AgentsDirectoryPage() {
-  const [domains, setDomains] = useState<DomainWithAgents[]>([]);
+  const [agents, setAgents] = useState<AgentData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeDomain, setActiveDomain] = useState('general');
+  const [filter, setFilter] = useState<string>('all');
 
   useEffect(() => {
-    fetch('/api/domains')
+    fetch('/api/agents/directory')
       .then(res => res.json())
-      .then(async (data) => {
-        if (data.domains) {
-          const domainsWithAgents = await Promise.all(
-            data.domains.map(async (d: Domain) => {
-              try {
-                const res = await fetch(`/api/domains/${d.slug}`);
-                const detail = await res.json();
-                return { ...d, agents: detail.domain?.agents || [] };
-              } catch {
-                return { ...d, agents: [] };
-              }
-            })
-          );
-          setDomains(domainsWithAgents);
-        }
+      .then(data => {
+        if (data.agents) setAgents(data.agents);
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
 
-  const currentDomain = domains.find(d => d.slug === activeDomain);
+  const archetypes = ['all', ...new Set(agents.map(a => a.archetype).filter(Boolean))];
+  const filtered = filter === 'all' ? agents : agents.filter(a => a.archetype === filter);
 
   return (
     <div className="max-w-4xl mx-auto py-6 px-4">
       <PageBreadcrumb items={[{ label: 'Members' }]} />
       <PageHeader
         title="Members"
-        subtitle="People hanging out here"
+        subtitle={`${agents.length} agents active`}
       />
 
-      {/* Domain filter */}
-      {!isLoading && domains.length > 0 && (
+      {/* Archetype filter */}
+      {!isLoading && agents.length > 0 && (
         <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1 scrollbar-hide">
-          {domains.filter(d => d.isActive).map(domain => (
-            <button
-              key={domain.slug}
-              onClick={() => setActiveDomain(domain.slug)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-all',
-                activeDomain === domain.slug
-                  ? 'bg-foreground text-background font-medium'
-                  : 'bg-muted text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <span style={{ color: activeDomain === domain.slug ? undefined : domain.color }}>
-                {DOMAIN_ICONS[domain.icon || 'Globe'] || <Globe className="h-4 w-4" />}
-              </span>
-              {domain.name}
-            </button>
-          ))}
+          {archetypes.map(arch => {
+            const info = arch === 'all' ? { label: 'All', color: 'bg-foreground text-background' } : ARCHETYPE_LABELS[arch] || { label: arch, color: 'bg-muted text-foreground' };
+            return (
+              <button
+                key={arch}
+                onClick={() => setFilter(arch)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
+                  filter === arch
+                    ? 'bg-foreground text-background'
+                    : `${info.color} hover:opacity-80`
+                )}
+              >
+                {info.label}
+                {arch !== 'all' && (
+                  <span className="ml-1 opacity-60">{agents.filter(a => a.archetype === arch).length}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -103,28 +104,61 @@ export default function AgentsDirectoryPage() {
             </div>
           ))}
         </div>
-      ) : currentDomain ? (
+      ) : (
         <div className="grid gap-2">
-          {currentDomain.agents.map(agent => {
-            const avatar = agent.avatar_url || getAvatarUrl(agent.name);
+          {filtered.map(agent => {
+            const avatar = agent.avatarUrl || getAvatarUrl(agent.name);
+            const arch = agent.archetype ? ARCHETYPE_LABELS[agent.archetype] : null;
+            const gyeokguk = agent.saju?.gyeokguk?.name;
+
             return (
               <div key={agent.name} className="card-base p-4">
                 <div className="flex items-start gap-3">
                   <img
                     src={avatar}
                     alt={agent.name}
-                    className="h-9 w-9 rounded-full bg-muted shrink-0"
+                    className="h-10 w-10 rounded-full bg-muted shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold">{agent.display_name || agent.name}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-semibold">{agent.displayName || agent.name}</h3>
+                      {arch && (
+                        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium', arch.color)}>
+                          {arch.label}
+                        </span>
+                      )}
+                      {gyeokguk && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                          {gyeokguk}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Topics */}
+                    {agent.topics.length > 0 && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {agent.topics.slice(0, 4).map(t => (
+                          <span key={t} className="px-1.5 py-0.5 rounded-full text-[10px] bg-muted text-muted-foreground">
+                            {t.replace(/_/g, ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-right text-xs text-muted-foreground shrink-0">
+                    <div>{agent.karma} karma</div>
                   </div>
                 </div>
               </div>
             );
           })}
+
+          {filtered.length === 0 && (
+            <p className="text-center text-sm text-muted-foreground py-8">No agents found</p>
+          )}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

@@ -27,6 +27,31 @@ const { queryOne, queryAll } = require('../config/database');
 const { getRedis } = require('../config/redis');
 
 // ──────────────────────────────────────────
+// OpenJarvis Bridge (interest check + trace)
+// ──────────────────────────────────────────
+
+const OJ_BRIDGE_URL = process.env.OJ_BRIDGE_URL || 'http://localhost:5000';
+
+async function _ojFetch(path, body, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${OJ_BRIDGE_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ──────────────────────────────────────────
 // Configuration (tune these for behavior)
 // ──────────────────────────────────────────
 
@@ -44,11 +69,10 @@ const CONFIG = {
   // Interest threshold (0-1 scale)
   INTEREST_THRESHOLD: 0.45,
 
-  // Interest weights
-  W_DOMAIN: 0.40,
+  // Interest weights (OpenJarvis LLM + recency + novelty)
+  W_OJ: 0.50,
   W_RECENCY: 0.30,
   W_NOVELTY: 0.20,
-  W_ENGAGEMENT: 0.10,
 
   // Response delay after deciding to act (lognormal)
   // mu=2.5, sigma=0.8 → median ~12min, range ~2min to ~1h
@@ -284,7 +308,8 @@ class AgentLifecycle {
     const agent = await queryOne(
       `SELECT id, name, display_name, persona, domain_id,
               daily_action_count, daily_action_limit,
-              archetype, activity_config, llm_tier, expertise_topics
+              archetype, activity_config, llm_tier, expertise_topics,
+              personality
        FROM agents
        WHERE id = $1 AND is_active = true AND autonomy_enabled = true`,
       [agentId]
@@ -373,23 +398,29 @@ class AgentLifecycle {
         if (already) return; // Already posted from RSS today
       }
 
-      // Resolve agent's domain for topic filtering + domain-specific feeds
-      const domain = await queryOne('SELECT slug, name FROM domains WHERE id = $1', [agent.domain_id]);
-      const domainSlug = domain?.slug || 'general';
-      const topic = domain?.name || 'general';
-
-      // Pick domain-specific feeds
-      const feeds = blogWatch.getDomainFeeds(domainSlug);
+      // Map agent's expertise topics to RSS domain feeds
+      const topics = agent.expertise_topics || [];
+      const TOPIC_TO_FEED = {
+        technology: 'tech', programming: 'tech', ai: 'tech', startups: 'tech', innovation: 'tech',
+        medical: 'medical', health: 'medical', clinical: 'medical', wellness: 'medical', science: 'medical',
+        investment: 'investment', finance: 'investment', stocks: 'investment', crypto: 'investment', economics: 'investment', business: 'investment',
+        books: 'book', reading: 'book', literary_analysis: 'book', publishing: 'book',
+        novel: 'novel', fiction: 'novel', creative_writing: 'novel', storytelling: 'novel', character_design: 'novel',
+        webtoon: 'webtoon', illustration: 'webtoon', comics: 'webtoon', visual_storytelling: 'webtoon', art: 'webtoon',
+        legal: 'general', law: 'general', gaming: 'general', entertainment: 'general',
+      };
+      const feedSlug = topics.map(t => TOPIC_TO_FEED[t]).find(Boolean) || 'general';
+      const feeds = blogWatch.getDomainFeeds(feedSlug);
 
       // Scan feeds (must pass feeds array — scanFeeds expects it as first arg)
       const results = await blogWatch.scanFeeds(feeds, { limit: 5 });
       const items = results.flatMap(r => r.articles);
       if (!items || items.length === 0) return;
 
-      // Filter by relevance to agent's domain
+      // Filter by relevance to agent's expertise topics
       const relevant = items.filter(item => {
         const text = `${item.title} ${item.summary || ''}`.toLowerCase();
-        return text.includes(topic.toLowerCase()) || text.includes(domainSlug);
+        return topics.some(t => text.includes(t.toLowerCase().replace(/_/g, ' ')));
       });
 
       const article = relevant.length > 0 ? relevant[0] : items[Math.floor(Math.random() * Math.min(5, items.length))];
@@ -450,7 +481,12 @@ class AgentLifecycle {
         });
       }
 
-      console.log(`AgentLifecycle: ${agent.name} shared RSS article "${article.title.slice(0, 40)}"`);
+      // Record trace
+      if (post) {
+        this._recordTrace(agent, 'rss_post', post, content?.slice(0, 200), null);
+      }
+
+      console.log(`AgentLifecycle: ${agent.display_name || agent.name} shared RSS article "${article.title.slice(0, 40)}"`);
       this._stats.totalActions++;
     } catch (err) {
       console.error(`AgentLifecycle: RSS discovery failed for ${agent.name}:`, err.message);
@@ -496,13 +532,11 @@ class AgentLifecycle {
     const unseenPosts = posts.filter(p => !browsedSet.has(p.id));
     if (unseenPosts.length === 0) return 0;
 
-    // Resolve agent's domain slug for matching
-    const agentDomain = await queryOne(
-      `SELECT slug FROM domains WHERE id = $1`, [agent.domain_id]
-    );
-    const agentDomainSlug = agentDomain?.slug || 'general';
+    // Batch interest check — one HTTP call for all unseen posts
+    const interestScores = await this._batchInterestCheck(agent, unseenPosts);
 
-    for (const post of unseenPosts) {
+    for (let i = 0; i < unseenPosts.length; i++) {
+      const post = unseenPosts[i];
       if (actionsThisCycle >= CONFIG.MAX_ACTIONS_PER_WAKEUP) break;
 
       // Mark as seen
@@ -511,8 +545,8 @@ class AgentLifecycle {
         await redis.expire(browsedKey, CONFIG.BROWSED_POSTS_TTL);
       }
 
-      // Calculate interest
-      const interest = await this._calculateInterest(agent, post, agentDomainSlug);
+      // Use pre-calculated interest score
+      const interest = interestScores[i];
       const tier = this._getAgentTier(agent);
       const tierConfig = CONFIG.TIER_CONFIG[tier];
       const adjustedThreshold = CONFIG.INTEREST_THRESHOLD - (tierConfig.interestBoost || 0);
@@ -564,7 +598,10 @@ class AgentLifecycle {
       actionsThisCycle++;
       this._stats.totalActions++;
 
-      console.log(`AgentLifecycle: ${agent.name} interested in "${post.title?.slice(0, 30)}" (score=${interest.toFixed(2)}, delay=${Math.round(clampedDelay)}min)`);
+      // Record trace in OpenJarvis
+      this._recordTrace(agent, taskType, post, null, interest);
+
+      console.log(`AgentLifecycle: ${agent.display_name || agent.name} interested in "${post.title?.slice(0, 30)}" (score=${interest.toFixed(2)}, delay=${Math.round(clampedDelay)}min)`);
     }
 
     return actionsThisCycle;
@@ -595,13 +632,14 @@ class AgentLifecycle {
 
     if (posts.length === 0) return 0;
 
-    const agentDomain = await queryOne('SELECT slug FROM domains WHERE id = $1', [agent.domain_id]);
-    const agentDomainSlug = agentDomain?.slug || 'general';
+    // Batch interest check
+    const interestScores = await this._batchInterestCheck(agent, posts);
 
-    for (const post of posts) {
+    for (let i = 0; i < posts.length; i++) {
+      const post = posts[i];
       if (actionsThisCycle >= CONFIG.MAX_ACTIONS_PER_WAKEUP) break;
 
-      const interest = await this._calculateInterest(agent, post, agentDomainSlug);
+      const interest = interestScores[i];
       const tier = this._getAgentTier(agent);
       const tierConfig = CONFIG.TIER_CONFIG[tier];
       const adjustedThreshold = CONFIG.INTEREST_THRESHOLD - (tierConfig.interestBoost || 0);
@@ -620,6 +658,7 @@ class AgentLifecycle {
 
       const TaskScheduler = require('./TaskScheduler');
       await TaskScheduler.createTask({ type: taskType, agentId: agent.id, targetId, targetType, delayMinutes: clampedDelay, chainDepth: 0 });
+      this._recordTrace(agent, taskType, post, null, interest);
       actionsThisCycle++;
       this._stats.totalActions++;
     }
@@ -628,50 +667,74 @@ class AgentLifecycle {
   }
 
   /**
-   * Calculate how interested an agent is in a post (0-1).
-   *
-   * Factors:
-   *   domain_match: 1.0 if same domain, 0.3 if general, 0.1 otherwise
-   *   recency: exponential decay, 1.0 at 0h, ~0.3 at 24h
-   *   novelty: fewer comments = more novel (unsaturated discussion)
-   *   engagement: high vote/comment ratio = engaging content
+   * Keyword matching fallback when OpenJarvis is unavailable.
    */
-  static async _calculateInterest(agent, post, agentDomainSlug) {
-    // 1. Domain match
-    let domainScore = 0.1;
-    if (post.post_type === 'question' || post.post_type === 'critique') {
-      const table = post.post_type === 'question' ? 'questions' : 'creations';
-      const row = await queryOne(
-        `SELECT domain_slug FROM ${table} WHERE post_id = $1`, [post.id]
-      );
-      const postDomain = row?.domain_slug || 'general';
-      if (postDomain === agentDomainSlug) domainScore = 1.0;
-      else if (postDomain === 'general' || agentDomainSlug === 'general') domainScore = 0.3;
-    } else {
-      // General posts — everyone has moderate interest
-      domainScore = 0.3;
+  static _keywordFallback(agent, post) {
+    const topics = agent.expertise_topics || [];
+    if (!topics.length) return 0.2;
+
+    const text = `${post.title || ''} ${post.content || ''}`.toLowerCase();
+    const matches = topics.filter(t => text.includes(t.toLowerCase().replace(/_/g, ' '))).length;
+    return Math.min(1, matches / Math.max(1, topics.length) + 0.2);
+  }
+
+  /**
+   * Batch interest check — send all posts in one request to OpenJarvis bridge.
+   * Returns array of final interest scores (0-1) for each post.
+   */
+  static async _batchInterestCheck(agent, posts) {
+    const postInfos = posts.map(p => ({
+      id: p.id,
+      title: p.title || '',
+      content: (p.content || '').slice(0, 500),
+      post_type: p.post_type || 'general',
+    }));
+
+    // Try batch endpoint — agent_name only, Bridge loads SOUL from AGTHUB
+    const batchResult = await _ojFetch('/v1/interest/check/batch', {
+      agent_name: agent.name,
+      posts: postInfos,
+    }, 30000); // 30s timeout for batch
+
+    if (batchResult?.results) {
+      // Map batch OJ scores → final weighted scores
+      return posts.map((post, i) => {
+        const ojScore = batchResult.results[i]?.score ?? 0.2;
+        const ageHours = (Date.now() - new Date(post.created_at).getTime()) / 3600000;
+        const recencyScore = Math.exp(-0.058 * ageHours);
+        const noveltyScore = Math.max(0, 1 - ((post.comment_count || 0) / 10));
+        return Math.max(0, Math.min(1,
+          CONFIG.W_OJ * ojScore + CONFIG.W_RECENCY * recencyScore + CONFIG.W_NOVELTY * noveltyScore
+        ));
+      });
     }
 
-    // 2. Recency (exponential decay: half-life ~12 hours)
-    const ageHours = (Date.now() - new Date(post.created_at).getTime()) / 3600000;
-    const recencyScore = Math.exp(-0.058 * ageHours); // ~0.5 at 12h, ~0.25 at 24h
+    // Fallback: calculate individually with keywords
+    return posts.map(post => {
+      const ojScore = this._keywordFallback(agent, post);
+      const ageHours = (Date.now() - new Date(post.created_at).getTime()) / 3600000;
+      const recencyScore = Math.exp(-0.058 * ageHours);
+      const noveltyScore = Math.max(0, 1 - ((post.comment_count || 0) / 10));
+      return Math.max(0, Math.min(1,
+        CONFIG.W_OJ * ojScore + CONFIG.W_RECENCY * recencyScore + CONFIG.W_NOVELTY * noveltyScore
+      ));
+    });
+  }
 
-    // 3. Novelty (fewer comments = more room to contribute)
-    const commentCount = post.comment_count || 0;
-    const noveltyScore = Math.max(0, 1 - (commentCount / 10)); // 0 comments=1.0, 10+=0.0
-
-    // 4. Engagement signal (votes relative to age)
-    const votes = post.score || 0;
-    const engagementScore = Math.min(1, votes / Math.max(1, ageHours * 2));
-
-    // Weighted sum
-    const score =
-      CONFIG.W_DOMAIN * domainScore +
-      CONFIG.W_RECENCY * recencyScore +
-      CONFIG.W_NOVELTY * noveltyScore +
-      CONFIG.W_ENGAGEMENT * engagementScore;
-
-    return Math.max(0, Math.min(1, score));
+  /**
+   * Record an agent action as a trace in OpenJarvis.
+   */
+  static async _recordTrace(agent, action, post, output, interestScore) {
+    _ojFetch('/v1/traces', {
+      agent_id: agent.id,
+      agent_name: agent.display_name || agent.name,
+      action,
+      target_id: post?.id,
+      target_type: 'post',
+      input: post ? `${post.title || ''}\n${(post.content || '').slice(0, 300)}` : '',
+      output: (output || '').slice(0, 500),
+      interest_score: interestScore,
+    }).catch(() => {}); // fire-and-forget
   }
 }
 

@@ -1,5 +1,10 @@
 # Dependencies
 node_modules/
+
+# OpenJarvis Bridge data
+openjarvis-bridge/data/
+openjarvis-bridge/__pycache__/
+openjarvis-bridge/**/__pycache__/
 .pnp/
 .pnp.js
 

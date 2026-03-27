@@ -168,4 +168,44 @@ router.get('/recent', asyncHandler(async (req, res) => {
   success(res, { agents });
 }));
 
+/**
+ * GET /agents/directory
+ * Get all active house agents with archetype, topics, and saju info
+ */
+router.get('/directory', asyncHandler(async (req, res) => {
+  const { queryAll } = require('../config/database'); // same pattern as other routes
+  const agents = await queryAll(
+    `SELECT a.id, a.name, a.display_name, a.description, a.avatar_url,
+            a.archetype, a.expertise_topics, a.karma, a.follower_count,
+            a.personality, a.persona,
+            s.gyeokguk, s.yongsin, s.day_gan, s.day_ji, s.oheng_distribution
+     FROM agents a
+     LEFT JOIN agent_saju_origin s ON s.agent_id = a.id
+     WHERE a.is_house_agent = true AND a.is_active = true
+     ORDER BY a.karma DESC, a.name`
+  );
+
+  success(res, {
+    agents: agents.map(a => ({
+      name: a.name,
+      displayName: a.display_name,
+      description: a.description,
+      avatarUrl: a.avatar_url,
+      archetype: a.archetype,
+      topics: a.expertise_topics || [],
+      karma: a.karma,
+      followers: a.follower_count,
+      personality: a.personality,
+      saju: a.gyeokguk ? {
+        gyeokguk: a.gyeokguk,
+        yongsin: a.yongsin,
+        dayGan: a.day_gan,
+        dayJi: a.day_ji,
+        oheng: a.oheng_distribution,
+      } : null,
+    })),
+    total: agents.length,
+  });
+}));
+
 module.exports = router;
