@@ -13,17 +13,75 @@ const BUCKET = 'creations';
 
 /**
  * Build a structured storage path
- * Format: {category}/{YYYY-MM}/{filename}
- * e.g., webtoons/2026-03/agent-1773456028729-8515efb9c35ee6b6.png
- *        uploads/2026-03/1773456028729-8515efb9.pdf
+ *
+ * With context (series/episode):
+ *   webtoons/{series_slug}/ep{N}/panel-001.png
+ *   novels/{series_slug}/cover.jpg
+ *
+ * Without context (legacy/generic):
+ *   {category}/{YYYY-MM}/{filename}
+ *
  * @param {string} filename - Base filename
  * @param {string} [category] - Category folder (webtoons, novels, avatars, uploads)
+ * @param {Object} [context] - Optional context for structured paths
+ * @param {string} [context.seriesSlug] - Series slug
+ * @param {number} [context.episodeNumber] - Episode number
  * @returns {string} Structured storage path
  */
-function buildStoragePath(filename, category = 'uploads') {
+function buildStoragePath(filename, category = 'uploads', context = {}) {
+  const { seriesSlug, episodeNumber } = context;
+
+  // Sanitize slug to prevent path traversal
+  const safeSlug = seriesSlug ? seriesSlug.replace(/[^a-zA-Z0-9_-]/g, '') : null;
+
+  if (safeSlug && typeof episodeNumber === 'number' && episodeNumber >= 0) {
+    // Structured: category/series/epN/filename
+    return `${category}/${safeSlug}/ep${episodeNumber}/${filename}`;
+  }
+  if (safeSlug) {
+    // Series-level (covers, etc.)
+    return `${category}/${safeSlug}/${filename}`;
+  }
+
+  // Legacy: category/YYYY-MM/filename
   const now = new Date();
   const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   return `${category}/${yearMonth}/${filename}`;
+}
+
+/**
+ * Build storage path for agent series content
+ *
+ * @param {string} agentName - Agent name (sanitized)
+ * @param {Object} [context]
+ * @param {string} [context.seriesSlug] - Series slug
+ * @param {number} [context.episodeNumber] - Episode number
+ * @param {string} [context.filename] - File name
+ * @param {string} [context.subfolder] - Subfolder (characters, etc.)
+ * @returns {string} Storage path
+ */
+function buildAgentSeriesPath(agentName, context = {}) {
+  const safeName = agentName.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
+  const { seriesSlug, episodeNumber, filename, subfolder } = context;
+  const safeSlug = seriesSlug ? seriesSlug.replace(/[^a-zA-Z0-9_-]/g, '') : null;
+
+  let path = `agents/${safeName}`;
+
+  if (safeSlug) {
+    path += `/series/${safeSlug}`;
+    if (subfolder) {
+      path += `/${subfolder}`;
+    }
+    if (typeof episodeNumber === 'number' && episodeNumber > 0) {
+      path += `/ep${episodeNumber}`;
+    }
+  }
+
+  if (filename) {
+    path += `/${filename}`;
+  }
+
+  return path;
 }
 
 /**
@@ -121,12 +179,15 @@ async function deleteFile(filename) {
  * @param {string} ext - File extension (e.g., '.mp3', '.png')
  * @param {string} [mimetype] - MIME type
  * @param {string} [category] - Storage folder category (webtoons, novels, avatars)
+ * @param {Object} [context] - Optional context { seriesSlug, episodeNumber, panelIndex }
  * @returns {Promise<string>} Public URL
  */
-async function uploadBuffer(buffer, ext, mimetype, category = 'webtoons') {
+async function uploadBuffer(buffer, ext, mimetype, category = 'webtoons', context = {}) {
   const uniqueId = crypto.randomBytes(8).toString('hex');
-  const baseFilename = `agent-${Date.now()}-${uniqueId}${ext}`;
-  const storagePath = buildStoragePath(baseFilename, category);
+  const baseFilename = context.panelIndex != null
+    ? `panel-${String(context.panelIndex).padStart(3, '0')}${ext}`
+    : `agent-${Date.now()}-${uniqueId}${ext}`;
+  const storagePath = context.fullPath || buildStoragePath(baseFilename, category, context);
 
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     ensureUploadDir();
@@ -140,7 +201,7 @@ async function uploadBuffer(buffer, ext, mimetype, category = 'webtoons') {
     .from(BUCKET)
     .upload(storagePath, buffer, {
       contentType: mimetype || 'application/octet-stream',
-      upsert: false,
+      upsert: context.panelIndex != null || context.seriesSlug != null,
     });
 
   if (error) {
@@ -157,5 +218,6 @@ module.exports = {
   getFileUrl,
   getPublicUrl,
   deleteFile,
+  buildAgentSeriesPath,
   UPLOAD_DIR,
 };
