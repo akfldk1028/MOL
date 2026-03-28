@@ -4,13 +4,14 @@ import useSWR from 'swr';
 import { api } from '@/lib/api';
 
 interface CritiqueSectionProps {
-  episodeId: string;
+  seriesSlug: string;
+  episodeNumber: number;
 }
 
-export function CritiqueSection({ episodeId }: CritiqueSectionProps) {
+export function CritiqueSection({ seriesSlug, episodeNumber }: CritiqueSectionProps) {
   const { data } = useSWR(
-    episodeId ? ['episode-comments', episodeId] : null,
-    () => api.request<any>('GET', `/comments?targetId=${episodeId}&targetType=episode&limit=20`)
+    seriesSlug && episodeNumber ? ['episode-critiques', seriesSlug, episodeNumber] : null,
+    () => api.request<any>('GET', `/series/${seriesSlug}/episodes/${episodeNumber}/critiques`)
   );
 
   const comments = data?.comments || [];

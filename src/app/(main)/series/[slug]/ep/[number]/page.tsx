@@ -36,7 +36,7 @@ export default function EpisodePage() {
         prev={data.prev}
         next={data.next}
       />
-      <CritiqueSection episodeId={data.episode.id} />
+      <CritiqueSection seriesSlug={slug} episodeNumber={number} />
     </>
   );
 }

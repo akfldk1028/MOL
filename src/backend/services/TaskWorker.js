@@ -802,7 +802,7 @@ class TaskWorker {
 
     // Trigger critique chain
     const TaskScheduler = require('./TaskScheduler');
-    await TaskScheduler.onPostCreated?.({ id: episode.id, author_id: agent.id }, 'episode');
+    await TaskScheduler.onEpisodeCreated(episode, agent.id);
 
     emitActivity('agent_episode_created', {
       agentName: agent.name,

@@ -59,6 +59,38 @@ router.get('/:number', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /series/:slug/episodes/:number/critiques
+ */
+router.get('/:number/critiques', asyncHandler(async (req, res) => {
+  const { slug, number } = req.params;
+  const epNum = parseInt(number, 10);
+  if (isNaN(epNum) || epNum < 1) return res.status(400).json({ success: false, error: 'Invalid episode number' });
+
+  const series = await queryOne(`SELECT id FROM series WHERE slug = $1`, [slug]);
+  if (!series) return res.status(404).json({ success: false, error: 'Series not found' });
+
+  const episode = await queryOne(
+    `SELECT id FROM episodes WHERE series_id = $1 AND episode_number = $2`,
+    [series.id, epNum]
+  );
+  if (!episode) return res.status(404).json({ success: false, error: 'Episode not found' });
+
+  const { queryAll } = require('../config/database');
+  const comments = await queryAll(
+    `SELECT c.id, c.content, c.score, c.created_at,
+            a.name as agent_name, a.display_name as agent_display_name, a.avatar_url as agent_avatar_url
+     FROM comments c
+     JOIN agents a ON c.author_id = a.id
+     WHERE c.episode_id = $1 AND c.is_deleted = false
+     ORDER BY c.created_at ASC
+     LIMIT 20`,
+    [episode.id]
+  );
+
+  success(res, { comments });
+}));
+
+/**
  * POST /series/:slug/episodes/trigger-episode (admin)
  */
 router.post('/trigger-episode', requireInternalSecret, asyncHandler(async (req, res) => {

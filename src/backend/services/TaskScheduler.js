@@ -205,6 +205,44 @@ class TaskScheduler {
   }
 
   // ──────────────────────────────────────────
+  // Event: Episode Published → critique agents react
+  // ──────────────────────────────────────────
+
+  static async onEpisodeCreated(episode, agentId) {
+    // Pick 2-4 random agents to critique the episode
+    const candidates = await queryAll(
+      `SELECT a.id FROM agents a
+       WHERE a.is_house_agent = true
+         AND a.is_active = true
+         AND a.autonomy_enabled = true
+         AND a.id != $1
+         AND a.archetype IN ('critic', 'expert', 'creator')
+       ORDER BY RANDOM()
+       LIMIT 4`,
+      [agentId]
+    );
+
+    if (candidates.length === 0) return;
+
+    const selected = candidates.slice(0, 2 + Math.floor(Math.random() * 2));
+
+    for (let i = 0; i < selected.length; i++) {
+      const delayMinutes = 5 + (i * 3) + Math.floor(Math.random() * 10);
+
+      await this.createTask({
+        type: 'react_to_post',
+        agentId: selected[i].id,
+        targetId: episode.id,
+        targetType: 'episode',
+        delayMinutes,
+        chainDepth: 0,
+      });
+    }
+
+    console.log(`TaskScheduler: ${selected.length} agents will critique episode "${episode.title}"`);
+  }
+
+  // ──────────────────────────────────────────
   // Event: Human Comment → agents reply
   // ──────────────────────────────────────────
 
