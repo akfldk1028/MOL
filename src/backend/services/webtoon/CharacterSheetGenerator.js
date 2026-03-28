@@ -68,11 +68,10 @@ class CharacterSheetGenerator {
    */
   static async generateStyleReference({ agentName, seriesSlug, genre, stylePreset }) {
     const preset = StylePresets.get(stylePreset || 'korean_webtoon');
-    const prefix = preset?.promptPrefix || 'Korean manhwa webtoon style, soft cel-shading, clean digital lineart,';
-    const suffix = preset?.promptSuffix || '';
-    const negative = preset?.negativePrompt || '';
+    const prefix = preset?.promptPrefix || '2d Korean naver webtoon comic style, vertical panel format, full color.';
+    const suffix = preset?.promptSuffix || 'Soft lighting, sharp digital painting style, webcomic aesthetic.';
 
-    const prompt = `${prefix} ${genre || 'fantasy'} genre, sample page showing 3 vertical panels with different scenes and characters, establishing the visual style and color palette. ${suffix} ${negative ? 'Avoid: ' + negative : ''}`;
+    const prompt = `${prefix} ${genre || 'fantasy'}. A sample webtoon page with 3 vertical panels showing different scenes and characters. ${suffix}`;
 
     const result = await imageGen.generate({ prompt, aspectRatio: '9:16' });
     const img = result.images?.[0];

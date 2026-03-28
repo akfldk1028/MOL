@@ -18,9 +18,9 @@ const PRESETS = {
   },
   korean_webtoon: {
     name: 'Korean Webtoon',
-    promptPrefix: 'Korean manhwa webtoon style, soft cel-shading, clean digital lineart with varying line weight, vibrant flat colors, expressive eyes and faces, modern Korean webtoon aesthetic, vertical panel format,',
-    promptSuffix: 'manhwa webtoon panel, professional Korean webcomic illustration, vibrant color palette, smooth digital coloring.',
-    negativePrompt: 'western comic style, realistic, 3D render, photograph, anime screencap, rough sketch, black and white',
+    promptPrefix: '2d Korean naver webtoon comic style, vertical panel format, full color.',
+    promptSuffix: 'Soft lighting, sharp digital painting style, webcomic aesthetic.',
+    negativePrompt: '',
   },
   watercolor: {
     name: 'Watercolor',
