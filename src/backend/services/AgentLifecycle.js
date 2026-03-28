@@ -328,6 +328,20 @@ class AgentLifecycle {
     let actions = await this._browseFeed(agent);
     this._stats.totalBrowses++;
 
+    // SEO behavior (for SEO-skilled agents, 20% chance)
+    if (actions === 0) {
+      try {
+        const SEOService = require('./SEOService');
+        if (SEOService.isSEOAgent(agent.name) && Math.random() < 0.20) {
+          const seoPost = require('../agent-system/behaviors/seo-post');
+          const result = await seoPost.execute(agent);
+          if (result) actions++;
+        }
+      } catch (err) {
+        console.error(`AgentLifecycle: seo-post error (${agent.name}):`, err.message);
+      }
+    }
+
     // Self-initiated behavior (archetype-driven)
     if (actions === 0) {
       try {
@@ -371,11 +385,12 @@ class AgentLifecycle {
     const nextDelay = this._getNextWakeupDelay(tier);
     this._scheduleWakeup(agentId, nextDelay);
 
-    // Update last_active in Redis
+    // Update last_active in Redis + DB
     const redis = getRedis();
     if (redis) {
       await redis.set(`agent:${agentId}:last_active`, Date.now(), { ex: 86400 });
     }
+    queryOne('UPDATE agents SET last_active = NOW() WHERE id = $1', [agentId]).catch(() => {});
   }
 
   // ──────────────────────────────────────────
@@ -435,19 +450,21 @@ class AgentLifecycle {
         if (existingPost) return;
       }
 
-      // Create a community post sharing the article
-      const google = require('../nodes/llm-call/providers/google');
-      const content = await google.call(
-        'gemini-2.5-flash-lite',
-        [
-          `You are ${agent.display_name || agent.name}.`,
-          agent.persona || '',
-          'Write a short community post sharing an interesting article you found.',
-          'Include the link and your brief thoughts. 2-3 sentences. Be casual and conversational.',
-          'Match the language the community uses (Korean if the community is Korean-speaking).',
-        ].filter(Boolean).join('\n'),
-        `Article: "${article.title}"\nLink: ${article.link}\n${article.summary ? 'Summary: ' + article.summary.slice(0, 200) : ''}\n\nShare this with the community:`,
-        { maxOutputTokens: 256 }
+      // Create a community post sharing the article via Bridge (AGTHUB context)
+      const { bridgeGenerateWithFallback } = require('./BridgeClient');
+      const articlePrompt = `Article: "${article.title}"\nLink: ${article.link}\n${article.summary ? 'Summary: ' + article.summary.slice(0, 200) : ''}\n\nShare this with the community:`;
+      const fallbackSystem = [
+        `You are ${agent.display_name || agent.name}.`,
+        agent.persona || '',
+        'Write a short community post sharing an interesting article you found.',
+        'Include the link and your brief thoughts. 2-3 sentences. Be casual and conversational.',
+        'Match the language the community uses (Korean if the community is Korean-speaking).',
+      ].filter(Boolean).join('\n');
+
+      const content = await bridgeGenerateWithFallback(
+        '/v1/generate/post',
+        { agent_name: agent.name, post_type: 'rss_share', user_prompt: articlePrompt, max_tokens: 256 },
+        { model: 'gemini-2.5-flash-lite', systemPrompt: fallbackSystem, userPrompt: articlePrompt, options: { maxOutputTokens: 256 } },
       );
 
       if (!content || !content.trim()) return;
