@@ -1,24 +1,19 @@
 /**
- * SeriesContentScheduler — Autonomous Series Episode Scheduler
+ * SeriesContentScheduler — Cron-based episode scheduler
  *
- * Pattern follows AgentLifecycle.js (start/stop, setInterval).
- *
- * tick() runs every 60 minutes:
- *   1. Find series with next_episode_at <= NOW() that are agent-authored + ongoing
- *   2. Skip if a pending/processing create_episode task already exists
- *   3. Create task via TaskScheduler
- *   4. Update next_episode_at to next scheduled day
+ * Checks every 30 minutes which series need new episodes based on schedule_cron.
+ * Creates create_episode tasks via TaskScheduler.
+ * Redis lock prevents double-trigger.
  */
 
-const { queryOne, queryAll } = require('../config/database');
+const { queryAll, queryOne } = require('../config/database');
+const { getRedis } = require('../config/redis');
+const { parseExpression } = require('cron-parser');
 
-const TICK_INTERVAL = 3_600_000; // 60 minutes
-
-const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+const TICK_INTERVAL = 1_800_000; // 30 minutes
 
 class SeriesContentScheduler {
   static _interval = null;
-  static _initialTimeout = null;
   static _started = false;
   static _stats = { startedAt: null, ticks: 0, tasksCreated: 0 };
 
@@ -27,131 +22,94 @@ class SeriesContentScheduler {
     this._started = true;
     this._stats.startedAt = new Date();
 
-    // Initial tick after 5 minutes (let other systems initialize)
-    this._initialTimeout = setTimeout(() => {
-      this._initialTimeout = null;
-      this._tick().catch(err =>
-        console.error('SeriesContentScheduler: initial tick error:', err.message)
-      );
-    }, 300_000);
+    // Initial tick after 2 minutes
+    setTimeout(() => {
+      this._tick().catch(err => console.error('SeriesScheduler: initial tick error:', err.message));
+    }, 120_000);
 
     this._interval = setInterval(() => {
-      this._tick().catch(err =>
-        console.error('SeriesContentScheduler: tick error:', err.message)
-      );
+      this._tick().catch(err => console.error('SeriesScheduler: tick error:', err.message));
     }, TICK_INTERVAL);
 
-    console.log('SeriesContentScheduler: started (60min interval)');
+    console.log('SeriesScheduler: started (30min interval, cron-based)');
   }
 
   static stop() {
-    if (this._initialTimeout) {
-      clearTimeout(this._initialTimeout);
-      this._initialTimeout = null;
-    }
-    if (this._interval) {
-      clearInterval(this._interval);
-      this._interval = null;
-    }
+    if (this._interval) { clearInterval(this._interval); this._interval = null; }
     this._started = false;
-    console.log('SeriesContentScheduler: stopped');
+    console.log('SeriesScheduler: stopped');
   }
 
   static getStatus() {
-    return {
-      started: this._started,
-      stats: { ...this._stats },
-    };
+    return { started: this._started, stats: { ...this._stats } };
   }
 
   static async _tick() {
     this._stats.ticks++;
 
-    // Find due autonomous series
-    const dueSeries = await queryAll(
-      `SELECT s.* FROM series s
-       WHERE s.created_by_agent_id IS NOT NULL
-         AND s.status = 'ongoing'
-         AND s.next_episode_at IS NOT NULL
-         AND s.next_episode_at <= NOW()`
+    // Find ongoing series with schedule_cron OR legacy schedule_days
+    const series = await queryAll(
+      `SELECT s.id, s.slug, s.title, s.schedule_cron, s.schedule_days, s.created_by_agent_id, s.max_episodes, s.episode_count, s.next_episode_at
+       FROM series s
+       WHERE s.status = 'ongoing'
+         AND s.created_by_agent_id IS NOT NULL
+         AND (s.schedule_cron IS NOT NULL OR s.next_episode_at <= NOW())`
     );
 
-    if (dueSeries.length === 0) return;
-
-    const TaskScheduler = require('./TaskScheduler');
-
-    for (const series of dueSeries) {
-      // Duplicate check: skip if create_episode task already pending/processing
-      const existing = await queryOne(
-        `SELECT id FROM agent_tasks
-         WHERE target_id = $1 AND type = 'create_episode'
-           AND status IN ('pending', 'processing')
-         LIMIT 1`,
-        [series.id]
-      );
-      if (existing) continue;
-
-      // Create task — only advance next_episode_at on success
+    for (const s of series) {
       try {
+        // Cron-based check
+        if (s.schedule_cron && !this._shouldTrigger(s.schedule_cron)) continue;
+
+        // Legacy: next_episode_at check (for series without schedule_cron)
+        if (!s.schedule_cron && s.next_episode_at && new Date(s.next_episode_at) > new Date()) continue;
+
+        // Check max_episodes
+        if (s.max_episodes && s.episode_count >= s.max_episodes) continue;
+
+        // Redis lock to prevent double-trigger
+        const redis = getRedis();
+        const lockKey = `series:${s.id}:episode-lock`;
+        const locked = await redis?.set(lockKey, '1', { ex: 3600, nx: true });
+        if (redis && !locked) continue;
+
+        // Check no pending create_episode task
+        const pending = await queryOne(
+          `SELECT 1 FROM agent_tasks WHERE target_id = $1 AND type = 'create_episode' AND status IN ('pending', 'processing') LIMIT 1`,
+          [s.id]
+        );
+        if (pending) continue;
+
+        // Create task
+        const TaskScheduler = require('./TaskScheduler');
         await TaskScheduler.createTask({
           type: 'create_episode',
-          agentId: series.created_by_agent_id,
-          targetId: series.id,
+          agentId: s.created_by_agent_id,
+          targetId: s.id,
           targetType: 'series',
-          delayMinutes: 0,
-          chainDepth: 0,
         });
 
-        // Advance next_episode_at only after task creation succeeds
-        const nextAt = this._calculateNextEpisodeAt(series.schedule_days, new Date());
-        if (nextAt) {
-          await queryOne(
-            `UPDATE series SET next_episode_at = $1 WHERE id = $2`,
-            [nextAt.toISOString(), series.id]
-          );
-        }
-
         this._stats.tasksCreated++;
-        console.log(`SeriesContentScheduler: scheduled episode for "${series.title}" (next: ${nextAt?.toISOString() || 'none'})`);
+        console.log(`SeriesScheduler: triggered episode for "${s.title}" (${s.slug})`);
       } catch (err) {
-        console.error(`SeriesContentScheduler: failed to create task for "${series.title}":`, err.message);
-        // next_episode_at NOT advanced — will retry on next tick
+        console.error(`SeriesScheduler: error for "${s.title}":`, err.message);
       }
     }
   }
 
   /**
-   * Calculate next episode date from schedule_days array.
-   * @param {string[]} scheduleDays - e.g. ['mon', 'thu']
-   * @param {Date} fromDate - calculate from this date
-   * @returns {Date|null}
+   * Check if a cron expression matches the current time (within 30min window)
    */
-  static _calculateNextEpisodeAt(scheduleDays, fromDate) {
-    if (!scheduleDays || scheduleDays.length === 0) return null;
-
-    const targetDays = scheduleDays
-      .map(d => DAY_MAP[d.toLowerCase()])
-      .filter(d => d !== undefined)
-      .sort((a, b) => a - b);
-
-    if (targetDays.length === 0) return null;
-
-    const now = new Date(fromDate);
-    const currentDay = now.getDay(); // 0=Sun
-
-    // Find next matching day (at least 1 day ahead)
-    for (let offset = 1; offset <= 7; offset++) {
-      const candidateDay = (currentDay + offset) % 7;
-      if (targetDays.includes(candidateDay)) {
-        const next = new Date(now);
-        next.setDate(next.getDate() + offset);
-        // Set to 10:00 KST (01:00 UTC) — morning publication
-        next.setUTCHours(1, 0, 0, 0);
-        return next;
-      }
+  static _shouldTrigger(cronExpr) {
+    try {
+      const interval = parseExpression(cronExpr, { utc: true });
+      const prev = interval.prev().toDate();
+      const now = new Date();
+      const diffMs = now.getTime() - prev.getTime();
+      return diffMs >= 0 && diffMs < TICK_INTERVAL;
+    } catch {
+      return false;
     }
-
-    return null;
   }
 }
 

@@ -21,6 +21,7 @@ const creationRoutes = require('./creations');
 const myAgentRoutes = require('./my-agent');
 const autonomyRoutes = require('./autonomy');
 const seriesRoutes = require('./series');
+const episodesRoutes = require('./episodes');
 
 const router = Router();
 
@@ -43,6 +44,7 @@ router.use('/creations', creationRoutes);
 router.use('/my-agent', myAgentRoutes);
 router.use('/autonomy', autonomyRoutes);
 router.use('/series', seriesRoutes);
+router.use('/series/:slug/episodes', episodesRoutes);
 
 // Health check (no auth required)
 router.get('/health', (req, res) => {

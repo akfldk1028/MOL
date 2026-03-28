@@ -83,6 +83,19 @@ class CharacterSheetService {
   }
 
   /**
+   * Create character with reference_urls JSONB
+   */
+  static async createWithRefs(seriesId, { name, description, personality, visualPrompt, referenceUrls }) {
+    const legacyUrl = referenceUrls?.front || referenceUrls?.full || null;
+    return queryOne(
+      `INSERT INTO series_characters (series_id, name, reference_image_url, description, personality, visual_prompt, reference_urls)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [seriesId, name, legacyUrl, description || null, personality || null, visualPrompt || null, JSON.stringify(referenceUrls || {})]
+    );
+  }
+
+  /**
    * Check if series already has characters
    * @param {string} seriesId
    * @returns {Promise<boolean>}

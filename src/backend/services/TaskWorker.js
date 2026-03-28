@@ -23,6 +23,7 @@ const { emitActivity } = require('./ActivityBus');
 const google = require('../nodes/llm-call/providers/google');
 const openclaw = require('../nodes/llm-call/providers/openclaw');
 const AgentSkills = require('./AgentSkills');
+const { bridgeGenerateWithFallback, bridgeGenerate } = require('./BridgeClient');
 const {
   buildCommentSystemPrompt,
   buildReplySystemPrompt,
@@ -266,6 +267,22 @@ class TaskWorker {
     if (quietPosts.length > 0) {
       console.log(`TaskWorker catalyst: seeded reactions for ${quietPosts.length} quiet posts`);
     }
+
+    // Daily relationship decay (max once per 24h via Redis)
+    try {
+      const redis = getRedis();
+      const decayKey = 'system:relationship_decay_at';
+      const lastDecay = redis ? await redis.get(decayKey) : null;
+      const dayMs = 24 * 60 * 60 * 1000;
+      if (!lastDecay || Date.now() - Number(lastDecay) > dayMs) {
+        const RelationshipGraph = require('../agent-system/relationships');
+        await RelationshipGraph.applyDecay(0.995);
+        if (redis) await redis.set(decayKey, String(Date.now()), { ex: 86400 });
+        console.log('TaskWorker catalyst: applied daily relationship decay');
+      }
+    } catch (err) {
+      console.error('TaskWorker catalyst: decay error:', err.message);
+    }
   }
 
   // ──────────────────────────────────────────
@@ -313,6 +330,16 @@ class TaskWorker {
     if (!comment) return;
 
     await this._incrementDailyCount(agent.id);
+
+    // Update relationship with post author
+    if (post.author_id && post.author_id !== agent.id) {
+      try {
+        const RelationshipGraph = require('../agent-system/relationships');
+        const { classifySentiment } = require('../agent-system/relationships/sentiment');
+        const sentiment = classifySentiment(comment.content);
+        await RelationshipGraph.updateFromInteraction(agent.id, post.author_id, sentiment);
+      } catch (err) { console.warn('Relationship update skipped:', err.message); }
+    }
 
     if (redis) {
       await redis.set(cooldownKey, '1', { ex: 14400 }); // 4h cooldown
@@ -405,11 +432,23 @@ class TaskWorker {
       replyContent = pickTemplate(targetComment.content).content;
     } else {
       try {
-        replyContent = await google.call(tier.model, systemPrompt, userPrompt, {
-          tools: skills.tools,
-          imageUrls: replyImageUrls,
-          maxOutputTokens: tier.maxTokens,
-        });
+        // Build thread context string for Bridge
+        const threadText = threadContext.map(c => `${c.author_display_name || c.author_name}: ${c.content.slice(0, 200)}`).join('\n');
+        const targetText = `${targetComment.author_display_name || targetComment.author_name}: ${targetComment.content}`;
+
+        replyContent = await bridgeGenerateWithFallback(
+          '/v1/generate/reply',
+          {
+            agent_name: agent.name,
+            post_content: `${post.title}\n${(post.content || '').slice(0, 300)}`,
+            thread_context: threadText,
+            target_comment: targetText,
+            skill_hint: skills.skillHint || '',
+            tone_hint: toneHint || '',
+            max_tokens: tier.maxTokens,
+          },
+          { model: tier.model, systemPrompt, userPrompt, options: { tools: skills.tools, imageUrls: replyImageUrls, maxOutputTokens: tier.maxTokens } },
+        );
       } catch (e) {
         throw new Error(`LLM error for reply (${agent.name}): ${e.message}`);
       }
@@ -429,6 +468,16 @@ class TaskWorker {
       [task.id, comment.id]
     );
     await this._incrementDailyCount(agent.id);
+
+    // Update relationship with comment author (sentiment-based)
+    if (targetComment.author_id && targetComment.author_id !== agent.id) {
+      try {
+        const RelationshipGraph = require('../agent-system/relationships');
+        const { classifySentiment } = require('../agent-system/relationships/sentiment');
+        const sentiment = classifySentiment(replyContent);
+        await RelationshipGraph.updateFromInteraction(agent.id, targetComment.author_id, sentiment);
+      } catch (err) { console.warn('Relationship update skipped:', err.message); }
+    }
 
     console.log(`TaskWorker: ${agent.name} replied in post ${post.id}`);
 
@@ -502,10 +551,11 @@ class TaskWorker {
 
     let content;
     try {
-      content = await google.call(DEFAULT_MODEL, systemPrompt, userPrompt, {
-        tools: skills.tools,
-        maxOutputTokens: skills.maxOutputTokens,
-      });
+      content = await bridgeGenerateWithFallback(
+        '/v1/generate/comment',
+        { agent_name: agent.name, post_content: `${question.title}\n${question.content || ''}`, skill_hint: skills.skillHint || '', max_tokens: skills.maxOutputTokens || 512 },
+        { model: DEFAULT_MODEL, systemPrompt, userPrompt, options: { tools: skills.tools, maxOutputTokens: skills.maxOutputTokens } },
+      );
     } catch (e) {
       throw new Error(`LLM error for question response (${agent.name}): ${e.message}`);
     }
@@ -599,7 +649,11 @@ class TaskWorker {
 
     let content;
     try {
-      content = await google.call(DEFAULT_MODEL, systemPrompt, userPrompt);
+      content = await bridgeGenerateWithFallback(
+        '/v1/generate/synthesis',
+        { agent_name: agent.name, user_prompt: userPrompt },
+        { model: DEFAULT_MODEL, systemPrompt, userPrompt },
+      );
     } catch (e) {
       throw new Error(`LLM error for synthesis (${agent.name}): ${e.message}`);
     }
@@ -645,57 +699,47 @@ class TaskWorker {
   // ──────────────────────────────────────────
 
   static async _handleCreateEpisode(task) {
-    const CreationService = require('./CreationService');
+    const { EpisodeGenerator } = require('./webtoon');
+    const EpisodeService = require('./EpisodeService');
 
     const agent = await this._getAgentWithLimitCheck(task.agent_id);
     if (!agent) throw new Error('Agent not found or limit reached');
 
-    // Load series
     const series = await queryOne(
       `SELECT * FROM series WHERE id = $1 AND status = 'ongoing'`,
       [task.target_id]
     );
     if (!series) throw new Error('Series not found or not ongoing');
 
-    // Preliminary number for LLM prompt context only — actual episode_number is set atomically in createAutonomous
-    const nextEpisodeNumber = (series.episode_count || 0) + 1;
-    const isWebtoon = series.content_type === 'webtoon';
-
-    // Load previous 5 episodes for context
-    const previousEpisodes = await queryAll(
-      `SELECT p.title, p.content, c.episode_number
-       FROM creations c
-       JOIN posts p ON c.post_id = p.id
-       WHERE c.series_id = $1
-       ORDER BY c.episode_number DESC
-       LIMIT 5`,
-      [series.id]
-    );
-    previousEpisodes.reverse(); // chronological order
-
-    // Collect community critique feedback from recent episodes
-    const critiqueFeedback = await this._collectCritiqueFeedback(series.id, 3);
-
-    // Extract image-specific hints for webtoon system prompt
-    let imageFeedbackHints = null;
-    if (isWebtoon && critiqueFeedback.length > 0) {
-      imageFeedbackHints = critiqueFeedback
-        .flatMap(ep => ep.topComments)
-        .filter(c => /캐릭터|얼굴|배경|그림|이미지|패널|character|face|background|image|panel|style|art/i.test(c.content))
-        .map(c => c.content)
-        .slice(0, 3);
+    // Check max_episodes limit
+    if (series.max_episodes) {
+      const currentCount = await queryOne(
+        `SELECT COUNT(*) as cnt FROM episodes WHERE series_id = $1`,
+        [series.id]
+      );
+      if ((currentCount?.cnt || 0) >= series.max_episodes) {
+        await queryOne(`UPDATE series SET status = 'completed' WHERE id = $1`, [series.id]);
+        throw new Error(`Series "${series.title}" reached max episodes (${series.max_episodes})`);
+      }
     }
 
+    const nextEpisodeNumber = await EpisodeService.getNextNumber(series.id);
+
+    // Load previous episodes with feedback for context
+    const previousEpisodes = await EpisodeService.getRecentWithFeedback(series.id, 3);
+    previousEpisodes.reverse(); // chronological
+
+    // Collect feedback directives from previous episodes
+    const feedbackDirectives = previousEpisodes
+      .filter(ep => ep.feedback_directives && ep.feedback_directives.length > 0)
+      .flatMap(ep => ep.feedback_directives);
+
     // Build prompts
-    const systemPrompt = buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber, imageFeedbackHints);
-    const userPrompt = buildEpisodeUserPrompt(series, previousEpisodes, critiqueFeedback);
+    const systemPrompt = buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber);
+    const userPrompt = buildEpisodeUserPrompt(series, previousEpisodes, feedbackDirectives);
 
-    // Generate episode via LLM (with 90s timeout for webtoon, 60s for novel)
-    const timeout = isWebtoon ? 90_000 : 60_000;
-    const useOpenClaw = process.env.OPENCLAW_ENABLED === 'true';
-    const openClawModel = process.env.OPENCLAW_MODEL || 'qwen3-8b';
-    const sessionId = useOpenClaw ? `series-${series.id}-ep${nextEpisodeNumber}` : null;
-
+    // Generate script via LLM
+    const timeout = 90_000;
     let response;
     try {
       let timer;
@@ -703,202 +747,71 @@ class TaskWorker {
         timer = setTimeout(() => reject(new Error(`LLM timeout (${timeout / 1000}s)`)), timeout);
       });
 
-      let llmPromise;
-      if (useOpenClaw) {
-        // OpenClaw-RL: Turn 1 — generate episode, session stays open for critique
-        llmPromise = openclaw.call(openClawModel, systemPrompt, userPrompt, {
-          maxOutputTokens: isWebtoon ? 8192 : 4096,
-          sessionId,
-          turnType: 'main',
-          sessionDone: false,
-        });
-      } else {
-        llmPromise = google.call(DEFAULT_MODEL, systemPrompt, userPrompt, {
-          maxOutputTokens: isWebtoon ? 8192 : 4096,
-        });
-      }
+      const llmPromise = bridgeGenerateWithFallback(
+        '/v1/generate/episode',
+        {
+          agent_name: agent.name,
+          series_info: { title: series.title, content_type: series.content_type, genre: series.genre, next_episode_number: nextEpisodeNumber },
+          prev_episodes: previousEpisodes.map(e => ({ title: e.title, script_content: (e.script_content || '').slice(0, 500), episode_number: e.episode_number })),
+          feedback_directives: feedbackDirectives,
+          max_tokens: 8192,
+          temperature: 0.8,
+        },
+        { model: DEFAULT_MODEL, systemPrompt, userPrompt, options: { maxOutputTokens: 8192 } },
+        60000,
+      );
 
       response = await Promise.race([llmPromise, timeoutPromise]).finally(() => clearTimeout(timer));
     } catch (e) {
-      // Fallback: if OpenClaw fails, try google
-      if (useOpenClaw) {
-        console.warn(`TaskWorker: OpenClaw failed for ${agent.name}, falling back to google: ${e.message}`);
-        try {
-          let timer;
-          response = await Promise.race([
-            google.call(DEFAULT_MODEL, systemPrompt, userPrompt, {
-              maxOutputTokens: isWebtoon ? 8192 : 4096,
-            }),
-            new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`LLM timeout (${timeout / 1000}s)`)), timeout); }),
-          ]).finally(() => clearTimeout(timer));
-        } catch (fallbackErr) {
-          throw new Error(`LLM error for episode (${agent.name}): OpenClaw failed (${e.message}), fallback also failed (${fallbackErr.message})`);
-        }
-      } else {
-        throw new Error(`LLM error for episode (${agent.name}): ${e.message}`);
-      }
+      throw new Error(`LLM error for episode (${agent.name}): ${e.message}`);
     }
+
     if (!response || !response.trim()) throw new Error('LLM returned empty response');
 
-    // Log OpenClaw training session (Turn 1)
-    if (useOpenClaw && sessionId) {
-      try {
-        await queryOne(
-          `INSERT INTO openclaw_training_sessions (session_id, series_id, episode_number, model, turn_count, status)
-           VALUES ($1, $2, $3, $4, 1, 'open')`,
-          [sessionId, series.id, nextEpisodeNumber, openClawModel]
-        );
-      } catch (dbErr) {
-        console.warn('TaskWorker: OpenClaw session log failed:', dbErr.message);
-      }
-    }
-
-    // Parse response: first line = TITLE: ..., rest = content
-    const lines = response.trim().split('\n');
-    let episodeTitle = `Episode ${nextEpisodeNumber}`;
-    let episodeContent = response.trim();
-
-    if (lines[0] && lines[0].toUpperCase().startsWith('TITLE:')) {
-      episodeTitle = lines[0].replace(/^TITLE:\s*/i, '').trim();
-      episodeContent = lines.slice(1).join('\n').trim();
-    }
-
-    // ── Webtoon: use WebtoonPipeline for enhanced panel generation ──
-    let imageUrls = [];
-    if (isWebtoon) {
-      const { WebtoonPipeline } = require('./webtoon');
-
-      console.log(`TaskWorker: ${agent.name} generating webtoon panels for "${episodeTitle}"...`);
-
-      const pipelineResult = await WebtoonPipeline.generate({
-        content: episodeContent,
-        series,
-        episodeNumber: nextEpisodeNumber,
-        enableQualityCheck: false, // Phase 3: enable later
-      });
-
-      imageUrls = pipelineResult.imageUrls;
-
-      const validCount = imageUrls.filter(Boolean).length;
-      if (pipelineResult.panels.length > 0 && validCount === 0) {
-        throw new Error(`Image generation failed for all ${pipelineResult.panels.length} panels of "${episodeTitle}". Webtoon requires images.`);
-      }
-
-      // Use pipeline's rebuilt content (with embedded image URLs + dialogue structure)
-      if (validCount > 0) {
-        episodeContent = pipelineResult.content;
-      }
-    }
-
-    // Create via CreationService.createAutonomous
-    const result = await CreationService.createAutonomous({
-      agentId: agent.id,
-      seriesId: series.id,
-      title: episodeTitle,
-      content: episodeContent,
-      creationType: series.content_type || 'novel',
-      genre: series.genre,
+    // Generate episode (script → images → DB)
+    const { episode, imageUrls } = await EpisodeGenerator.generate({
+      llmResponse: response,
+      series,
+      agent,
       episodeNumber: nextEpisodeNumber,
-      imageUrls,
     });
 
     await this._incrementDailyCount(agent.id);
 
-    // Auto-set series cover if missing
-    if (!series.cover_image_url) {
+    // Auto-generate cover if missing
+    if (!series.cover_image_url && imageUrls.length > 0) {
       try {
-        let coverUrl = imageUrls.find(Boolean); // webtoon: use first panel
-        if (!coverUrl) {
-          // novel/other: generate a cover image
-          const imageGen = require('./skills/image-gen');
-          const { uploadBuffer } = require('../utils/storage');
-          const coverPrompt = `Book cover illustration, ${series.genre || 'fiction'}, "${series.title}", cinematic lighting, high quality, no text`;
-          const result = await imageGen.generate({ prompt: coverPrompt, aspectRatio: '3:4' });
-          const img = result.images?.[0];
-          if (img?.b64) {
-            const ext = (img.mimeType || '').includes('jpeg') ? '.jpg' : '.png';
-            coverUrl = await uploadBuffer(Buffer.from(img.b64, 'base64'), ext, img.mimeType || 'image/png');
-          } else if (img?.url) {
-            coverUrl = img.url;
-          }
-        }
-        if (coverUrl) {
-          await queryOne('UPDATE series SET cover_image_url = $1 WHERE id = $2 AND cover_image_url IS NULL', [coverUrl, series.id]);
-          console.log(`TaskWorker: auto-generated cover for "${series.title}"`);
-        }
+        await queryOne(
+          'UPDATE series SET cover_image_url = $1 WHERE id = $2 AND cover_image_url IS NULL',
+          [imageUrls[0], series.id]
+        );
       } catch (err) {
-        console.warn(`TaskWorker: cover generation failed for "${series.title}":`, err.message);
+        console.warn(`TaskWorker: cover set failed: ${err.message}`);
       }
     }
 
-    // OpenClaw Turn 2: send critique feedback to close the RL session
-    if (useOpenClaw && sessionId && critiqueFeedback.length > 0) {
-      try {
-        const feedbackText = critiqueFeedback
-          .flatMap(ep => ep.topComments)
-          .map(c => c.content)
-          .join('\n');
-
-        if (feedbackText.trim()) {
-          await openclaw.call(openClawModel,
-            'You are evaluating the previous episode based on reader feedback.',
-            `Critique feedback from previous episodes applied to episode ${nextEpisodeNumber}:\n${feedbackText}`,
-            {
-              sessionId,
-              turnType: 'feedback',
-              sessionDone: true,
-              maxOutputTokens: 256,
-            }
-          );
-
-          // Update session log
-          await queryOne(
-            `UPDATE openclaw_training_sessions
-             SET turn_count = 2, status = 'closed', closed_at = NOW()
-             WHERE session_id = $1`,
-            [sessionId]
-          ).catch(() => {});
-
-          console.log(`TaskWorker: OpenClaw session ${sessionId} closed with critique feedback`);
-        }
-      } catch (clawErr) {
-        console.warn(`TaskWorker: OpenClaw Turn 2 failed for ${sessionId}:`, clawErr.message);
-        await queryOne(
-          `UPDATE openclaw_training_sessions SET status = 'failed', metadata = jsonb_set(metadata, '{error}', $2::jsonb)
-           WHERE session_id = $1`,
-          [sessionId, JSON.stringify(clawErr.message)]
-        ).catch(() => {});
-      }
+    // Mark previous feedback as applied
+    const appliedIds = previousEpisodes
+      .filter(ep => ep.feedback_directives?.length > 0 && !ep.feedback_applied)
+      .map(ep => ep.id);
+    if (appliedIds.length > 0) {
+      await EpisodeService.markFeedbackApplied(appliedIds);
     }
 
-    // Mark feedback as applied to this episode
-    if (critiqueFeedback.length > 0) {
-      const feedbackEp = critiqueFeedback[0]?.episodeNumber;
-      if (feedbackEp) {
-        await queryOne(
-          `UPDATE episode_feedback SET applied_to_episode = $1, applied_at = NOW()
-           WHERE series_id = $2 AND episode_number = $3 AND applied_to_episode IS NULL`,
-          [nextEpisodeNumber, series.id, feedbackEp]
-        ).catch(() => {}); // non-critical
-      }
-    }
+    console.log(`TaskWorker: ${agent.name} created episode ${nextEpisodeNumber} for "${series.title}" (${imageUrls.length} pages)`);
 
-    console.log(`TaskWorker: ${agent.name} created episode ${nextEpisodeNumber} for "${series.title}" (${imageUrls.filter(Boolean).length} images)`);
-
-    // Trigger agent reactions on the new episode post (critique chain)
+    // Trigger critique chain
     const TaskScheduler = require('./TaskScheduler');
-    await TaskScheduler.onPostCreated(result.post);
+    await TaskScheduler.onPostCreated?.({ id: episode.id, author_id: agent.id }, 'episode');
 
-    // Emit activity
     emitActivity('agent_episode_created', {
       agentName: agent.name,
       agentDisplayName: agent.display_name,
       seriesId: series.id,
       seriesTitle: series.title,
       episodeNumber: nextEpisodeNumber,
-      episodeTitle,
-      creationId: result.creation.id,
-      imageCount: imageUrls.length,
+      episodeTitle: episode.title,
+      pages: imageUrls.length,
       ts: Date.now(),
     });
   }
@@ -1075,9 +988,11 @@ Output EXACTLY this JSON format:
 Use the SAME LANGUAGE as the majority of comments for directives.`;
 
     try {
-      const response = await google.call('gemini-2.5-flash-lite', distillPrompt, inputText, {
-        maxOutputTokens: 500,
-      });
+      const response = await bridgeGenerateWithFallback(
+        '/v1/generate/raw',
+        { system_prompt: distillPrompt, user_prompt: inputText, max_tokens: 500, temperature: 0.3 },
+        { model: 'gemini-2.5-flash-lite', systemPrompt: distillPrompt, userPrompt: inputText, options: { maxOutputTokens: 500 } },
+      );
 
       if (!response || !response.trim()) return rawFeedback;
 
@@ -1160,6 +1075,25 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
   static async _generateAndPostComment(agent, post, taskId, skills = {}) {
     const postSummary = post.title + (post.content ? '\n' + post.content.slice(0, 500) : '');
 
+    // Get other commenters on this post for @mention context
+    const otherCommenters = await queryAll(
+      `SELECT DISTINCT a.name FROM comments c
+       JOIN agents a ON c.author_id = a.id
+       WHERE c.post_id = $1 AND c.author_id != $2 AND c.is_deleted = false
+       ORDER BY c.created_at DESC LIMIT 5`,
+      [post.id, agent.id]
+    ).catch(() => []);
+    const commenterNames = otherCommenters.map(c => c.name);
+
+    // Relationship tone for post author
+    let toneHint = '';
+    if (post.author_id && post.author_id !== agent.id) {
+      try {
+        const { getToneInstruction } = require('../agent-system/relationships/tone-modulator');
+        toneHint = await getToneInstruction(agent.id, post.author_id, '');
+      } catch {}
+    }
+
     // Cost-tier routing: rule_based agents use template responses
     const { selectTier, pickTemplate } = require('../agent-system/cost');
     const tier = selectTier('react_to_post', agent.llm_tier || 'standard');
@@ -1171,13 +1105,14 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
       content = tmpl.content;
       console.log(`TaskWorker: ${agent.name} template response (${tmpl.type})`);
     } else {
-      const systemPrompt = buildCommentSystemPrompt(agent, skills.skillHint);
+      const systemPrompt = buildCommentSystemPrompt(agent, skills.skillHint, toneHint, commenterNames);
+      const userPrompt = `Post: "${postSummary}"\n\nWrite your comment:`;
       try {
-        content = await google.call(tier.model, systemPrompt, `Post: "${postSummary}"\n\nWrite a comment:`, {
-          tools: skills.tools || [],
-          imageUrls: skills.imageUrls || [],
-          maxOutputTokens: tier.maxTokens,
-        });
+        content = await bridgeGenerateWithFallback(
+          '/v1/generate/comment',
+          { agent_name: agent.name, post_content: postSummary, skill_hint: skills.skillHint || '', max_tokens: tier.maxTokens },
+          { model: tier.model, systemPrompt, userPrompt, options: { tools: skills.tools || [], imageUrls: skills.imageUrls || [], maxOutputTokens: tier.maxTokens } },
+        );
       } catch (e) {
         throw new Error(`LLM error for comment (${agent.name}): ${e.message}`);
       }
@@ -1285,9 +1220,9 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
     if (post.content) prompt += `${post.content.slice(0, 300)}\n`;
     prompt += '\n--- Thread ---\n';
     for (const c of threadContext) {
-      prompt += `${c.author_display_name || c.author_name}: ${c.content.slice(0, 200)}\n`;
+      prompt += `@${c.author_display_name || c.author_name}: ${c.content.slice(0, 200)}\n`;
     }
-    prompt += `${targetComment.author_display_name || targetComment.author_name}: ${targetComment.content}\n`;
+    prompt += `@${targetComment.author_display_name || targetComment.author_name}: ${targetComment.content}\n`;
     prompt += '\n--- Your reply ---\n';
     return prompt;
   }
@@ -1351,7 +1286,9 @@ async function _generatePanelImages(panels, series, episodeNumber, referenceUrls
         if (img?.b64) {
           const ext = (img.mimeType || '').includes('jpeg') ? '.jpg' : '.png';
           const buffer = Buffer.from(img.b64, 'base64');
-          const url = await uploadBuffer(buffer, ext, img.mimeType || 'image/png');
+          const url = await uploadBuffer(buffer, ext, img.mimeType || 'image/png', 'webtoons', {
+            seriesSlug: series.slug, episodeNumber, panelIndex: i,
+          });
           urls.push(url);
           console.log(`  Panel ${i + 1}/${panels.length}: generated (${result.provider})`);
           generated = true;

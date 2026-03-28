@@ -20,34 +20,28 @@ function buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber, imageFeedbac
     base.push(
       '',
       'You are creating a WEBTOON episode — a vertical-scroll visual story.',
-      'Your episode must include 4-8 scene panels with vivid image descriptions.',
+      'Your episode must include multiple PAGE blocks, each representing one vertical strip page.',
       '',
-      '=== CHARACTER CONSISTENCY (CRITICAL) ===',
-      'Every IMAGE description MUST repeat the FULL character appearance details:',
-      '- Hair: exact color, length, style (e.g. "shoulder-length dark brown messy hair")',
-      '- Eyes: exact color (e.g. "glowing ice-blue eyes")',
-      '- Face: distinguishing features (e.g. "scar across left cheek, sharp jawline")',
-      '- Clothing: exact outfit (e.g. "torn dark leather armor, tattered brown cloak")',
-      '- Build: body type (e.g. "lean muscular build, tall")',
-      'Do NOT abbreviate or skip — repeat the SAME description in EVERY panel so the AI generates the SAME character.',
+      '=== FORMAT ===',
+      'TITLE: [episode title]',
       '',
-      'Format your response EXACTLY as follows:',
-      'TITLE: [episode title here]',
-      '[blank line]',
-      'Then for each scene panel, write:',
-      '[PANEL]',
-      'IMAGE: [Detailed visual description for AI image generation. ALWAYS include full character appearance (hair, eyes, face, clothes, build), pose, expression, background, lighting, camera angle.]',
-      'TEXT: [Narration, dialogue, or sound effects for this panel. Can be empty for silent panels.]',
-      '[/PANEL]',
+      '[PAGE 1]',
+      'SCENE: [Detailed visual description. Include FULL character appearance every time: hair color/style, eye color, clothing, build. Include background, lighting, camera angle, action/pose.]',
+      'DIALOGUE: [Character dialogue or narration. Empty string for silent pages.]',
+      'MOOD: [Mood keywords: tense, peaceful, dramatic, comedic, etc.]',
       '',
-      'Example:',
-      '[PANEL]',
-      'IMAGE: A young man with shoulder-length dark brown messy hair, glowing ice-blue eyes, a scar across his left cheek, lean muscular build, wearing torn dark leather armor and a tattered brown cloak — kneeling on a stone floor in a dark dungeon, clutching his wounded arm, grimacing in pain. Torchlight casts harsh shadows. Close-up shot, webtoon style, dark fantasy, full color.',
-      'TEXT: ...젠장. 여기가 어디야.',
-      '[/PANEL]',
+      '[PAGE 2]',
+      'SCENE: ...',
+      'DIALOGUE: ...',
+      'MOOD: ...',
       '',
-      'Write 4-8 panels per episode. Each IMAGE description must include FULL character appearance.',
-      'Use the same art style keywords in every panel: "webtoon style, [genre], full color, high quality illustration".',
+      '=== RULES ===',
+      '- Write as many pages as the story needs (typically 3-12)',
+      '- Each SCENE description will become a 3-4 panel vertical webtoon strip',
+      '- ALWAYS repeat FULL character appearance in EVERY SCENE (hair, eyes, clothes, build)',
+      '- Describe clear visual actions and poses, not abstract concepts',
+      '- Keep consistent art direction: same lighting style, same color palette throughout',
+      series.style_preset ? `- Art style: ${series.style_preset}` : '- Art style: korean webtoon, full color',
     );
   } else {
     base.push(
@@ -83,49 +77,32 @@ function buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber, imageFeedbac
   return base.filter(Boolean).join('\n');
 }
 
-function buildEpisodeUserPrompt(series, previousEpisodes, critiqueFeedback = []) {
-  let prompt = '';
+function buildEpisodeUserPrompt(series, previousEpisodes, feedbackDirectives = []) {
+  const parts = [];
 
   if (series.synopsis) {
-    prompt += `Series synopsis: ${series.synopsis}\n\n`;
+    parts.push(`Series synopsis: ${series.synopsis}`);
   }
 
   if (previousEpisodes && previousEpisodes.length > 0) {
-    prompt += '--- Previous episodes ---\n';
+    parts.push('\n--- Previous Episodes ---');
     for (const ep of previousEpisodes) {
-      const summary = ep.content ? ep.content.slice(0, 300) : '(no content)';
-      prompt += `Episode ${ep.episode_number}: "${ep.title}"\n${summary}...\n\n`;
+      const content = ep.script_content || ep.content || '';
+      parts.push(`Episode ${ep.episode_number}: "${ep.title}"\n${content.slice(0, 500)}...`);
     }
   } else {
-    prompt += 'This is the first episode. Begin the story.\n';
+    parts.push('This is the first episode. Begin the story.');
   }
 
-  // Inject community critique feedback (distilled into actionable directives)
-  if (critiqueFeedback.length > 0) {
-    const isDistilled = critiqueFeedback[0]?.topComments?.[0]?.archetype === 'distilled';
-    if (isDistilled) {
-      prompt += '--- Improvement Directives (반드시 반영) ---\n';
-      prompt += '커뮤니티 비평을 분석한 결과, 다음 사항을 반영하세요:\n';
-      for (const c of critiqueFeedback[0].topComments) {
-        prompt += `• ${c.content}\n`;
-      }
-      prompt += '\n위 지시사항을 스토리에 자연스럽게 녹여내세요.\n\n';
-    } else {
-      prompt += '--- Community Feedback (반영 필수) ---\n';
-      for (const ep of critiqueFeedback) {
-        prompt += `Episode ${ep.episodeNumber}에 대한 에이전트 비평:\n`;
-        for (const c of ep.topComments) {
-          const archetypeLabel = c.archetype ? `[${c.archetype}]` : '[Agent]';
-          prompt += `- ${archetypeLabel} ${c.content}${c.score ? ` (score: ${c.score})` : ''}\n`;
-        }
-        prompt += '\n';
-      }
-      prompt += '→ 다음 에피소드에서 위 피드백을 자연스럽게 반영하세요.\n\n';
+  if (feedbackDirectives.length > 0) {
+    parts.push('\n--- Reader Feedback (IMPORTANT — apply these) ---');
+    for (const directive of feedbackDirectives) {
+      parts.push(`- ${directive}`);
     }
   }
 
-  prompt += '--- Continue the story naturally ---\n';
-  return prompt;
+  parts.push('\nWrite the next episode now.');
+  return parts.join('\n');
 }
 
 module.exports = {
