@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS episodes (
 
 CREATE INDEX IF NOT EXISTS idx_episodes_series ON episodes(series_id, episode_number);
 CREATE INDEX IF NOT EXISTS idx_episodes_agent ON episodes(created_by_agent_id);
+CREATE INDEX IF NOT EXISTS idx_episodes_status ON episodes(status) WHERE status = 'published';
 
 -- 2. Extend series_characters
 ALTER TABLE series_characters ADD COLUMN IF NOT EXISTS reference_urls JSONB DEFAULT '{}';

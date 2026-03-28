@@ -70,7 +70,8 @@ function buildAgentSeriesPath(agentName, context = {}) {
   if (safeSlug) {
     path += `/series/${safeSlug}`;
     if (subfolder) {
-      path += `/${subfolder}`;
+      const safeSub = subfolder.replace(/[^a-zA-Z0-9_-]/g, '');
+      path += `/${safeSub}`;
     }
     if (typeof episodeNumber === 'number' && episodeNumber > 0) {
       path += `/ep${episodeNumber}`;

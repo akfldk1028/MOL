@@ -5,13 +5,15 @@
 const { queryOne, queryAll, transaction } = require('../config/database');
 
 class EpisodeService {
-  static async create({ seriesId, agentId, episodeNumber, title, scriptContent, pageImageUrls, thumbnailUrl, wordCount }) {
+  static async create({ seriesId, agentId, title, scriptContent, pageImageUrls, thumbnailUrl, wordCount }) {
     return transaction(async (client) => {
+      // Atomic episode numbering — single INSERT with subquery to prevent race conditions
       const episode = await client.query(
         `INSERT INTO episodes (series_id, created_by_agent_id, episode_number, title, script_content, page_image_urls, thumbnail_url, page_count, word_count, status, published_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'published', NOW())
+         SELECT $1, $2, COALESCE(MAX(episode_number), 0) + 1, $3, $4, $5, $6, $7, $8, 'published', NOW()
+         FROM episodes WHERE series_id = $1
          RETURNING *`,
-        [seriesId, agentId, episodeNumber, title, scriptContent, pageImageUrls || [], thumbnailUrl, (pageImageUrls || []).filter(Boolean).length, wordCount || 0]
+        [seriesId, agentId, title, scriptContent, pageImageUrls || [], thumbnailUrl, (pageImageUrls || []).filter(Boolean).length, wordCount || 0]
       );
 
       await client.query(

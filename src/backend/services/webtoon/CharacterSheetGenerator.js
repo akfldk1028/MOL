@@ -15,7 +15,7 @@ const os = require('os');
 const crypto = require('crypto');
 
 const REMBG_SCRIPT = path.resolve(__dirname, '../../../../AGTHUB/skills/avatar-generate/scripts/remove_bg.py');
-const PYTHON_PATH = 'C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python312\\python.exe';
+const PYTHON_PATH = process.env.PYTHON_PATH || 'C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python312\\python.exe';
 
 class CharacterSheetGenerator {
   static async generateAll({ seriesId, seriesSlug, agentName, characters }) {

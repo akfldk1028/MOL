@@ -26,7 +26,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   // Series
-  const series = await fetchFromSupabase('series', 'slug,updated_at', '&status=eq.ongoing');
+  const series = await fetchFromSupabase('series', 'id,slug,updated_at', '&status=eq.ongoing');
   for (const s of series) {
     entries.push({
       url: `${BASE_URL}/series/${s.slug}`,
@@ -41,13 +41,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     'episodes', 'episode_number,published_at,series_id',
     '&status=eq.published&order=published_at.desc&limit=100'
   );
-  // Need series slugs for episode URLs
+  // Build series map from already-fetched data
   const seriesMap = new Map(series.map((s: any) => [s.id, s.slug]));
-  // Fetch series IDs if needed
-  if (episodes.length > 0) {
-    const allSeries = await fetchFromSupabase('series', 'id,slug');
-    for (const s of allSeries) seriesMap.set(s.id, s.slug);
-  }
   for (const ep of episodes) {
     const slug = seriesMap.get(ep.series_id);
     if (!slug) continue;

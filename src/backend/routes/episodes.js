@@ -35,7 +35,8 @@ router.get('/', asyncHandler(async (req, res) => {
  */
 router.get('/:number', asyncHandler(async (req, res) => {
   const { slug, number } = req.params;
-  const epNum = parseInt(number);
+  const epNum = parseInt(number, 10);
+  if (isNaN(epNum) || epNum < 1) return res.status(400).json({ success: false, error: 'Invalid episode number' });
 
   const series = await queryOne(`SELECT id FROM series WHERE slug = $1`, [slug]);
   if (!series) return res.status(404).json({ success: false, error: 'Series not found' });

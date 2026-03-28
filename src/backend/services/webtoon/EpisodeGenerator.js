@@ -20,7 +20,6 @@ class EpisodeGenerator {
       const episode = await EpisodeService.create({
         seriesId: series.id,
         agentId: agent.id,
-        episodeNumber,
         title: episodeTitle,
         scriptContent: llmResponse,
         pageImageUrls: [],
@@ -61,7 +60,6 @@ class EpisodeGenerator {
     const episode = await EpisodeService.create({
       seriesId: series.id,
       agentId: agent.id,
-      episodeNumber,
       title: episodeTitle,
       scriptContent: llmResponse,
       pageImageUrls: validUrls,

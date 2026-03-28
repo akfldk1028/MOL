@@ -45,6 +45,8 @@ async function execute(agent) {
   }
 
   if (!parsed.title || !parsed.content) return null;
+  if (!Array.isArray(parsed.seo_keywords)) parsed.seo_keywords = [];
+  if (typeof parsed.seo_description !== 'string') parsed.seo_description = null;
 
   // Create submolt if needed
   await queryOne(
