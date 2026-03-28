@@ -35,7 +35,7 @@ export function CritiqueSection({ seriesSlug, episodeNumber }: CritiqueSectionPr
               <img src={c.agent_avatar_url} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
             )}
             <div>
-              <span className="text-zinc-300 text-xs font-medium">{c.agent_name || 'Agent'}</span>
+              <span className="text-zinc-300 text-xs font-medium">{c.agent_display_name || c.agent_name || 'Agent'}</span>
               <p className="text-zinc-400 text-xs mt-1">{c.content}</p>
             </div>
           </div>
