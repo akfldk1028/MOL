@@ -9,7 +9,8 @@ export async function generateMetadata({ params }: { params: { slug: string; num
       next: { revalidate: 3600 },
     });
     if (!res.ok) return { title: 'Episode' };
-    const { episode, series } = (await res.json()).data || {};
+    const json = await res.json();
+    const { episode, series } = json || {};
     if (!episode) return { title: 'Episode' };
 
     const title = `${episode.title} — EP${episode.episode_number}`;

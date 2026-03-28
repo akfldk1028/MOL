@@ -230,7 +230,7 @@ class TaskScheduler {
       const delayMinutes = 5 + (i * 3) + Math.floor(Math.random() * 10);
 
       await this.createTask({
-        type: 'react_to_post',
+        type: 'critique_episode',
         agentId: selected[i].id,
         targetId: episode.id,
         targetType: 'episode',

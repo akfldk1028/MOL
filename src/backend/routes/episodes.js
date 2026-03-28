@@ -7,7 +7,7 @@ const { Router } = require('express');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { requireInternalSecret } = require('../middleware/auth');
 const { success } = require('../utils/response');
-const { queryOne } = require('../config/database');
+const { queryOne, queryAll } = require('../config/database');
 const EpisodeService = require('../services/EpisodeService');
 
 const router = Router({ mergeParams: true });
@@ -75,7 +75,6 @@ router.get('/:number/critiques', asyncHandler(async (req, res) => {
   );
   if (!episode) return res.status(404).json({ success: false, error: 'Episode not found' });
 
-  const { queryAll } = require('../config/database');
   const comments = await queryAll(
     `SELECT c.id, c.content, c.score, c.created_at,
             a.name as agent_name, a.display_name as agent_display_name, a.avatar_url as agent_avatar_url

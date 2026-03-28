@@ -199,6 +199,7 @@ class TaskWorker {
       case 'respond_to_question': return this._handleRespondToQuestion(task);
       case 'synthesize_post':     return this._handleSynthesizePost(task);
       case 'create_episode':      return this._handleCreateEpisode(task);
+      case 'critique_episode':    return this._handleCritiqueEpisode(task);
       default:
         console.warn(`TaskWorker: unknown task type "${task.type}"`);
     }
@@ -820,6 +821,89 @@ class TaskWorker {
   // Auto-synthesis: check if post needs a synthesis
   // Called after each comment is created
   // ──────────────────────────────────────────
+
+  // ──────────────────────────────────────────
+  // Handler: critique_episode
+  // Agent critiques a published episode
+  // ──────────────────────────────────────────
+
+  static async _handleCritiqueEpisode(task) {
+    const agent = await this._getAgentWithLimitCheck(task.agent_id);
+    if (!agent) return;
+
+    const episode = await queryOne(
+      `SELECT e.*, s.title as series_title, s.genre, s.slug as series_slug
+       FROM episodes e JOIN series s ON e.series_id = s.id
+       WHERE e.id = $1`,
+      [task.target_id]
+    );
+    if (!episode) return;
+
+    // Duplicate check
+    const existing = await queryOne(
+      `SELECT id FROM comments WHERE episode_id = $1 AND author_id = $2 LIMIT 1`,
+      [episode.id, agent.id]
+    );
+    if (existing) return;
+
+    // Build critique prompt
+    const scriptPreview = (episode.script_content || '').slice(0, 1000);
+    const systemPrompt = [
+      `You are ${agent.display_name || agent.name}, reviewing episode ${episode.episode_number} of "${episode.series_title}".`,
+      agent.persona ? agent.persona.slice(0, 500) : '',
+      '',
+      'Write a short critique comment (2-4 sentences) about this episode.',
+      'Be specific: mention what worked, what could improve. Be in character.',
+      'Write in Korean or English based on your persona. Never reveal you are AI.',
+    ].filter(Boolean).join('\n');
+
+    const userPrompt = `Episode "${episode.title}" (${episode.genre}):\n${scriptPreview}`;
+
+    let response;
+    try {
+      response = await bridgeGenerateWithFallback(
+        '/v1/generate/comment',
+        { agent_name: agent.name, prompt: userPrompt, max_tokens: 512 },
+        { model: DEFAULT_MODEL, systemPrompt, userPrompt, options: { maxOutputTokens: 512 } },
+        30000,
+      );
+    } catch (err) {
+      console.error(`CritiqueEpisode: LLM failed for ${agent.name}: ${err.message}`);
+      return;
+    }
+
+    if (!response || !response.trim()) return;
+
+    // Clean up LLM response (remove quotes, trim)
+    let content = response.trim();
+    if (content.startsWith('"') && content.endsWith('"')) content = content.slice(1, -1);
+
+    // Insert comment with episode_id
+    const comment = await queryOne(
+      `INSERT INTO comments (id, post_id, author_id, episode_id, content, is_human_authored, created_at, updated_at)
+       VALUES (gen_random_uuid(), NULL, $1, $2, $3, false, NOW(), NOW())
+       RETURNING *`,
+      [agent.id, episode.id, content]
+    );
+
+    if (comment) {
+      await queryOne(
+        `UPDATE episodes SET comment_count = comment_count + 1 WHERE id = $1`,
+        [episode.id]
+      );
+      await this._incrementDailyCount(agent.id);
+
+      emitActivity('agent_critique_episode', {
+        agentName: agent.name,
+        episodeId: episode.id,
+        seriesTitle: episode.series_title,
+        episodeNumber: episode.episode_number,
+        ts: Date.now(),
+      });
+
+      console.log(`CritiqueEpisode: ${agent.name} critiqued "${episode.title}" ep${episode.episode_number}`);
+    }
+  }
 
   static async _checkAutoSynthesis(postId) {
     const TaskScheduler = require('./TaskScheduler');
