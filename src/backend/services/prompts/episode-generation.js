@@ -42,6 +42,12 @@ function buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber, imageFeedbac
       '- Describe clear visual actions and poses, not abstract concepts',
       '- Keep consistent art direction: same lighting style, same color palette throughout',
       series.style_preset ? `- Art style: ${series.style_preset}` : '- Art style: korean webtoon, full color',
+      '',
+      '=== CRITICAL FORMAT RULES ===',
+      '- DIALOGUE에 캐릭터 이름 태그 넣지 마세요. "(Jin) 안녕" ❌ → "안녕" ✅',
+      '- DIALOGUE는 순수 대사만. 괄호 캐릭터명, 나레이션 태그 금지.',
+      '- MOOD 필드는 영어 키워드 1-2개만. 한국어로 번역하지 마세요.',
+      '- SCENE에 "기분:", "분위기:" 같은 메타데이터 텍스트 넣지 마세요. 시각적 묘사만.',
     );
   } else {
     base.push(

@@ -73,13 +73,21 @@ class PageGenerator {
 
   static _buildPagePrompt(page, series, style) {
     const preset = StylePresets.get(style || series.style_preset || 'korean_webtoon');
-    const prefix = preset?.promptPrefix || '한국 네이버 웹툰 스타일의 세로 스크롤 만화 컷. 풀컬러, 깔끔한 디지털 선화.';
-    const suffix = preset?.promptSuffix || '한국 웹툰 특유의 부드러운 채색과 선명한 디지털 페인팅.';
+    const prefix = preset?.promptPrefix || '한국 네이버 웹툰 스타일. 사실적 인체 비율, 날카로운 턱선, 굵은 외곽선, 강한 명암 대비.';
+    const suffix = preset?.promptSuffix || '프로 한국 웹툰 작화. 디지털 페인팅. 텍스트 없이 그림만.';
 
-    let prompt = `${prefix} 장르: ${series.genre || '판타지'}. `;
-    prompt += `장면: ${page.scene}. `;
-    if (page.dialogue) prompt += `말풍선 대사: "${page.dialogue}". `;
-    if (page.mood) prompt += `분위기: ${page.mood}. `;
+    let prompt = `${prefix} `;
+    prompt += `${page.scene}. `;
+    if (page.dialogue) {
+      // Strip character name tags like (Jin), (Hero), [나레이션] etc
+      let cleanDialogue = page.dialogue
+        .replace(/^\s*\([^)]+\)\s*/g, '')       // (Jin) at start
+        .replace(/^\s*\[[^\]]+\]\s*/g, '')       // [narration] at start
+        .replace(/\s*\([^)]+\)\s*/g, ' ')        // (name) anywhere
+        .trim();
+      if (cleanDialogue) prompt += `말풍선 안에 한국어로: "${cleanDialogue}". `;
+    }
+    // MOOD는 프롬프트에 넣지 않음 — Nano Banana가 텍스트로 렌더링하는 버그
     prompt += suffix;
     return prompt;
   }
