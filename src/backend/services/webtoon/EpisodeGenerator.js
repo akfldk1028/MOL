@@ -29,8 +29,9 @@ class EpisodeGenerator {
       return { episode, imageUrls: [] };
     }
 
-    // 2. Load character sheets
+    // 2. Load character sheets + style reference
     const characters = await this._loadCharacters(series.id);
+    const styleReferenceUrl = this._buildStyleReferenceUrl(series, agent);
 
     // 3. Generate page images
     console.log(`EpisodeGenerator: generating ${pages.length} pages for "${episodeTitle}"`);
@@ -41,6 +42,7 @@ class EpisodeGenerator {
       episodeNumber,
       characters,
       style: series.style_preset,
+      styleReferenceUrl,
     });
 
     const validUrls = imageUrls.filter(Boolean);
@@ -69,6 +71,20 @@ class EpisodeGenerator {
 
     console.log(`EpisodeGenerator: "${episodeTitle}" saved with ${validUrls.length} pages`);
     return { episode, imageUrls: validUrls };
+  }
+
+  /**
+   * Build style reference URL (if exists in Storage)
+   */
+  static _buildStyleReferenceUrl(series, agent) {
+    const { buildAgentSeriesPath } = require('../../utils/storage');
+    const storagePath = buildAgentSeriesPath(agent.name, {
+      seriesSlug: series.slug,
+      filename: 'style-reference.webp',
+    });
+    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!baseUrl) return null;
+    return `${baseUrl}/storage/v1/object/public/creations/${storagePath}`;
   }
 
   static async _loadCharacters(seriesId) {

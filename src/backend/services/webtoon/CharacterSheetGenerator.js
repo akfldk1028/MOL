@@ -7,6 +7,7 @@
 const imageGen = require('../skills/image-gen');
 const { uploadBuffer, buildAgentSeriesPath } = require('../../utils/storage');
 const CharacterSheetService = require('./character/CharacterSheetService');
+const StylePresets = require('./style/StylePresets');
 const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -59,6 +60,36 @@ class CharacterSheetGenerator {
       refs[view.key] = url;
     }
     return refs;
+  }
+
+  /**
+   * Generate a style reference image for the series
+   * Used as reference for all episode pages to maintain visual consistency
+   */
+  static async generateStyleReference({ agentName, seriesSlug, genre, stylePreset }) {
+    const preset = StylePresets.get(stylePreset || 'korean_webtoon');
+    const prefix = preset?.promptPrefix || 'Korean manhwa webtoon style, soft cel-shading, clean digital lineart,';
+    const suffix = preset?.promptSuffix || '';
+    const negative = preset?.negativePrompt || '';
+
+    const prompt = `${prefix} ${genre || 'fantasy'} genre, sample page showing 3 vertical panels with different scenes and characters, establishing the visual style and color palette. ${suffix} ${negative ? 'Avoid: ' + negative : ''}`;
+
+    const result = await imageGen.generate({ prompt, aspectRatio: '9:16' });
+    const img = result.images?.[0];
+    if (!img?.b64) throw new Error('Style reference generation returned no image');
+
+    const storagePath = buildAgentSeriesPath(agentName, {
+      seriesSlug,
+      filename: 'style-reference.webp',
+    });
+
+    const url = await uploadBuffer(
+      Buffer.from(img.b64, 'base64'),
+      '.webp', 'image/webp', null, { fullPath: storagePath }
+    );
+
+    console.log(`StyleReference: generated → ${storagePath}`);
+    return url;
   }
 
   static _removeBackground(inputBuffer) {

@@ -7,9 +7,10 @@
 
 const imageGen = require('../skills/image-gen');
 const { uploadBuffer, buildAgentSeriesPath } = require('../../utils/storage');
+const StylePresets = require('./style/StylePresets');
 
 class PageGenerator {
-  static async generateAll({ pages, series, agent, episodeNumber, characters, style }) {
+  static async generateAll({ pages, series, agent, episodeNumber, characters, style, styleReferenceUrl }) {
     const imageUrls = [];
     const failedPages = [];
     const charRefs = this._getCharacterRefs(characters);
@@ -20,7 +21,12 @@ class PageGenerator {
 
       try {
         const prompt = this._buildPagePrompt(page, series, style);
-        const refs = [...charRefs];
+        const refs = [];
+        // Style reference first (strongest influence)
+        if (styleReferenceUrl) refs.push(styleReferenceUrl);
+        // Character references
+        refs.push(...charRefs);
+        // Previous page for continuity
         if (i > 0 && imageUrls[i - 1]) refs.push(imageUrls[i - 1]);
 
         const result = await imageGen.generate({
@@ -66,14 +72,18 @@ class PageGenerator {
   }
 
   static _buildPagePrompt(page, series, style) {
-    const genre = series.genre || 'fantasy';
-    const styleName = style || series.style_preset || 'korean_webtoon';
+    const preset = StylePresets.get(style || series.style_preset || 'korean_webtoon');
+    const prefix = preset?.promptPrefix || StylePresets.getPrefix(null, series.genre);
+    const suffix = preset?.promptSuffix || '';
+    const negative = preset?.negativePrompt || '';
 
-    let prompt = `A 3-4 panel vertical webtoon strip, ${styleName} style, ${genre} genre, full color, high quality illustration. `;
+    let prompt = `${prefix} ${series.genre || 'fantasy'} genre. `;
     prompt += `Scene: ${page.scene}. `;
     if (page.dialogue) prompt += `Include speech bubbles with dialogue: ${page.dialogue}. `;
     if (page.mood) prompt += `Mood and atmosphere: ${page.mood}. `;
-    prompt += 'Panels flow top to bottom in vertical scroll format. Consistent character design throughout all panels.';
+    prompt += `${suffix} `;
+    prompt += 'Panels flow top to bottom in vertical scroll format. Consistent character design throughout all panels. ';
+    if (negative) prompt += `Avoid: ${negative}.`;
     return prompt;
   }
 
