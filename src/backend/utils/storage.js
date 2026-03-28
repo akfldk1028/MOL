@@ -201,7 +201,7 @@ async function uploadBuffer(buffer, ext, mimetype, category = 'webtoons', contex
     .from(BUCKET)
     .upload(storagePath, buffer, {
       contentType: mimetype || 'application/octet-stream',
-      upsert: context.panelIndex != null || context.seriesSlug != null,
+      upsert: context.panelIndex != null || context.seriesSlug != null || context.fullPath != null,
     });
 
   if (error) {

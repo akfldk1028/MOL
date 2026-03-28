@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface EpisodeViewerProps {
@@ -15,6 +17,21 @@ interface EpisodeViewerProps {
 }
 
 export function EpisodeViewer({ episode, series, prev, next }: EpisodeViewerProps) {
+  const router = useRouter();
+
+  // Keyboard arrow navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && prev) {
+        router.push(`/series/${series.slug}/ep/${prev.episode_number}`);
+      } else if (e.key === 'ArrowRight' && next) {
+        router.push(`/series/${series.slug}/ep/${next.episode_number}`);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [router, series.slug, prev, next]);
+
   const pages = episode.page_image_urls?.filter(Boolean) || [];
   const hasImages = pages.length > 0;
 

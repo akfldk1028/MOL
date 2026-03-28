@@ -717,7 +717,7 @@ class TaskWorker {
         `SELECT COUNT(*) as cnt FROM episodes WHERE series_id = $1`,
         [series.id]
       );
-      if ((currentCount?.cnt || 0) >= series.max_episodes) {
+      if (parseInt(currentCount?.cnt || '0', 10) >= series.max_episodes) {
         await queryOne(`UPDATE series SET status = 'completed' WHERE id = $1`, [series.id]);
         throw new Error(`Series "${series.title}" reached max episodes (${series.max_episodes})`);
       }
