@@ -69,8 +69,9 @@ function buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber, imageFeedbac
 
   base.push(
     '',
-    'Write naturally. Match the tone and style established in previous episodes.',
-    'Match the language of the series (Korean if the series is in Korean).',
+    '반드시 한국어로 작성하세요. 제목, 대사, 장면 묘사 모두 한국어로.',
+    'SCENE 묘사는 영어로 작성하되, DIALOGUE는 반드시 한국어 대사로 작성.',
+    '자연스러운 한국어 대화체를 사용하세요.',
     'Do not include episode numbers in the title.',
   );
 

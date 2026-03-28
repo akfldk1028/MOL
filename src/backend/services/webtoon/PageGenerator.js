@@ -73,13 +73,13 @@ class PageGenerator {
 
   static _buildPagePrompt(page, series, style) {
     const preset = StylePresets.get(style || series.style_preset || 'korean_webtoon');
-    const prefix = preset?.promptPrefix || '2d Korean naver webtoon comic style, vertical panel format, full color.';
-    const suffix = preset?.promptSuffix || 'Soft lighting, sharp digital painting style, webcomic aesthetic.';
+    const prefix = preset?.promptPrefix || '한국 네이버 웹툰 스타일의 세로 스크롤 만화 컷. 풀컬러, 깔끔한 디지털 선화.';
+    const suffix = preset?.promptSuffix || '한국 웹툰 특유의 부드러운 채색과 선명한 디지털 페인팅.';
 
-    let prompt = `${prefix} ${series.genre || 'fantasy'}. `;
-    prompt += `${page.scene}. `;
-    if (page.dialogue) prompt += `"${page.dialogue}" in a speech bubble. `;
-    if (page.mood) prompt += `${page.mood} mood. `;
+    let prompt = `${prefix} 장르: ${series.genre || '판타지'}. `;
+    prompt += `장면: ${page.scene}. `;
+    if (page.dialogue) prompt += `말풍선 대사: "${page.dialogue}". `;
+    if (page.mood) prompt += `분위기: ${page.mood}. `;
     prompt += suffix;
     return prompt;
   }

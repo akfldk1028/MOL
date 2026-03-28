@@ -18,8 +18,8 @@ const PRESETS = {
   },
   korean_webtoon: {
     name: 'Korean Webtoon',
-    promptPrefix: '2d Korean naver webtoon comic style, vertical panel format, full color.',
-    promptSuffix: 'Soft lighting, sharp digital painting style, webcomic aesthetic.',
+    promptPrefix: '한국 네이버 웹툰 스타일의 세로 스크롤 만화 컷. 풀컬러, 깔끔한 디지털 선화, 부드러운 셀셰이딩, 큰 눈과 표정이 풍부한 캐릭터.',
+    promptSuffix: '한국 웹툰 특유의 부드러운 채색과 선명한 디지털 페인팅. 말풍선에 한국어 대사 포함.',
     negativePrompt: '',
   },
   watercolor: {

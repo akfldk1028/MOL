@@ -17,7 +17,7 @@ const crypto = require('crypto');
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 // Official model names (2026-03): gemini-3.1-flash-image-preview (fast), gemini-3-pro-image-preview (quality)
-const GEMINI_MODEL = 'gemini-3.1-flash-image-preview';
+const GEMINI_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image-preview';
 
 const GEMINI_ASPECTS = ['1:1', '1:4', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
 
