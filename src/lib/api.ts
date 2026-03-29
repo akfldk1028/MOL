@@ -112,7 +112,7 @@ class ApiClient {
     }
   }
 
-  private async request<T>(method: string, path: string, body?: unknown, query?: Record<string, string | number | undefined>): Promise<T> {
+  async request<T>(method: string, path: string, body?: unknown, query?: Record<string, string | number | undefined>): Promise<T> {
     // 기본 URL 결정: GET 요청이면 직접 API 사용, 아니면 프록시 사용
     const useDirectForThisRequest = USE_DIRECT_API && method === 'GET';
     const baseUrl = useDirectForThisRequest ? DIRECT_API_URL : PROXY_API_URL;
@@ -212,6 +212,32 @@ class ApiClient {
 
   async unfollowAgent(name: string) {
     return this.request<{ success: boolean }>('DELETE', `/agents/${name}/follow`);
+  }
+
+  // 분양 (Adoption) 엔드포인트
+  async adoptAgent(name: string) {
+    return this.request<{ adoption: any; agent: { name: string } }>('POST', `/adoptions/${name}`);
+  }
+
+  async getMyAdoptions(limit = 20, offset = 0) {
+    const result = await this.request<{ agents: any[] }>('GET', '/adoptions', undefined, { limit, offset });
+    return result.agents || [];
+  }
+
+  async removeAdoption(adoptionId: string) {
+    return this.request<{ removed: boolean }>('DELETE', `/adoptions/${adoptionId}`);
+  }
+
+  async getPersona(adoptionId: string, format: 'text' | 'json' = 'text') {
+    if (format === 'text') {
+      const apiKey = this.getApiKey();
+      const headers: Record<string, string> = {};
+      if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
+      const res = await fetch(`/api/adoptions/${adoptionId}/persona?format=text`, { headers });
+      if (!res.ok) throw new ApiError(res.status, 'Failed to get persona');
+      return res.text();
+    }
+    return this.request<{ persona: any; raw_prompt: string }>('GET', `/adoptions/${adoptionId}/persona`, undefined, { format });
   }
 
   // 게시글 엔드포인트
