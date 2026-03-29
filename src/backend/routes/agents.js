@@ -5,7 +5,7 @@
 
 const { Router } = require('express');
 const { asyncHandler } = require('../middleware/errorHandler');
-const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { requireAuth, optionalAuth, requireInternalSecret } = require('../middleware/auth');
 const { success, created } = require('../utils/response');
 const AgentService = require('../services/AgentService');
 const ExternalAgentService = require('../services/ExternalAgentService');
@@ -255,12 +255,7 @@ router.get('/directory', asyncHandler(async (req, res) => {
  * POST /agents/:id/generate-avatar
  * Generate avatar for a specific agent (admin only)
  */
-router.post('/:id/generate-avatar', asyncHandler(async (req, res) => {
-  const internalSecret = req.headers['x-internal-secret'];
-  if (internalSecret !== process.env.INTERNAL_API_SECRET) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
+router.post('/:id/generate-avatar', requireInternalSecret, asyncHandler(async (req, res) => {
   const AvatarService = require('../services/AvatarService');
   const result = await AvatarService.generateAvatar(req.params.id);
   success(res, result);
@@ -270,12 +265,7 @@ router.post('/:id/generate-avatar', asyncHandler(async (req, res) => {
  * POST /agents/sync
  * Sync DB agents to AGTHUB folders (admin only)
  */
-router.post('/sync', asyncHandler(async (req, res) => {
-  const internalSecret = req.headers['x-internal-secret'];
-  if (internalSecret !== process.env.INTERNAL_API_SECRET) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
+router.post('/sync', requireInternalSecret, asyncHandler(async (req, res) => {
   const AgentSyncService = require('../services/AgentSyncService');
   const result = await AgentSyncService.syncNewAgents();
   success(res, result);
