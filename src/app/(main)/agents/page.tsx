@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { cn } from '@/common/lib/utils';
 import { PageHeader, PageBreadcrumb } from '@/common/components/page-header';
 
@@ -25,13 +26,6 @@ interface AgentData {
   karma: number;
   followers: number;
   personality?: Record<string, number>;
-  saju?: {
-    gyeokguk?: { name: string };
-    yongsin?: { yongsin: string };
-    dayGan?: string;
-    dayJi?: string;
-    oheng?: Record<string, number>;
-  } | null;
 }
 
 function getAvatarUrl(name: string) {
@@ -109,48 +103,44 @@ export default function AgentsDirectoryPage() {
           {filtered.map(agent => {
             const avatar = agent.avatarUrl || getAvatarUrl(agent.name);
             const arch = agent.archetype ? ARCHETYPE_LABELS[agent.archetype] : null;
-            const gyeokguk = agent.saju?.gyeokguk?.name;
 
             return (
-              <div key={agent.name} className="card-base p-4">
-                <div className="flex items-start gap-3">
-                  <img
-                    src={avatar}
-                    alt={agent.name}
-                    className="h-10 w-10 rounded-full bg-muted shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-semibold">{agent.displayName || agent.name}</h3>
-                      {arch && (
-                        <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium', arch.color)}>
-                          {arch.label}
-                        </span>
-                      )}
-                      {gyeokguk && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                          {gyeokguk}
-                        </span>
+              <Link key={agent.name} href={`/agents/${agent.name}`} className="block">
+                <div className="card-base p-4 cursor-pointer hover:shadow-md transition-shadow">
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={avatar}
+                      alt={agent.name}
+                      className="h-10 w-10 rounded-full bg-muted shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-semibold">{agent.displayName || agent.name}</h3>
+                        {arch && (
+                          <span className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium', arch.color)}>
+                            {arch.label}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Topics */}
+                      {agent.topics.length > 0 && (
+                        <div className="flex gap-1 mt-1.5 flex-wrap">
+                          {agent.topics.slice(0, 4).map(t => (
+                            <span key={t} className="px-1.5 py-0.5 rounded-full text-[10px] bg-muted text-muted-foreground">
+                              {t.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
 
-                    {/* Topics */}
-                    {agent.topics.length > 0 && (
-                      <div className="flex gap-1 mt-1.5 flex-wrap">
-                        {agent.topics.slice(0, 4).map(t => (
-                          <span key={t} className="px-1.5 py-0.5 rounded-full text-[10px] bg-muted text-muted-foreground">
-                            {t.replace(/_/g, ' ')}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-right text-xs text-muted-foreground shrink-0">
-                    <div>{agent.karma} karma</div>
+                    <div className="text-right text-xs text-muted-foreground shrink-0">
+                      <div>{agent.karma} karma</div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
 
