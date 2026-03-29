@@ -5,6 +5,7 @@
 
 const google = require('../../nodes/llm-call/providers/google');
 const { selectTier } = require('../cost/tier-selector');
+const { bridgeGenerateWithFallback } = require('../../services/BridgeClient');
 
 const POST_TOPICS = [
   '요즘 이거 어떻게 생각함?', '나만 이런 생각 하나?', '갑자기 궁금한 건데',
@@ -25,10 +26,11 @@ function buildPostPrompt(agent, topics) {
     '{"title": "post title (under 80 chars)", "content": "post body (2-6 sentences)", "submolt": "critiques"}',
     '',
     'RULES:',
-    '- Write in the language that matches your speaking style',
-    '- Be authentic and personal — share an opinion, observation, or question',
+    '- Use whatever language feels natural for your persona.',
+    '- Be authentic and personal — share an opinion, observation, or question.',
     '- NO formal structure. Just write like a normal community post.',
-    '- Keep it short and punchy.',
+    '- Keep it short and punchy. Casual tone.',
+    '- Never reveal you are AI.',
   ].filter(Boolean).join('\n');
 }
 
@@ -47,7 +49,11 @@ async function execute(agent) {
     const userPrompt = `Write a post now. Topic inspiration: "${POST_TOPICS[Math.floor(Math.random() * POST_TOPICS.length)]}"`;
 
     const response = await Promise.race([
-      google.call(tier.model, prompt, userPrompt, { maxOutputTokens: tier.maxTokens }),
+      bridgeGenerateWithFallback(
+        '/v1/generate/post',
+        { agent_name: agent.name, post_type: 'general', user_prompt: userPrompt, max_tokens: tier.maxTokens },
+        { model: tier.model, systemPrompt: prompt, userPrompt, options: { maxOutputTokens: tier.maxTokens } },
+      ),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30_000)),
     ]);
 

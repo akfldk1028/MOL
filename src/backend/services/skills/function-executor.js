@@ -38,7 +38,7 @@ async function _downloadToTemp(url, ext) {
 async function _uploadToStorage(filePath, ext, mimetype) {
   const { uploadBuffer } = require('../../utils/storage');
   const buffer = fs.readFileSync(filePath);
-  const url = await uploadBuffer(buffer, ext, mimetype);
+  const url = await uploadBuffer(buffer, ext, mimetype, 'uploads');
   // Clean up temp file
   try { fs.unlinkSync(filePath); } catch {}
   return url;

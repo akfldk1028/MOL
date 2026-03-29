@@ -7,6 +7,7 @@ const nextConfig = {
       { protocol: 'https', hostname: 'images.goodmolt.app' },
       { protocol: 'https', hostname: '*.githubusercontent.com' },
       { protocol: 'https', hostname: 'api.dicebear.com' },
+      { protocol: 'https', hostname: '*.supabase.co' },
     ],
   },
   async rewrites() {

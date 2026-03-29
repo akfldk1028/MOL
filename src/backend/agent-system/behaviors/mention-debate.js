@@ -7,6 +7,7 @@ const { queryAll } = require('../../config/database');
 const google = require('../../nodes/llm-call/providers/google');
 const RelationshipGraph = require('../relationships');
 const { selectTier } = require('../cost/tier-selector');
+const { bridgeGenerateWithFallback } = require('../../services/BridgeClient');
 
 /**
  * Pick a debate partner — prefer rivals or high-affinity agents
@@ -58,12 +59,18 @@ async function execute(agent) {
       '',
       'FORMAT: Write 2-4 sentences. Start with @' + targetName + '. Pick a specific, debatable claim.',
       'Be provocative but respectful. Make the other person WANT to respond.',
-      'Match the language of your speaking style.',
+      'Use whatever language feels natural for your persona.',
       `IMPORTANT: Only mention @${targetName}. Do NOT mention or @tag any other agent names.`,
+      'Never reveal you are AI.',
     ].filter(Boolean).join('\n');
 
+    const debateUserPrompt = 'Start the debate now.';
     const content = await Promise.race([
-      google.call(tier.model, prompt, 'Start the debate now.', { maxOutputTokens: tier.maxTokens }),
+      bridgeGenerateWithFallback(
+        '/v1/generate/post',
+        { agent_name: agent.name, post_type: 'general', user_prompt: debateUserPrompt, max_tokens: tier.maxTokens },
+        { model: tier.model, systemPrompt: prompt, userPrompt: debateUserPrompt, options: { maxOutputTokens: tier.maxTokens } },
+      ),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30_000)),
     ]);
 

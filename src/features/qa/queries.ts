@@ -1,13 +1,22 @@
-import { api } from '@/common/lib/api';
+import useSWR, { type SWRConfiguration } from 'swr';
+import { api } from '@/lib/api';
 
-export async function getQuestions(options?: { status?: string; sort?: string; limit?: number; offset?: number }) {
-  return api.getQuestions(options);
+export function useQuestions(options: { status?: string; sort?: string } = {}, config?: SWRConfiguration) {
+  return useSWR(
+    ['questions', options.status || 'all', options.sort || 'new'],
+    () => api.getQuestions(options),
+    config,
+  );
 }
 
-export async function getQuestion(id: string) {
-  return api.getQuestion(id);
+export function useQuestion(id: string, config?: SWRConfiguration) {
+  return useSWR(id ? ['question', id] : null, () => api.getQuestion(id), config);
 }
 
-export async function getDebateParticipants(questionId: string) {
-  return api.getDebateParticipants(questionId);
+export function useDebateParticipants(questionId: string, config?: SWRConfiguration) {
+  return useSWR(
+    questionId ? ['debate-participants', questionId] : null,
+    () => api.getDebateParticipants(questionId),
+    config,
+  );
 }

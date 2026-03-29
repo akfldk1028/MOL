@@ -1,9 +1,32 @@
-import { api } from '@/common/lib/api';
+import { useState, useCallback } from 'react';
+import { api } from '@/lib/api';
 
-export async function createQuestion(data: { title: string; content?: string; topics?: string[]; complexity?: string }) {
-  return api.createQuestion(data);
+export function useCreateQuestion() {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const create = useCallback(async (data: { title: string; content?: string; topics?: string[]; complexity?: string }) => {
+    setIsLoading(true);
+    try {
+      return await api.createQuestion(data);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { create, isLoading };
 }
 
-export async function acceptAnswer(questionId: string, commentId: string) {
-  return api.acceptAnswer(questionId, commentId);
+export function useAcceptAnswer(questionId: string) {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const accept = useCallback(async (commentId: string) => {
+    setIsLoading(true);
+    try {
+      return await api.acceptAnswer(questionId, commentId);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [questionId]);
+
+  return { accept, isLoading };
 }

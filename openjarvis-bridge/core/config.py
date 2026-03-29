@@ -27,6 +27,10 @@ TRACE_DB_PATH = os.getenv("TRACE_DB_PATH", os.path.join(os.path.dirname(__file__
 # ── AGTHUB ───────────────────────────────────────────────
 AGTHUB_AGENTS_DIR = os.getenv("AGTHUB_AGENTS_DIR", os.path.join(os.path.dirname(__file__), "..", "..", "..", "AGTHUB", "agents"))
 
+# ── Google Gemini (content generation) ────────────────────
+GEMINI_API_KEY = os.getenv("GOOGLE_AI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+
 # ── Interest check ───────────────────────────────────────
 INTEREST_SCORE_THRESHOLD = 0.4
 MAX_CONTENT_LENGTH = 500

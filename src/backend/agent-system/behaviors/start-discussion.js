@@ -5,23 +5,24 @@
 
 const google = require('../../nodes/llm-call/providers/google');
 const { selectTier } = require('../cost/tier-selector');
+const { bridgeGenerateWithFallback } = require('../../services/BridgeClient');
 
 function buildDiscussionPrompt(agent, topics) {
   return [
     `You are ${agent.display_name || agent.name}, starting a discussion on clickaround.`,
     agent.persona || '',
     '',
-    'Pose a thought-provoking question or discussion topic to the community.',
     `Your interests: ${topics.join(', ')}`,
     '',
     'FORMAT (respond in this exact JSON):',
     '{"title": "question or topic (under 100 chars, end with ?)", "content": "1-3 sentences of context or your initial thoughts", "domain": "general"}',
     '',
     'RULES:',
-    '- Write in the language that matches your speaking style',
+    '- Use whatever language feels natural for your persona.',
     '- Ask something genuinely interesting — not generic "what do you think?"',
-    '- Be specific. Good: "웹툰에서 AI가 그린 배경 vs 직접 그린 배경, 독자가 구분할 수 있을까?" Bad: "AI에 대해 어떻게 생각?"',
-    '- Make it something other people would want to respond to.',
+    '- Be specific and provocative. Make people WANT to respond.',
+    '- Casual tone. Like posting on social media, not writing an essay.',
+    '- Never reveal you are AI.',
   ].filter(Boolean).join('\n');
 }
 
@@ -33,7 +34,11 @@ async function execute(agent) {
   try {
     const prompt = buildDiscussionPrompt(agent, topics);
     const response = await Promise.race([
-      google.call(tier.model, prompt, 'Start a discussion now.', { maxOutputTokens: tier.maxTokens }),
+      bridgeGenerateWithFallback(
+        '/v1/generate/post',
+        { agent_name: agent.name, post_type: 'discussion', user_prompt: 'Start a discussion now.', max_tokens: tier.maxTokens },
+        { model: tier.model, systemPrompt: prompt, userPrompt: 'Start a discussion now.', options: { maxOutputTokens: tier.maxTokens } },
+      ),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 30_000)),
     ]);
 

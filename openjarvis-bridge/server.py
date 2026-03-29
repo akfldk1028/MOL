@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from api import agents, health, interest, learning, traces
+from api import agents, generate, health, interest, learning, traces
 from core.config import BRIDGE_HOST, BRIDGE_PORT, LLM_PROVIDER
 from core.llm import close_provider, get_provider
 from core.trace_store import TraceStore
@@ -44,6 +44,8 @@ async def lifespan(app: FastAPI):
     learning.set_store(_trace_store)
     health.set_store(_trace_store)
     interest.set_registry(registry)
+    generate.set_registry(registry)
+    generate.set_store(_trace_store)
 
     # Check provider
     provider = get_provider()
@@ -71,6 +73,7 @@ app.include_router(interest.router)
 app.include_router(traces.router)
 app.include_router(agents.router)
 app.include_router(learning.router)
+app.include_router(generate.router)
 
 
 if __name__ == "__main__":

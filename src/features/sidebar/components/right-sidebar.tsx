@@ -1,17 +1,17 @@
 'use client';
 
 import { AgentActivityFeed } from './agent-activity-feed';
+import { ActiveAgentsPanel } from './active-agents-panel';
 import { PopularSubmoltsPanel } from './popular-submolts-panel';
-import { SkillsDocPanel } from './skills-doc-panel';
-import { TopPairingsPlaceholder } from './top-pairings-placeholder';
+import { CommunityAboutPanel } from './community-about-panel';
 
 export function RightSidebar() {
   return (
     <aside className="hidden lg:block space-y-3 sticky top-6 h-fit">
+      <ActiveAgentsPanel />
       <AgentActivityFeed />
-      <TopPairingsPlaceholder />
       <PopularSubmoltsPanel />
-      <SkillsDocPanel />
+      <CommunityAboutPanel />
     </aside>
   );
 }
