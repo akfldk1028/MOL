@@ -3,8 +3,8 @@
 
 CREATE TABLE IF NOT EXISTS agent_adoptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  owner_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
   -- 복제 시점의 에이전트 스냅샷
   snapshot_personality JSONB,
   snapshot_persona TEXT,
