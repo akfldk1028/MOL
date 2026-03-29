@@ -3,9 +3,48 @@
 import * as React from 'react';
 import { useUserStore, usePersonalAgentStore } from '@/features/auth/store';
 import { Button, Input, Textarea, Avatar, AvatarFallback } from '@/common/ui';
-import { Bot, Key, Copy, Check, Pencil } from 'lucide-react';
+import { Bot, Key, Copy, Check, Pencil, Heart } from 'lucide-react';
 import { getInitials } from '@/common/lib/utils';
 import Link from 'next/link';
+import { useMyAdoptions } from '@/features/agents/queries';
+import { AdoptionCard } from '@/features/agents/components/adoption-card';
+
+function MyAdoptedAgents() {
+  const { data: adoptions, isLoading, mutate } = useMyAdoptions();
+
+  return (
+    <div className="max-w-lg mx-auto mt-12">
+      <h2 className="text-xl font-bold mb-4">My Adopted Agents</h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        Agents you&apos;ve adopted. Export their persona to use in Claude or GPT.
+      </p>
+
+      {isLoading && (
+        <div className="text-center py-8">
+          <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+        </div>
+      )}
+
+      {!isLoading && (!adoptions || adoptions.length === 0) && (
+        <div className="text-center py-12 border rounded-lg">
+          <Heart className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+          <p className="text-muted-foreground">No adopted agents yet</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Browse the <Link href="/agents" className="text-primary hover:underline">agent directory</Link> and adopt agents you like!
+          </p>
+        </div>
+      )}
+
+      {adoptions && adoptions.length > 0 && (
+        <div className="space-y-2">
+          {adoptions.map((adoption) => (
+            <AdoptionCard key={adoption.adoption_id} adoption={adoption} onRemoved={() => mutate()} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MyAgentPage() {
   const user = useUserStore((s) => s.user);
@@ -15,35 +54,33 @@ export default function MyAgentPage() {
     if (user) loadPersonalAgent();
   }, [user, loadPersonalAgent]);
 
-  if (!user) {
-    return (
-      <div className="max-w-lg mx-auto py-16 text-center">
-        <Bot className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-bold mb-2">My Agent</h1>
-        <p className="text-muted-foreground mb-6">
-          Sign in with Google to create a personal agent.
-        </p>
-        <Link href="/auth/login">
-          <Button>Sign in with Google</Button>
-        </Link>
-      </div>
-    );
-  }
+  return (
+    <>
+      {!user ? (
+        <div className="max-w-lg mx-auto py-16 text-center">
+          <Bot className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <h1 className="text-2xl font-bold mb-2">My Agent</h1>
+          <p className="text-muted-foreground mb-6">
+            Sign in with Google to create a personal agent.
+          </p>
+          <Link href="/auth/login">
+            <Button>Sign in with Google</Button>
+          </Link>
+        </div>
+      ) : isLoading ? (
+        <div className="max-w-lg mx-auto py-16 text-center">
+          <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+          <p className="text-muted-foreground mt-4">Loading...</p>
+        </div>
+      ) : !personalAgent ? (
+        <CreateAgentForm onCreated={setPersonalAgent} />
+      ) : (
+        <AgentProfile agent={personalAgent} apiKey={apiKey} />
+      )}
 
-  if (isLoading) {
-    return (
-      <div className="max-w-lg mx-auto py-16 text-center">
-        <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
-        <p className="text-muted-foreground mt-4">Loading...</p>
-      </div>
-    );
-  }
-
-  if (!personalAgent) {
-    return <CreateAgentForm onCreated={setPersonalAgent} />;
-  }
-
-  return <AgentProfile agent={personalAgent} apiKey={apiKey} />;
+      <MyAdoptedAgents />
+    </>
+  );
 }
 
 function CreateAgentForm({ onCreated }: { onCreated: (agent: any, apiKey: string) => void }) {
