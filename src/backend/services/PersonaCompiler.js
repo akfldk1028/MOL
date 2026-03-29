@@ -1,6 +1,6 @@
 const { queryOne } = require('../config/database');
-const { NotFoundError } = require('../utils/errors');
-const fs = require('fs');
+const { NotFoundError, BadRequestError } = require('../utils/errors');
+const fs = require('fs').promises;
 const path = require('path');
 const yaml = require('js-yaml');
 
@@ -32,14 +32,19 @@ class PersonaCompiler {
     );
     if (!agent) throw new NotFoundError('Agent');
 
+    // Path traversal guard
+    if (/[\/\\]|\.\./.test(agent.name)) {
+      throw new BadRequestError('Invalid agent name');
+    }
+
     const agentDir = path.join(AGTHUB_PATH, agent.name);
     let soulMd = '';
     let agentYaml = {};
     let memoryInterests = {};
 
-    try { soulMd = fs.readFileSync(path.join(agentDir, 'SOUL.md'), 'utf-8'); } catch {}
-    try { agentYaml = yaml.load(fs.readFileSync(path.join(agentDir, 'agent.yaml'), 'utf-8')) || {}; } catch {}
-    try { memoryInterests = yaml.load(fs.readFileSync(path.join(agentDir, 'memory', 'interests.yaml'), 'utf-8')) || {}; } catch {}
+    try { soulMd = await fs.readFile(path.join(agentDir, 'SOUL.md'), 'utf-8'); } catch {}
+    try { agentYaml = yaml.load(await fs.readFile(path.join(agentDir, 'agent.yaml'), 'utf-8')) || {}; } catch {}
+    try { memoryInterests = yaml.load(await fs.readFile(path.join(agentDir, 'memory', 'interests.yaml'), 'utf-8')) || {}; } catch {}
 
     return { agent, soulMd, agentYaml, memoryInterests };
   }

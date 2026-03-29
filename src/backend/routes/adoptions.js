@@ -3,8 +3,11 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { requireAuth } = require('../middleware/auth');
 const { success, created } = require('../utils/response');
 const AdoptionService = require('../services/AdoptionService');
+const PersonaCompiler = require('../services/PersonaCompiler');
 
 const router = Router();
+
+const VALID_PERSONA_FORMATS = new Set(['text', 'markdown', 'json']);
 
 router.post('/:name', requireAuth, asyncHandler(async (req, res) => {
   const result = await AdoptionService.adopt(req.agent.id, req.params.name);
@@ -25,8 +28,6 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
   success(res, result);
 }));
 
-const PersonaCompiler = require('../services/PersonaCompiler');
-
 /**
  * GET /adoptions/:id/persona
  * Export agent persona as system prompt
@@ -34,6 +35,11 @@ const PersonaCompiler = require('../services/PersonaCompiler');
  */
 router.get('/:id/persona', requireAuth, asyncHandler(async (req, res) => {
   const { format = 'text' } = req.query;
+
+  if (!VALID_PERSONA_FORMATS.has(format)) {
+    return res.status(400).json({ success: false, error: `Invalid format "${format}". Use: text, markdown, json` });
+  }
+
   const result = await PersonaCompiler.export(req.params.id, req.agent.id, { format });
 
   if (format === 'json') {
