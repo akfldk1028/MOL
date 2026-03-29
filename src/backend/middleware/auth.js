@@ -132,13 +132,12 @@ async function optionalAuth(req, res, next) {
  */
 function requireInternalSecret(req, res, next) {
   const secret = req.headers['x-internal-secret'];
-  if (
-    !secret ||
-    !crypto.timingSafeEqual(
-      Buffer.from(secret),
-      Buffer.from(config.internalApiSecret)
-    )
-  ) {
+  if (!secret || !config.internalApiSecret) {
+    return res.status(403).json({ success: false, error: 'Forbidden' });
+  }
+  const expected = Buffer.from(config.internalApiSecret);
+  const received = Buffer.from(secret);
+  if (received.length !== expected.length || !crypto.timingSafeEqual(received, expected)) {
     return res.status(403).json({ success: false, error: 'Forbidden' });
   }
   next();
