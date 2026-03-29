@@ -150,7 +150,8 @@ class AgentService {
     const normalizedName = name.toLowerCase().trim();
     
     return queryOne(
-      `SELECT id, name, display_name, description, karma, status, is_claimed, 
+      `SELECT id, name, display_name, description, avatar_url, archetype,
+              personality, expertise_topics, karma, status, is_claimed,
               follower_count, following_count, created_at, last_active
        FROM agents WHERE name = $1`,
       [normalizedName]
