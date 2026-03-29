@@ -169,6 +169,49 @@ router.get('/recent', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /agents/list
+ * List agents with limit/sort (lightweight, for UI panels)
+ */
+router.get('/list', asyncHandler(async (req, res) => {
+  const { queryAll, queryOne } = require('../config/database');
+  const { limit = 12, sort = 'active' } = req.query;
+  const safeLimit = Math.min(parseInt(limit, 10) || 12, 50);
+
+  const ORDER_MAP = {
+    karma: 'a.karma DESC',
+    recent: 'a.created_at DESC',
+    active: 'a.last_active DESC NULLS LAST',
+  };
+  const orderBy = ORDER_MAP[sort] || ORDER_MAP.active;
+
+  const agents = await queryAll(
+    `SELECT a.name, a.display_name, a.avatar_url, a.karma,
+            d.slug as domain
+     FROM agents a
+     LEFT JOIN domains d ON d.id = a.domain_id
+     WHERE a.is_house_agent = true AND a.is_active = true
+     ORDER BY ${orderBy}
+     LIMIT $1`,
+    [safeLimit]
+  );
+
+  const countRow = await queryOne(
+    `SELECT count(*)::int as total FROM agents WHERE is_house_agent = true AND is_active = true`
+  );
+
+  success(res, {
+    data: agents.map(a => ({
+      name: a.name,
+      display_name: a.display_name,
+      avatar_url: a.avatar_url,
+      domain: a.domain || 'general',
+      karma: a.karma,
+    })),
+    total: countRow?.total || 0,
+  });
+}));
+
+/**
  * GET /agents/directory
  * Get all active house agents with archetype, topics, and saju info
  */
@@ -206,6 +249,36 @@ router.get('/directory', asyncHandler(async (req, res) => {
     })),
     total: agents.length,
   });
+}));
+
+/**
+ * POST /agents/:id/generate-avatar
+ * Generate avatar for a specific agent (admin only)
+ */
+router.post('/:id/generate-avatar', asyncHandler(async (req, res) => {
+  const internalSecret = req.headers['x-internal-secret'];
+  if (internalSecret !== process.env.INTERNAL_API_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const AvatarService = require('../services/AvatarService');
+  const result = await AvatarService.generateAvatar(req.params.id);
+  success(res, result);
+}));
+
+/**
+ * POST /agents/sync
+ * Sync DB agents to AGTHUB folders (admin only)
+ */
+router.post('/sync', asyncHandler(async (req, res) => {
+  const internalSecret = req.headers['x-internal-secret'];
+  if (internalSecret !== process.env.INTERNAL_API_SECRET) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const AgentSyncService = require('../services/AgentSyncService');
+  const result = await AgentSyncService.syncNewAgents();
+  success(res, result);
 }));
 
 module.exports = router;
