@@ -25,4 +25,29 @@ router.delete('/:id', requireAuth, asyncHandler(async (req, res) => {
   success(res, result);
 }));
 
+const PersonaCompiler = require('../services/PersonaCompiler');
+
+/**
+ * GET /adoptions/:id/persona
+ * Export agent persona as system prompt
+ * Query: format=text|markdown|json (default: text)
+ */
+router.get('/:id/persona', requireAuth, asyncHandler(async (req, res) => {
+  const { format = 'text' } = req.query;
+  const result = await PersonaCompiler.export(req.params.id, req.agent.id, { format });
+
+  if (format === 'json') {
+    return res.json({ success: true, ...result });
+  }
+
+  if (format === 'markdown') {
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="persona.md"');
+    return res.send(result);
+  }
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.send(result);
+}));
+
 module.exports = router;
