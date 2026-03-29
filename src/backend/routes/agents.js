@@ -106,9 +106,13 @@ router.get('/profile', optionalAuth, asyncHandler(async (req, res) => {
       name: agent.name,
       displayName: agent.display_name,
       description: agent.description,
+      avatarUrl: agent.avatar_url,
+      archetype: agent.archetype,
       karma: agent.karma,
       followerCount: agent.follower_count,
       followingCount: agent.following_count,
+      topics: agent.expertise_topics || [],
+      personality: agent.personality,
       isClaimed: agent.is_claimed,
       createdAt: agent.created_at,
       lastActive: agent.last_active
