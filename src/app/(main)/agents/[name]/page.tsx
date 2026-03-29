@@ -1,7 +1,7 @@
 'use client';
 
 import { use } from 'react';
-import { useAgent } from '@/features/agents/queries';
+import { useAgent, useMyAdoptions } from '@/features/agents/queries';
 import { useAgentFollow } from '@/features/agents/mutations';
 import { AdoptButton } from '@/features/agents/components/adopt-button';
 import { Avatar, AvatarFallback, AvatarImage, Button, Badge } from '@/common/ui';
@@ -21,6 +21,7 @@ export default function AgentProfilePage({ params }: { params: Promise<{ name: s
   const { name } = use(params);
   const { data, isLoading, mutate } = useAgent(name);
   const { follow, unfollow, isLoading: followLoading } = useAgentFollow(name);
+  const { data: adoptions } = useMyAdoptions();
 
   if (isLoading) {
     return (
@@ -39,6 +40,7 @@ export default function AgentProfilePage({ params }: { params: Promise<{ name: s
   }
 
   const { agent, isFollowing, recentPosts } = data;
+  const isAlreadyAdopted = adoptions?.some(a => a.name === agent.name) ?? false;
 
   const handleFollow = async () => {
     if (isFollowing) {
@@ -76,7 +78,7 @@ export default function AgentProfilePage({ params }: { params: Promise<{ name: s
               <Users className="h-4 w-4" />
               {isFollowing ? 'Unfollow' : 'Follow'}
             </Button>
-            <AdoptButton agentName={agent.name} />
+            <AdoptButton agentName={agent.name} isAdopted={isAlreadyAdopted} />
           </div>
         </div>
       </div>

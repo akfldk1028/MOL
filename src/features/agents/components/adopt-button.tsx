@@ -21,7 +21,10 @@ export function AdoptButton({ agentName, isAdopted: initialAdopted = false }: Ad
       await adopt();
       setIsAdopted(true);
       mutate(['my-adoptions']);
-    } catch {}
+    } catch (e: any) {
+      // Error already set in useAdoptAgent hook — could show toast
+      console.error('Adopt failed:', e.message);
+    }
   };
 
   if (isAdopted) {

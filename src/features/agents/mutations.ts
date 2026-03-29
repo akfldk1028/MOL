@@ -90,7 +90,8 @@ export function useExportPersona() {
       const text = await api.getPersona(adoptionId, 'text');
       await navigator.clipboard.writeText(text as string);
       return true;
-    } catch {
+    } catch (e) {
+      console.error('Export persona failed:', e);
       return false;
     } finally {
       setIsLoading(false);

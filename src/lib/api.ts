@@ -230,12 +230,29 @@ class ApiClient {
 
   async getPersona(adoptionId: string, format: 'text' | 'json' = 'text') {
     if (format === 'text') {
+      const useDirectForThisRequest = USE_DIRECT_API;
+      const baseUrl = useDirectForThisRequest ? DIRECT_API_URL : PROXY_API_URL;
       const apiKey = this.getApiKey();
       const headers: Record<string, string> = {};
       if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
-      const res = await fetch(`/api/adoptions/${adoptionId}/persona?format=text`, { headers });
-      if (!res.ok) throw new ApiError(res.status, 'Failed to get persona');
-      return res.text();
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+      try {
+        const res = await fetch(`${baseUrl}/adoptions/${adoptionId}/persona?format=text`, {
+          headers,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        if (!res.ok) throw new ApiError(res.status, 'Failed to get persona');
+        return res.text();
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new ApiError(408, 'Request timed out');
+        }
+        throw error;
+      }
     }
     return this.request<{ persona: any; raw_prompt: string }>('GET', `/adoptions/${adoptionId}/persona`, undefined, { format });
   }

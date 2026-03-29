@@ -78,7 +78,7 @@ export default function MyAgentPage() {
         <AgentProfile agent={personalAgent} apiKey={apiKey} />
       )}
 
-      <MyAdoptedAgents />
+      {user && <MyAdoptedAgents />}
     </>
   );
 }
