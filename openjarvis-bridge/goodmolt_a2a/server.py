@@ -248,6 +248,97 @@ class GoodmoltA2AServer:
                 "total_rounds": len([t for t in result.tasks if t.member.role == "reviewer"]),
             })
 
+        @app.post("/a2a/teams/research")
+        async def research_team_investigate(request: Request):
+            """Fan-out research team: multiple agents investigate, one synthesizes."""
+            from goodmolt_a2a.teams.research_team import ResearchTeam
+
+            body = await request.json()
+            researchers = body.get("researchers", ["adagio", "allegro", "andante"])
+            synthesizer = body.get("synthesizer", researchers[0])
+            topic = body.get("topic", "")
+            depth = body.get("depth", "brief")
+
+            if not topic:
+                raise HTTPException(status_code=400, detail="Topic is required")
+
+            for name in researchers + [synthesizer]:
+                if not self._card_registry.get(name):
+                    raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+
+            team = ResearchTeam(
+                agent_registry=self._executor._registry,
+                llm_generate=self._executor._llm_generate,
+                conversation_manager=self._conversation_manager,
+            )
+
+            result = await team.research(
+                researcher_names=researchers,
+                synthesizer_name=synthesizer,
+                topic=topic,
+                depth=depth,
+            )
+
+            return JSONResponse({
+                "pattern": result.pattern,
+                "context_id": result.context_id,
+                "topic": topic,
+                "tasks": [
+                    {"member": t.member.name, "role": t.member.role,
+                     "status": t.status, "result_preview": t.result[:200] if t.result else ""}
+                    for t in result.tasks
+                ],
+                "final_output": result.final_output,
+                "researcher_count": len(researchers),
+            })
+
+        @app.post("/a2a/teams/debate")
+        async def debate_team_run(request: Request):
+            """Structured debate between two agents with a judge."""
+            from goodmolt_a2a.teams.debate_team import DebateTeam
+
+            body = await request.json()
+            pro = body.get("pro", "adagio")
+            con = body.get("con", "allegro")
+            judge = body.get("judge", "andante")
+            topic = body.get("topic", "")
+            rounds = body.get("rounds", 2)
+
+            if not topic:
+                raise HTTPException(status_code=400, detail="Topic is required")
+
+            for name in [pro, con, judge]:
+                if not self._card_registry.get(name):
+                    raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+
+            team = DebateTeam(
+                agent_registry=self._executor._registry,
+                llm_generate=self._executor._llm_generate,
+                conversation_manager=self._conversation_manager,
+            )
+
+            result = await team.debate(
+                debater_a_name=pro,
+                debater_b_name=con,
+                judge_name=judge,
+                topic=topic,
+                rounds=rounds,
+            )
+
+            return JSONResponse({
+                "pattern": result.pattern,
+                "context_id": result.context_id,
+                "topic": topic,
+                "tasks": [
+                    {"member": t.member.name, "role": t.member.role,
+                     "instruction": t.instruction, "status": t.status,
+                     "result_preview": t.result[:200] if t.result else ""}
+                    for t in result.tasks
+                ],
+                "final_output": result.final_output,
+                "rounds": rounds,
+            })
+
     def _build_directory_card(self) -> AgentCard:
         from a2a.types import AgentCapabilities, AgentProvider, AgentSkill, AgentInterface
         return AgentCard(
