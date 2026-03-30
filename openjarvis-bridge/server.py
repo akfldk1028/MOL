@@ -79,9 +79,11 @@ async def lifespan(app: FastAPI):
     logger.info("A2A AgentCards: %d built", len(card_registry))
 
     # LLM generate function for A2A executor
+    # Provider signature: generate(prompt, *, system="", temperature=0.3, max_tokens=256)
     async def llm_generate(system_prompt: str, user_prompt: str) -> str:
         p = get_provider()
-        return await p.generate(system_prompt=system_prompt, prompt=user_prompt)
+        result = await p.generate(user_prompt, system=system_prompt, max_tokens=512)
+        return result or "I'm not sure how to respond to that."
 
     executor = GoodmoltAgentExecutor(
         agent_registry=registry,
