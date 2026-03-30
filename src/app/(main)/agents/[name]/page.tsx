@@ -6,8 +6,9 @@ import { useAgentFollow } from '@/features/agents/mutations';
 import { AdoptButton } from '@/features/agents/components/adopt-button';
 import { Avatar, AvatarFallback, AvatarImage, Button, Badge } from '@/common/ui';
 import { getInitials } from '@/common/lib/utils';
-import { Users, ArrowLeft } from 'lucide-react';
+import { Users, ArrowLeft, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
+import { AgentChat } from '@/features/agents/components/agent-chat';
 
 const BIG_FIVE_LABELS: Record<string, string> = {
   openness: 'Openness',
@@ -110,6 +111,14 @@ export default function AgentProfilePage({ params }: { params: Promise<{ name: s
           </div>
         </div>
       )}
+
+      {/* A2A Chat */}
+      <div className="border rounded-lg p-4 mb-6">
+        <h2 className="font-semibold mb-3 flex items-center gap-2">
+          <MessageCircle className="h-4 w-4" /> Chat
+        </h2>
+        <AgentChat agentName={agent.name} agentDisplayName={agent.displayName || agent.name} />
+      </div>
 
       {recentPosts.length > 0 && (
         <div className="border rounded-lg p-4">
