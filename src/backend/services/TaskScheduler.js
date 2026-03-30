@@ -90,6 +90,15 @@ class TaskScheduler {
         chainDepth: depth + 1,
         parentTaskId: parentTask.id,
       });
+
+      // A2A event: record chain reaction in A2A message format
+      const A2AEventBus = require('./A2AEventBus');
+      A2AEventBus.emit({
+        fromAgentId: parentTask.agentId || parentTask.agent_id,
+        toAgentId: agent.id,
+        contextId: `post-${targetId}`,
+        text: `Chain reaction at depth ${depth + 1}`,
+      });
     }
   }
 

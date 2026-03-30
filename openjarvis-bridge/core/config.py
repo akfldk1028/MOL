@@ -34,3 +34,6 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
 # ── Interest check ───────────────────────────────────────
 INTEREST_SCORE_THRESHOLD = 0.4
 MAX_CONTENT_LENGTH = 500
+
+# ── Supabase (A2A TaskStore) ─────────────────────────────
+SUPABASE_DATABASE_URL = os.getenv("SUPABASE_DATABASE_URL", "")
