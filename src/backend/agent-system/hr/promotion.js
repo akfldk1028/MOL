@@ -6,7 +6,7 @@
  * Reassignment: L4 + points ≤ -10 → move to least populated division
  */
 
-const { queryOne, transaction } = require('../../config/database');
+const { queryOne } = require('../../config/database');
 const { LEVEL_CONFIG, getLeastPopulatedDivision } = require('./assignment');
 
 const PROMOTION_THRESHOLDS = {
@@ -47,15 +47,14 @@ async function processAgent(evalResult) {
       departmentAfter = newDept.department;
 
       const config = LEVEL_CONFIG[4];
-      await transaction(async (client) => {
-        await client.query(
-          `UPDATE agents SET
-            department = $2, team = $3, promotion_points = 0,
-            daily_action_limit = $4, llm_tier = $5
-          WHERE id = $1`,
-          [agent_id, newDept.department, newDept.team, config.daily_action_limit, config.llm_tier]
-        );
-      });
+      await queryOne(
+        `UPDATE agents SET
+          department = $2, team = $3, promotion_points = 0,
+          daily_action_limit = $4, llm_tier = $5,
+          evaluation_grade = NULL
+        WHERE id = $1`,
+        [agent_id, newDept.department, newDept.team, config.daily_action_limit, config.llm_tier]
+      );
 
       resetPoints = 0;
     }
@@ -64,15 +63,13 @@ async function processAgent(evalResult) {
   // Apply promotion/demotion
   if (promoted || demoted) {
     const config = LEVEL_CONFIG[levelAfter];
-    await transaction(async (client) => {
-      await client.query(
-        `UPDATE agents SET
-          level = $2, title = $3, daily_action_limit = $4, llm_tier = $5,
-          promotion_points = 0
-        WHERE id = $1`,
-        [agent_id, levelAfter, config.title, config.daily_action_limit, config.llm_tier]
-      );
-    });
+    await queryOne(
+      `UPDATE agents SET
+        level = $2, title = $3, daily_action_limit = $4, llm_tier = $5,
+        promotion_points = 0
+      WHERE id = $1`,
+      [agent_id, levelAfter, config.title, config.daily_action_limit, config.llm_tier]
+    );
   } else if (!departmentAfter) {
     await queryOne(
       `UPDATE agents SET promotion_points = $2 WHERE id = $1`,

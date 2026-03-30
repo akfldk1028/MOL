@@ -163,6 +163,14 @@ async function evaluateAll(dateStr) {
   );
   const allIds = agents.map(a => a.id);
 
+  // Check if there's meaningful activity — if not, skip evaluation to avoid
+  // all agents clustering at the same percentile (everyone gets S or D)
+  const totalProductivity = Object.values(kpis.productivity).reduce((sum, v) => sum + Number(v), 0);
+  if (totalProductivity === 0) {
+    console.log(`[HR] No activity detected for ${dateStr}, skipping evaluation`);
+    return [];
+  }
+
   const results = [];
 
   for (const agent of agents) {

@@ -16,6 +16,43 @@ const router = Router();
  * GET /hr/organization
  */
 router.get('/organization', asyncHandler(async (req, res) => {
+  const compact = req.query.compact === 'true';
+
+  if (compact) {
+    // Compact mode: leaders (L1/L2) with full data, L3/L4 as counts only
+    const leaders = await queryAll(
+      `SELECT id, name, display_name, avatar_url, level, department, team, title, evaluation_grade, karma
+       FROM agents WHERE is_active = true AND department IS NOT NULL AND level <= 2
+       ORDER BY department, team, level ASC, karma DESC`
+    );
+    const counts = await queryAll(
+      `SELECT department, team, level, count(*) as cnt
+       FROM agents WHERE is_active = true AND department IS NOT NULL AND level > 2
+       GROUP BY department, team, level`
+    );
+    const totalRow = await queryOne(
+      `SELECT count(*) as total FROM agents WHERE is_active = true AND department IS NOT NULL`
+    );
+
+    const org = {};
+    // Add leaders
+    for (const agent of leaders) {
+      if (!org[agent.department]) org[agent.department] = {};
+      if (!org[agent.department][agent.team]) org[agent.department][agent.team] = { leaders: [], seniorCount: 0, juniorCount: 0 };
+      org[agent.department][agent.team].leaders.push(agent);
+    }
+    // Add counts
+    for (const row of counts) {
+      if (!org[row.department]) org[row.department] = {};
+      if (!org[row.department][row.team]) org[row.department][row.team] = { leaders: [], seniorCount: 0, juniorCount: 0 };
+      if (row.level === 3) org[row.department][row.team].seniorCount = Number(row.cnt);
+      else org[row.department][row.team].juniorCount = Number(row.cnt);
+    }
+
+    return success(res, { organization: org, totalAgents: Number(totalRow.total), compact: true });
+  }
+
+  // Full mode: all agents
   const agents = await queryAll(
     `SELECT id, name, display_name, avatar_url, level, department, team, title, evaluation_grade, karma
      FROM agents WHERE is_active = true AND department IS NOT NULL

@@ -258,8 +258,8 @@ class ApiClient {
   }
 
   // ── HR ──
-  async getOrganization() {
-    return this.request<any>('GET', '/hr/organization');
+  async getOrganization(compact = false) {
+    return this.request<any>('GET', '/hr/organization', undefined, compact ? { compact: 'true' } : undefined);
   }
 
   async getHRDashboard() {

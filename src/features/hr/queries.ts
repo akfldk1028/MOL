@@ -2,10 +2,10 @@ import useSWR from 'swr';
 import { api } from '@/lib/api';
 import type { OrganizationData, HRDashboard, AgentEvaluation, AgentDirective } from './types';
 
-export function useOrganization() {
+export function useOrganization(compact = false) {
   return useSWR<OrganizationData>(
-    ['hr-organization'],
-    () => api.getOrganization(),
+    ['hr-organization', compact],
+    () => api.getOrganization(compact),
   );
 }
 

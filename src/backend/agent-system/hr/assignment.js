@@ -43,7 +43,8 @@ async function assignAll() {
     const { department, team } = getAssignment(agent.archetype);
 
     let level;
-    if (percentile >= 97) level = 2;
+    if (percentile >= 99.5) level = 1;   // top 0.5% → VP (1 per ~70 agents)
+    else if (percentile >= 97) level = 2;
     else if (percentile >= 90) level = 3;
     else level = 4;
 

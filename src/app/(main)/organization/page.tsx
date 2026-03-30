@@ -162,7 +162,31 @@ interface OrgAgent {
   karma: number;
 }
 
-function buildGraph(organization: Record<string, Record<string, OrgAgent[]>>, totalAgents: number) {
+interface CompactTeam {
+  leaders: OrgAgent[];
+  seniorCount: number;
+  juniorCount: number;
+}
+
+function normalizeTeam(data: OrgAgent[] | CompactTeam): { leaders: OrgAgent[]; seniorCount: number; juniorCount: number; total: number } {
+  if (Array.isArray(data)) {
+    const leaders = data.filter(a => a.level <= 2).sort((a, b) => a.level - b.level);
+    return {
+      leaders,
+      seniorCount: data.filter(a => a.level === 3).length,
+      juniorCount: data.filter(a => a.level === 4).length,
+      total: data.length,
+    };
+  }
+  return {
+    leaders: data.leaders || [],
+    seniorCount: data.seniorCount || 0,
+    juniorCount: data.juniorCount || 0,
+    total: (data.leaders?.length || 0) + (data.seniorCount || 0) + (data.juniorCount || 0),
+  };
+}
+
+function buildGraph(organization: Record<string, Record<string, OrgAgent[] | CompactTeam>>, totalAgents: number) {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
@@ -174,10 +198,10 @@ function buildGraph(organization: Record<string, Record<string, OrgAgent[]>>, to
   const Y_LEAF = 520;
 
   // Flatten teams for global X layout
-  const allTeams: { dept: string; team: string; agents: OrgAgent[] }[] = [];
+  const allTeams: { dept: string; team: string; data: ReturnType<typeof normalizeTeam> }[] = [];
   for (const dept of divisions) {
-    for (const [teamName, agents] of Object.entries(organization[dept])) {
-      allTeams.push({ dept, team: teamName, agents });
+    for (const [teamName, teamData] of Object.entries(organization[dept])) {
+      allTeams.push({ dept, team: teamName, data: normalizeTeam(teamData) });
     }
   }
 
@@ -209,13 +233,11 @@ function buildGraph(organization: Record<string, Record<string, OrgAgent[]>>, to
       id: teamId,
       type: 'team',
       position: { x: teamX, y: Y_TEAM },
-      data: { label: t.team, color: meta.color, count: t.agents.length },
+      data: { label: t.team, color: meta.color, count: t.data.total },
     });
 
     // Leaf nodes
-    const leaders = t.agents.filter(a => a.level <= 2).sort((a, b) => a.level - b.level);
-    const seniorCount = t.agents.filter(a => a.level === 3).length;
-    const juniorCount = t.agents.filter(a => a.level === 4).length;
+    const { leaders, seniorCount, juniorCount } = t.data;
 
     const leafItems: { id: string; node: Node }[] = [];
 
@@ -277,7 +299,7 @@ function buildGraph(organization: Record<string, Record<string, OrgAgent[]>>, to
     const meta = DIVISION_META[dept] || { label: dept, color: '#6B7280', bg: '#F9FAFB', icon: '📁' };
     const xs = deptTeamXs[dept] || [0];
     const centerX = xs.reduce((a, b) => a + b, 0) / xs.length;
-    const divCount = Object.values(organization[dept]).flat().length;
+    const divCount = allTeams.filter(t => t.dept === dept).reduce((sum, t) => sum + t.data.total, 0);
 
     nodes.push({
       id: divId,
@@ -312,7 +334,7 @@ function buildGraph(organization: Record<string, Record<string, OrgAgent[]>>, to
 // ── Page ──
 
 export default function OrganizationPage() {
-  const { data, isLoading, error } = useOrganization();
+  const { data, isLoading, error } = useOrganization(true);
 
   const graph = useMemo(() => {
     if (!data) return null;
