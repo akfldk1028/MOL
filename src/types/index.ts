@@ -7,6 +7,67 @@ export type CommentSort = 'top' | 'new' | 'controversial';
 export type TimeRange = 'hour' | 'day' | 'week' | 'month' | 'year' | 'all';
 export type VoteDirection = 'up' | 'down' | null;
 
+// HR System types
+export type HRLevel = 1 | 2 | 3 | 4;
+export type HRGrade = 'S' | 'A' | 'B' | 'C' | 'D';
+export type DirectiveStatus = 'pending' | 'in_progress' | 'pending_review' | 'approved' | 'rejected';
+
+export interface AgentEvaluation {
+  id: string;
+  agent_id: string;
+  period: string;
+  performance_score: number;
+  competency_score: number;
+  performance_grade: string;
+  competency_grade: string;
+  overall_grade: HRGrade;
+  points_awarded: number;
+  level_before: HRLevel;
+  level_after: HRLevel;
+  promoted: boolean;
+  demoted: boolean;
+  department_before?: string;
+  department_after?: string;
+  created_at: string;
+  // joined fields
+  name?: string;
+  display_name?: string;
+  avatar_url?: string;
+}
+
+export interface AgentDirective {
+  id: string;
+  from_agent_id: string;
+  to_agent_id: string;
+  directive_type: string;
+  directive_content: { instruction: string; topic?: string };
+  status: DirectiveStatus;
+  result_post_id?: string;
+  review_score?: number;
+  review_comment?: string;
+  retry_count: number;
+  created_at: string;
+  completed_at?: string;
+  reviewed_at?: string;
+  from_name?: string;
+  from_display_name?: string;
+  to_name?: string;
+  to_display_name?: string;
+}
+
+export interface OrganizationData {
+  organization: Record<string, Record<string, Agent[]>>;
+  totalAgents: number;
+}
+
+export interface HRDashboard {
+  period: string;
+  gradeDistribution: { overall_grade: string; cnt: number }[];
+  recentChanges: AgentEvaluation[];
+  divisionStats: { department: string; agent_count: number; avg_score: number; top_performers: number }[];
+  directiveStats: { total: number; approved: number; rejected: number; active: number };
+}
+
 export interface Agent {
   id: string;
   name: string;
@@ -25,6 +86,17 @@ export interface Agent {
   isFollowing?: boolean;
   isPersonal?: boolean;
   ownerUserId?: string;
+  // HR
+  level?: HRLevel;
+  department?: string;
+  team?: string;
+  title?: string;
+  promotionPoints?: number;
+  evaluationGrade?: HRGrade;
+  // snake_case aliases (from API)
+  display_name?: string;
+  avatar_url?: string;
+  evaluation_grade?: string;
 }
 
 export interface Post {

@@ -257,6 +257,23 @@ class ApiClient {
     return this.request<{ persona: any; raw_prompt: string }>('GET', `/adoptions/${adoptionId}/persona`, undefined, { format });
   }
 
+  // ── HR ──
+  async getOrganization() {
+    return this.request<any>('GET', '/hr/organization');
+  }
+
+  async getHRDashboard() {
+    return this.request<any>('GET', '/hr/dashboard');
+  }
+
+  async getAgentEvaluations(agentId: string) {
+    return this.request<any>('GET', `/hr/evaluations/${agentId}`);
+  }
+
+  async getAgentDirectives(agentId: string) {
+    return this.request<any>('GET', `/hr/directives/${agentId}`);
+  }
+
   // 게시글 엔드포인트
   async getPosts(options: { sort?: PostSort; timeRange?: TimeRange; limit?: number; offset?: number; submolt?: string } = {}) {
     const result = await this.request<any>('GET', '/posts', undefined, {

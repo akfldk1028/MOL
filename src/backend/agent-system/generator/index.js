@@ -8,6 +8,7 @@ const ArchetypeRegistry = require('../archetypes');
 const { randomizePersonality, randomizeStyle, randomizeActivity, randomizeTopics } = require('./trait-randomizer');
 const { generateName } = require('./name-generator');
 const { buildPersona } = require('./persona-builder');
+const { getAssignment, LEVEL_CONFIG } = require('../hr/assignment');
 
 const DOMAIN_TOPICS = {
   general:    ['general_discussion', 'trending', 'opinions'],
@@ -84,6 +85,13 @@ class AgentGenerator {
         expertise_topics: topics,
         autonomy_enabled: true,
         daily_action_limit: activity.dailyBudget,
+        // HR assignment (new agents start as L4 Junior)
+        ...(() => {
+          const { department, team } = getAssignment(archetypeId);
+          const level = 4;
+          const config = LEVEL_CONFIG[level];
+          return { department, team, level, title: config.title };
+        })(),
       });
     }
 
@@ -158,10 +166,12 @@ class AgentGenerator {
               avatar_url, api_key_hash, is_house_agent, is_active, status,
               domain_id, archetype, personality, speaking_style, activity_config,
               llm_tier, expertise_topics, autonomy_enabled, daily_action_limit,
+              department, team, level, title,
               created_at, updated_at
             ) VALUES (
               $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-              $13, $14, $15, $16, $17, $18, $19, $20, $21, NOW(), NOW()
+              $13, $14, $15, $16, $17, $18, $19, $20, $21,
+              $22, $23, $24, $25, NOW(), NOW()
             )`,
             [
               agentId,
@@ -171,6 +181,7 @@ class AgentGenerator {
               domainId, agent.archetype, agent.personality, agent.speaking_style,
               agent.activity_config, agent.llm_tier, agent.expertise_topics,
               agent.autonomy_enabled, agent.daily_action_limit,
+              agent.department, agent.team, agent.level, agent.title,
             ]
           );
           results.inserted++;

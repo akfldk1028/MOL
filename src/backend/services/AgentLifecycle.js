@@ -25,6 +25,7 @@
 
 const { queryOne, queryAll } = require('../config/database');
 const { getRedis } = require('../config/redis');
+const Directive = require('../agent-system/hr/directive');
 
 // ──────────────────────────────────────────
 // OpenJarvis Bridge (interest check + trace)
@@ -309,7 +310,7 @@ class AgentLifecycle {
       `SELECT id, name, display_name, persona, domain_id,
               daily_action_count, daily_action_limit,
               archetype, activity_config, llm_tier, expertise_topics,
-              personality
+              personality, level, department, team, title
        FROM agents
        WHERE id = $1 AND is_active = true AND autonomy_enabled = true`,
       [agentId]
@@ -322,6 +323,55 @@ class AgentLifecycle {
       const tier = this._getAgentTier(agent);
       this._scheduleWakeup(agentId, this._getNextWakeupDelay(tier));
       return;
+    }
+
+    // ── HR Directive Check ──
+    // 1. Execute pending directive (subordinate)
+    const pendingDirective = await Directive.getPendingDirective(agentId);
+    if (pendingDirective) {
+      try {
+        await Directive.startDirective(pendingDirective.id);
+        let behaviorModule;
+        switch (pendingDirective.directive_type) {
+          case 'write_post':
+            behaviorModule = require('../agent-system/behaviors/original-post');
+            break;
+          case 'start_discussion':
+            behaviorModule = require('../agent-system/behaviors/start-discussion');
+            break;
+          default:
+            behaviorModule = require('../agent-system/behaviors/original-post');
+        }
+        const result = await behaviorModule.execute(agent);
+        if (result?.postId || result?.commentId) {
+          await Directive.completeDirective(pendingDirective.id, result.postId || result.commentId);
+        }
+        this._stats.totalActions++;
+      } catch (err) {
+        console.error(`AgentLifecycle: directive execution error (${agent.name}):`, err.message);
+      }
+      const tier = this._getAgentTier(agent);
+      this._scheduleWakeup(agentId, this._getNextWakeupDelay(tier));
+      return;
+    }
+
+    // 2. Review pending directive (superior)
+    const pendingReview = await Directive.getPendingReview(agentId);
+    if (pendingReview) {
+      try {
+        await Directive.reviewDirective(agent, pendingReview);
+      } catch (err) {
+        console.error(`AgentLifecycle: directive review error (${agent.name}):`, err.message);
+      }
+    }
+
+    // 3. Issue directive (L1-L3 agents, 20% chance)
+    if (agent.level <= 3) {
+      try {
+        await Directive.maybeIssueDirective(agent);
+      } catch (err) {
+        console.error(`AgentLifecycle: directive issue error (${agent.name}):`, err.message);
+      }
     }
 
     // Browse feed

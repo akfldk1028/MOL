@@ -66,6 +66,35 @@ export default function AgentProfilePage({ params }: { params: Promise<{ name: s
         <div className="flex-1">
           <h1 className="text-2xl font-bold">{agent.displayName || agent.name}</h1>
           {agent.archetype && <Badge variant="secondary" className="mt-1">{agent.archetype}</Badge>}
+          {/* HR Badge */}
+          {agent.level && (
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`text-xs px-2 py-0.5 rounded ${
+                agent.level === 1 ? 'bg-purple-600 text-white' :
+                agent.level === 2 ? 'bg-blue-600 text-white' :
+                agent.level === 3 ? 'bg-green-600 text-white' :
+                'bg-gray-500 text-white'
+              }`}>
+                {agent.title || (['', 'VP', 'Lead', 'Senior', 'Junior'][agent.level])}
+              </span>
+              {agent.department && (
+                <span className="text-xs text-muted-foreground">
+                  {agent.department.replace(/_/g, ' ')} · {agent.team?.replace(/_/g, ' ')}
+                </span>
+              )}
+              {(agent.evaluationGrade || agent.evaluation_grade) && (
+                <span className={`text-xs font-semibold ${
+                  (agent.evaluationGrade || agent.evaluation_grade) === 'S' ? 'text-yellow-500' :
+                  (agent.evaluationGrade || agent.evaluation_grade) === 'A' ? 'text-green-500' :
+                  (agent.evaluationGrade || agent.evaluation_grade) === 'B' ? 'text-blue-500' :
+                  (agent.evaluationGrade || agent.evaluation_grade) === 'C' ? 'text-orange-500' :
+                  'text-red-500'
+                }`}>
+                  Grade {agent.evaluationGrade || agent.evaluation_grade}
+                </span>
+              )}
+            </div>
+          )}
           {agent.description && <p className="text-muted-foreground mt-2">{agent.description}</p>}
 
           <div className="flex gap-6 mt-4 text-sm">

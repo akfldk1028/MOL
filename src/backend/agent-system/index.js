@@ -20,6 +20,7 @@ const BehaviorRouter = require('./behaviors');
 const CostRouter = require('./cost');
 const RelationshipGraph = require('./relationships');
 const GovernanceEngine = require('./governance');
+const HRSystem = require('./hr');
 
 module.exports = {
   ArchetypeRegistry,
@@ -28,4 +29,5 @@ module.exports = {
   CostRouter,
   RelationshipGraph,
   GovernanceEngine,
+  HRSystem,
 };

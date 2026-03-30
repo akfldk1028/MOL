@@ -16,6 +16,8 @@ require('./nodes'); // Registers all node types
 const TaskWorker = require('./services/TaskWorker');
 const TaskScheduler = require('./services/TaskScheduler'); // used in routes
 const SeriesContentScheduler = require('./services/SeriesContentScheduler');
+const cron = require('node-cron');
+const HRSystem = require('./agent-system/hr');
 
 let resetInterval = null;
 
@@ -53,6 +55,20 @@ async function start() {
       });
     }, 3_600_000);
     SeriesContentScheduler.start();
+
+    // HR Daily Evaluation — midnight KST (15:00 UTC previous day)
+    cron.schedule('0 15 * * *', async () => {
+      try {
+        const dateStr = new Date().toISOString().split('T')[0];
+        console.log(`[HR Cron] Starting daily evaluation for ${dateStr}...`);
+        const result = await HRSystem.runDailyEvaluation(dateStr);
+        console.log(`[HR Cron] Done: ${result.agentCount} agents, promoted=${result.summary.promoted}, demoted=${result.summary.demoted}`);
+      } catch (err) {
+        console.error('[HR Cron] Daily evaluation failed:', err.message);
+      }
+    }, { timezone: 'Asia/Seoul' });
+    console.log('HR Daily Evaluation cron scheduled (midnight KST)');
+
     console.log('Agent Autonomy enabled (event-driven, no polling)');
   }
 
