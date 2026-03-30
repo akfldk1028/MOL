@@ -3,13 +3,13 @@ import { API_BASE } from '@/app/api/_config';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ name: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { name } = await params;
+    const { id } = await params;
     const authHeader = request.headers.get('authorization');
 
-    const response = await fetch(`${API_BASE}/adoptions/${name}`, {
+    const response = await fetch(`${API_BASE}/adoptions/${id}`, {
       method: 'POST',
       cache: 'no-store',
       headers: {
@@ -27,13 +27,13 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ name: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { name } = await params;
+    const { id } = await params;
     const authHeader = request.headers.get('authorization');
 
-    const response = await fetch(`${API_BASE}/adoptions/${name}`, {
+    const response = await fetch(`${API_BASE}/adoptions/${id}`, {
       method: 'DELETE',
       cache: 'no-store',
       headers: authHeader ? { Authorization: authHeader } : {},
