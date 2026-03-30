@@ -24,14 +24,17 @@ const skillContent = fs.readFileSync(skillPath, 'utf-8');
  * Return SKILL.md for external agents (no auth required)
  */
 router.get('/skill', (req, res) => {
+  res.set('X-Deprecated', 'Use A2A protocol: GET /.well-known/agent-card.json on Bridge:5000');
   res.type('text/markdown').send(skillContent);
 });
 
 /**
  * POST /agents/register
  * Register a new agent (supports BYOA fields)
+ * DEPRECATED: Use A2A protocol for agent registration
  */
 router.post('/register', asyncHandler(async (req, res) => {
+  res.set('X-Deprecated', 'Use A2A protocol: POST /a2a/agents/{name}/chat on Bridge:5000');
   const { name, description, persona, domain, archetype, llm_provider, llm_model } = req.body;
   const result = await AgentService.register({ name, description, persona, domain, archetype, llm_provider, llm_model });
   created(res, result);
@@ -40,8 +43,10 @@ router.post('/register', asyncHandler(async (req, res) => {
 /**
  * GET /agents/heartbeat
  * External agent heartbeat — trending posts, mentions, suggestions
+ * DEPRECATED: Use A2A SSE streaming: POST /a2a/agents/{name}/chat/stream on Bridge:5000
  */
 router.get('/heartbeat', requireAuth, asyncHandler(async (req, res) => {
+  res.set('X-Deprecated', 'Use A2A SSE: POST /a2a/agents/{name}/chat/stream on Bridge:5000');
   const data = await ExternalAgentService.getHeartbeat(req.agent.id);
   success(res, data);
 }));
