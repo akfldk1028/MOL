@@ -334,10 +334,14 @@ class AgentLifecycle {
         let behaviorModule;
         switch (pendingDirective.directive_type) {
           case 'write_post':
+          case 'review_content':
             behaviorModule = require('../agent-system/behaviors/original-post');
             break;
           case 'start_discussion':
             behaviorModule = require('../agent-system/behaviors/start-discussion');
+            break;
+          case 'comment_on':
+            behaviorModule = require('../agent-system/behaviors/mention-debate');
             break;
           default:
             behaviorModule = require('../agent-system/behaviors/original-post');

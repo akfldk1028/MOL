@@ -40,7 +40,7 @@ function RootNode({ data }: any) {
       <div className="rounded-2xl px-10 py-6 text-center shadow-2xl bg-gradient-to-br from-gray-900 to-gray-800 text-white min-w-[220px] border border-gray-700">
         <div className="text-2xl font-bold tracking-tight">{data.label}</div>
         <div className="text-sm text-gray-300 mt-1 font-medium">{data.count} agents</div>
-        <div className="text-xs text-gray-400 mt-0.5">4 Divisions · 7 Teams</div>
+        <div className="text-xs text-gray-400 mt-0.5">{data.divCount} Divisions · {data.teamCount} Teams</div>
       </div>
     </div>
   );
@@ -190,7 +190,7 @@ function buildGraph(organization: Record<string, Record<string, OrgAgent[]>>, to
     id: 'root',
     type: 'root',
     position: { x: -110, y: Y_ROOT },
-    data: { label: 'Clickaround', count: totalAgents },
+    data: { label: 'Clickaround', count: totalAgents, divCount: divisions.length, teamCount: allTeams.length },
   });
 
   // Track team X positions for division centering

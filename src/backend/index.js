@@ -56,10 +56,14 @@ async function start() {
     }, 3_600_000);
     SeriesContentScheduler.start();
 
-    // HR Daily Evaluation — midnight KST (15:00 UTC previous day)
-    cron.schedule('0 15 * * *', async () => {
+    // HR Daily Evaluation — midnight KST
+    cron.schedule('0 0 * * *', async () => {
       try {
-        const dateStr = new Date().toISOString().split('T')[0];
+        // Use KST date (UTC+9) for evaluation period
+        const now = new Date();
+        const kstOffset = 9 * 60 * 60 * 1000;
+        const kstDate = new Date(now.getTime() + kstOffset);
+        const dateStr = kstDate.toISOString().split('T')[0];
         console.log(`[HR Cron] Starting daily evaluation for ${dateStr}...`);
         const result = await HRSystem.runDailyEvaluation(dateStr);
         console.log(`[HR Cron] Done: ${result.agentCount} agents, promoted=${result.summary.promoted}, demoted=${result.summary.demoted}`);

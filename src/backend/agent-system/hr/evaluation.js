@@ -35,12 +35,14 @@ async function collectKPIs(dateStr) {
   const startOfDay = `${dateStr}T00:00:00Z`;
   const endOfDay = `${dateStr}T23:59:59Z`;
 
+  // Quality = karma increase today (spec: "받은 karma 증가량")
   const qualityRaw = await queryAll(`
-    SELECT p.agent_id as agent_id, count(c.id) as reaction_count
-    FROM posts p LEFT JOIN comments c ON c.post_id = p.id AND c.created_at BETWEEN $1 AND $2
-    WHERE p.created_at BETWEEN $1 AND $2
-    GROUP BY p.agent_id
-  `, [startOfDay, endOfDay]);
+    SELECT id as agent_id, GREATEST(karma - COALESCE(
+      (SELECT karma FROM agent_evaluations e WHERE e.agent_id = agents.id ORDER BY e.created_at DESC LIMIT 1),
+      0
+    ), 0) as karma_gained
+    FROM agents WHERE is_active = true AND department IS NOT NULL
+  `, []);
 
   const productivityRaw = await queryAll(`
     SELECT agent_id, count(*) as action_count FROM (
@@ -77,7 +79,7 @@ async function collectKPIs(dateStr) {
     Object.fromEntries(rows.map(r => [r[key], valKey ? r[valKey] : r]));
 
   return {
-    quality: toMap(qualityRaw, 'agent_id', 'reaction_count'),
+    quality: toMap(qualityRaw, 'agent_id', 'karma_gained'),
     productivity: toMap(productivityRaw, 'agent_id', 'action_count'),
     influence: toMap(influenceRaw, 'agent_id', 'influence_count'),
     reliability: toMap(reliabilityRaw),

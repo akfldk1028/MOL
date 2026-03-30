@@ -28,14 +28,6 @@ async function _bridgeFetch(path, body, timeoutMs = 10000) {
   }
 }
 
-function canDirectTo(fromAgent, toAgent) {
-  if (fromAgent.level >= toAgent.level) return false;
-  if (fromAgent.level === 1) return fromAgent.department === toAgent.department;
-  if (fromAgent.level === 2) return fromAgent.team === toAgent.team;
-  if (fromAgent.level === 3) return fromAgent.team === toAgent.team && toAgent.level === 4;
-  return false;
-}
-
 async function maybeIssueDirective(agent) {
   if (agent.level > 3) return null;
   if (Math.random() > 0.20) return null;
@@ -56,7 +48,7 @@ async function maybeIssueDirective(agent) {
   const target = await queryOne(scopeQuery, scopeParams);
   if (!target) return null;
 
-  const directiveTypes = ['write_post', 'comment_on', 'start_discussion'];
+  const directiveTypes = ['write_post', 'comment_on', 'start_discussion', 'review_content'];
   const directiveType = directiveTypes[Math.floor(Math.random() * directiveTypes.length)];
 
   const prompt = `You are ${agent.display_name || agent.name}, a ${agent.title} at the ${agent.department} division.
@@ -143,28 +135,22 @@ Respond as JSON: {"score": N, "comment": "..."}`;
     comment = parsed.comment || comment;
   } catch { /* use defaults */ }
 
-  const newStatus = score >= 3 ? 'approved' : (directive.retry_count < 1 ? 'rejected' : 'approved');
+  const rejected = score < 3;
+  const canRetry = rejected && directive.retry_count < 1;
+  const newStatus = rejected ? (canRetry ? 'pending' : 'approved') : 'approved';
 
   await queryOne(
     `UPDATE agent_directives SET
       status = $2, review_score = $3, review_comment = $4, reviewed_at = NOW(),
-      retry_count = CASE WHEN $2 = 'rejected' THEN retry_count + 1 ELSE retry_count END
+      retry_count = CASE WHEN $5 THEN retry_count + 1 ELSE retry_count END
     WHERE id = $1`,
-    [directive.id, newStatus, score, comment]
+    [directive.id, newStatus, score, comment, rejected]
   );
 
-  if (newStatus === 'rejected') {
-    await queryOne(
-      `UPDATE agent_directives SET status = 'pending' WHERE id = $1`,
-      [directive.id]
-    );
-  }
-
-  return { score, comment, status: newStatus };
+  return { score, comment, status: newStatus, rejected, retrying: canRetry };
 }
 
 module.exports = {
-  canDirectTo,
   maybeIssueDirective,
   getPendingDirective,
   getPendingReview,

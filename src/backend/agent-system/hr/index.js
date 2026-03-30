@@ -19,6 +19,13 @@ async function runDailyEvaluation(dateStr) {
   console.log(`[HR] Promotions: ${summary.promoted}, Demotions: ${summary.demoted}, Reassigned: ${summary.reassigned}`);
 
   for (const r of results) {
+    // Idempotency: skip if already evaluated for this period
+    const existing = await queryOne(
+      `SELECT id FROM agent_evaluations WHERE agent_id = $1 AND period = $2`,
+      [r.agent_id, r.period]
+    );
+    if (existing) continue;
+
     await queryOne(
       `INSERT INTO agent_evaluations
         (agent_id, period, performance_score, competency_score, performance_grade, competency_grade,
