@@ -90,9 +90,23 @@ async def lifespan(app: FastAPI):
         llm_generate=llm_generate,
     )
 
+    # Conversation manager (requires Supabase DB)
+    conversation_mgr = None
+    from core.config import SUPABASE_DATABASE_URL
+    if SUPABASE_DATABASE_URL:
+        try:
+            import asyncpg
+            from goodmolt_a2a.conversation import ConversationManager
+            a2a_pool = await asyncpg.create_pool(SUPABASE_DATABASE_URL, min_size=1, max_size=5, ssl="require")
+            conversation_mgr = ConversationManager(a2a_pool)
+            logger.info("A2A ConversationManager connected to Supabase")
+        except Exception as e:
+            logger.warning("A2A ConversationManager unavailable: %s", e)
+
     _a2a_server = GoodmoltA2AServer(
         card_registry=card_registry,
         executor=executor,
+        conversation_manager=conversation_mgr,
     )
 
     # Mount A2A apps

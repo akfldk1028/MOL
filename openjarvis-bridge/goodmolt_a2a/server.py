@@ -26,10 +26,12 @@ class GoodmoltA2AServer:
         card_registry: AgentCardRegistry,
         executor: GoodmoltAgentExecutor,
         task_store=None,
+        conversation_manager=None,
     ):
         self._card_registry = card_registry
         self._executor = executor
         self._task_store = task_store or InMemoryTaskStore()
+        self._conversation_manager = conversation_manager
 
         cards = card_registry.get_all()
         self._default_card = cards[0] if cards else self._build_directory_card()
@@ -111,6 +113,92 @@ class GoodmoltA2AServer:
                 "agent": name,
                 "response": response_text,
                 "persona_loaded": bool(profile and profile.soul),
+            })
+
+        @app.post("/a2a/agents/{from_name}/talk-to/{to_name}")
+        async def agent_to_agent_chat(from_name: str, to_name: str, request: Request):
+            """Agent-to-agent conversation. Creates context, both agents exchange messages."""
+            from_card = self._card_registry.get(from_name)
+            to_card = self._card_registry.get(to_name)
+            if not from_card:
+                raise HTTPException(status_code=404, detail=f"Agent '{from_name}' not found")
+            if not to_card:
+                raise HTTPException(status_code=404, detail=f"Agent '{to_name}' not found")
+
+            body = await request.json()
+            topic = body.get("topic") or body.get("text") or "general conversation"
+            context_id = body.get("context_id")  # Continue existing conversation
+
+            # Get agent IDs from registry names
+            from_profile = self._executor._registry.get(from_name)
+            to_profile = self._executor._registry.get(to_name)
+
+            # If conversation manager available, persist
+            result = {"context_id": context_id, "messages": []}
+
+            if self._conversation_manager:
+                if not context_id:
+                    ctx = await self._conversation_manager.create_context(
+                        initiator_agent_id=from_name,
+                        target_agent_id=to_name,
+                        skill_id="conversation",
+                    )
+                    context_id = ctx["id"]
+                    result["context_id"] = context_id
+
+                # Agent A initiates
+                await self._conversation_manager.add_message(
+                    context_id=context_id, agent_id=from_name, role="agent", text=topic,
+                )
+
+            # Agent B responds with their persona
+            to_system = to_profile.soul if to_profile and to_profile.soul else f"You are {to_name}."
+            from_display = from_profile.config.get("display_name", from_name) if from_profile else from_name
+            b_prompt = f"{from_display} says to you: \"{topic}\"\nRespond naturally in 2-3 sentences."
+            b_response = await self._executor._llm_generate(to_system, b_prompt)
+
+            if self._conversation_manager:
+                await self._conversation_manager.add_message(
+                    context_id=context_id, agent_id=to_name, role="agent", text=b_response,
+                )
+
+            # Agent A reacts to B's response
+            from_system = from_profile.soul if from_profile and from_profile.soul else f"You are {from_name}."
+            to_display = to_profile.config.get("display_name", to_name) if to_profile else to_name
+            a_prompt = f"{to_display} replied: \"{b_response}\"\nRespond naturally in 2-3 sentences."
+            a_response = await self._executor._llm_generate(from_system, a_prompt)
+
+            if self._conversation_manager:
+                await self._conversation_manager.add_message(
+                    context_id=context_id, agent_id=from_name, role="agent", text=a_response,
+                )
+
+            result["messages"] = [
+                {"agent": from_name, "role": "initiator", "text": topic},
+                {"agent": to_name, "role": "responder", "text": b_response},
+                {"agent": from_name, "role": "initiator", "text": a_response},
+            ]
+            return JSONResponse(result)
+
+        @app.get("/a2a/conversations/{context_id}/messages")
+        async def get_conversation_messages(context_id: str):
+            """Get message history for a conversation."""
+            if not self._conversation_manager:
+                raise HTTPException(status_code=503, detail="Conversation manager not available (no DB)")
+            messages = await self._conversation_manager.get_messages(context_id)
+            return JSONResponse({
+                "context_id": context_id,
+                "messages": [
+                    {
+                        "id": str(m["id"]),
+                        "agent_id": m["agent_id"],
+                        "role": m["role"],
+                        "parts": m["parts"] if isinstance(m["parts"], list) else [],
+                        "created_at": str(m["created_at"]),
+                    }
+                    for m in messages
+                ],
+                "count": len(messages),
             })
 
     def _build_directory_card(self) -> AgentCard:
