@@ -91,10 +91,14 @@ class SupabaseTaskStore(TaskStore):
                 idx += 1
 
         where = "WHERE " + " AND ".join(conditions) if conditions else ""
-        page_size = params.page_size or 20
+        page_size = min(params.page_size or 20, 100)  # Cap at 100
+
+        # Parameterize LIMIT to prevent SQL injection
+        limit_param = f"${idx}"
+        args.append(page_size + 1)
 
         rows = await self._pool.fetch(
-            f"SELECT id, context_id, state, artifacts, metadata FROM a2a_tasks {where} ORDER BY created_at DESC LIMIT {page_size + 1}",
+            f"SELECT id, context_id, state, artifacts, metadata FROM a2a_tasks {where} ORDER BY created_at DESC LIMIT {limit_param}",
             *args,
         )
 

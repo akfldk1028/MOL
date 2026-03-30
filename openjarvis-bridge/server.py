@@ -122,6 +122,9 @@ async def lifespan(app: FastAPI):
 
     _trace_store.close()
     await close_provider()
+    if conversation_mgr and hasattr(conversation_mgr, '_pool') and conversation_mgr._pool:
+        await conversation_mgr._pool.close()
+        logger.info("A2A connection pool closed")
     logger.info("OpenJarvis Bridge shutdown")
 
 

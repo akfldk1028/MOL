@@ -1,6 +1,7 @@
 /**
  * A2A Proxy Route — forwards /api/a2a/* to Bridge:5000/a2a/*
  * Handles POST (chat, teams) and GET (agents, cards, conversations)
+ * SSE streams are passed through as ReadableStream.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,7 +13,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const bridgePath = `/a2a/${path.join('/')}`;
   const url = new URL(bridgePath, BRIDGE_URL);
 
-  // Forward query params
   request.nextUrl.searchParams.forEach((value, key) => {
     url.searchParams.set(key, value);
   });
@@ -40,6 +40,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+
+    const contentType = res.headers.get('content-type') || '';
+
+    // SSE streaming: pass through as ReadableStream
+    if (contentType.includes('text/event-stream')) {
+      return new Response(res.body, {
+        status: res.status,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-Accel-Buffering': 'no',
+        },
+      });
+    }
+
+    // JSON response: parse and forward
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (error) {

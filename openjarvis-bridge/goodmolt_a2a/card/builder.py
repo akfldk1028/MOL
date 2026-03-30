@@ -105,7 +105,6 @@ class AgentCardBuilder:
                                url=f"{self._base_url}/a2a/jsonrpc/"),
                 AgentInterface(protocol_binding="HTTP+JSON", protocol_version="1.0",
                                url=f"{self._base_url}/a2a/rest/"),
-                AgentInterface(protocol_binding="GRPC", protocol_version="1.0",
-                               url=f"{self._base_url}:50051"),
+                # gRPC not yet implemented — will be added when gRPC server is wired up
             ],
         )

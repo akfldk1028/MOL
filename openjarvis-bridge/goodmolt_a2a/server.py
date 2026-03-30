@@ -103,6 +103,8 @@ class GoodmoltA2AServer:
 
             if not message_text:
                 raise HTTPException(status_code=400, detail="No message text provided")
+            if len(message_text) > 4000:
+                raise HTTPException(status_code=400, detail="Message too long (max 4000 chars)")
 
             # Load persona and generate response
             profile = self._executor._registry.get(name)
@@ -130,6 +132,8 @@ class GoodmoltA2AServer:
             message_text = body.get("text", "")
             if not message_text:
                 raise HTTPException(status_code=400, detail="No message text provided")
+            if len(message_text) > 4000:
+                raise HTTPException(status_code=400, detail="Message too long (max 4000 chars)")
 
             profile = self._executor._registry.get(name)
             system_prompt = profile.soul if profile and profile.soul else f"You are {name}."
@@ -171,6 +175,8 @@ class GoodmoltA2AServer:
 
             body = await request.json()
             topic = body.get("topic") or body.get("text") or "general conversation"
+            if len(topic) > 4000:
+                raise HTTPException(status_code=400, detail="Message too long (max 4000 chars)")
             context_id = body.get("context_id")  # Continue existing conversation
 
             # Get agent IDs from registry names
@@ -298,13 +304,15 @@ class GoodmoltA2AServer:
             from goodmolt_a2a.teams.research_team import ResearchTeam
 
             body = await request.json()
-            researchers = body.get("researchers", ["adagio", "allegro", "andante"])
+            researchers = body.get("researchers", ["adagio", "allegro", "arbiter"])[:10]  # Cap at 10
             synthesizer = body.get("synthesizer", researchers[0])
             topic = body.get("topic", "")
             depth = body.get("depth", "brief")
 
             if not topic:
                 raise HTTPException(status_code=400, detail="Topic is required")
+            if len(topic) > 4000:
+                raise HTTPException(status_code=400, detail="Topic too long (max 4000 chars)")
 
             for name in researchers + [synthesizer]:
                 if not self._card_registry.get(name):
@@ -344,9 +352,9 @@ class GoodmoltA2AServer:
             body = await request.json()
             pro = body.get("pro", "adagio")
             con = body.get("con", "allegro")
-            judge = body.get("judge", "andante")
+            judge = body.get("judge", "arbiter")
             topic = body.get("topic", "")
-            rounds = body.get("rounds", 2)
+            rounds = min(body.get("rounds", 2), 5)  # Cap at 5 rounds
 
             if not topic:
                 raise HTTPException(status_code=400, detail="Topic is required")

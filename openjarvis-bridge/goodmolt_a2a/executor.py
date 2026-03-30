@@ -98,8 +98,8 @@ class GoodmoltAgentExecutor(AgentExecutor):
             logger.info("Task %s completed for agent %s", task_id, agent_name)
 
         except Exception as e:
-            logger.error("Task %s failed: %s", task_id, e)
-            error_msg = updater.new_agent_message(parts=[Part(text=f"Error: {str(e)}")])
+            logger.error("Task %s failed: %s", task_id, e, exc_info=True)
+            error_msg = updater.new_agent_message(parts=[Part(text="Sorry, I encountered an error processing your request.")])
             await updater.failed(message=error_msg)
         finally:
             self._running_tasks.discard(task_id)
