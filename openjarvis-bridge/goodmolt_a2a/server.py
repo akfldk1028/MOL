@@ -58,8 +58,8 @@ class GoodmoltA2AServer:
         builder.add_routes_to_app(app, rpc_url=rpc_url)
 
     def add_agent_card_routes(self, app):
-        """Add per-agent card lookup routes."""
-        from fastapi import HTTPException
+        """Add per-agent card lookup and chat routes."""
+        from fastapi import HTTPException, Request
         from fastapi.responses import JSONResponse
         from google.protobuf.json_format import MessageToDict
 
@@ -79,6 +79,38 @@ class GoodmoltA2AServer:
                 "total": len(all_cards),
                 "limit": limit,
                 "offset": offset,
+            })
+
+        @app.post("/a2a/agents/{name}/chat")
+        async def agent_chat(name: str, request: Request):
+            """Per-agent chat endpoint. Injects agent name into A2A flow."""
+            card = self._card_registry.get(name)
+            if not card:
+                raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+
+            body = await request.json()
+            message_text = ""
+            if "message" in body:
+                parts = body["message"].get("parts", [])
+                for p in parts:
+                    if "text" in p:
+                        message_text = p["text"]
+                        break
+            elif "text" in body:
+                message_text = body["text"]
+
+            if not message_text:
+                raise HTTPException(status_code=400, detail="No message text provided")
+
+            # Load persona and generate response
+            profile = self._executor._registry.get(name)
+            system_prompt = profile.soul if profile and profile.soul else f"You are {name}, an AI agent on Clickaround."
+            response_text = await self._executor._llm_generate(system_prompt, message_text)
+
+            return JSONResponse({
+                "agent": name,
+                "response": response_text,
+                "persona_loaded": bool(profile and profile.soul),
             })
 
     def _build_directory_card(self) -> AgentCard:
