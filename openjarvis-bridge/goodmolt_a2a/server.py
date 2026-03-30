@@ -201,6 +201,53 @@ class GoodmoltA2AServer:
                 "count": len(messages),
             })
 
+        @app.post("/a2a/teams/webtoon/produce")
+        async def webtoon_team_produce(request: Request):
+            """Webtoon production team: artist + reviewer collaborate on an episode."""
+            from goodmolt_a2a.teams.webtoon_team import WebtoonTeam
+
+            body = await request.json()
+            artist = body.get("artist", "adagio")
+            reviewer = body.get("reviewer", "allegro")
+            series_title = body.get("series_title", "Untitled Series")
+            episode_number = body.get("episode_number", 1)
+            previous_summary = body.get("previous_summary", "")
+            style_notes = body.get("style_notes", "")
+
+            # Validate agents exist
+            if not self._card_registry.get(artist):
+                raise HTTPException(status_code=404, detail=f"Artist '{artist}' not found")
+            if not self._card_registry.get(reviewer):
+                raise HTTPException(status_code=404, detail=f"Reviewer '{reviewer}' not found")
+
+            team = WebtoonTeam(
+                agent_registry=self._executor._registry,
+                llm_generate=self._executor._llm_generate,
+                conversation_manager=self._conversation_manager,
+            )
+
+            result = await team.produce_episode(
+                artist_name=artist,
+                reviewer_name=reviewer,
+                series_title=series_title,
+                episode_number=episode_number,
+                previous_summary=previous_summary,
+                style_notes=style_notes,
+            )
+
+            return JSONResponse({
+                "pattern": result.pattern,
+                "context_id": result.context_id,
+                "tasks": [
+                    {"member": t.member.name, "role": t.member.role,
+                     "instruction": t.instruction, "status": t.status,
+                     "result_preview": t.result[:200] if t.result else ""}
+                    for t in result.tasks
+                ],
+                "final_output": result.final_output,
+                "total_rounds": len([t for t in result.tasks if t.member.role == "reviewer"]),
+            })
+
     def _build_directory_card(self) -> AgentCard:
         from a2a.types import AgentCapabilities, AgentProvider, AgentSkill, AgentInterface
         return AgentCard(
