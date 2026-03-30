@@ -11,7 +11,7 @@ from a2a.server.agent_execution.agent_executor import AgentExecutor
 from a2a.server.agent_execution.context import RequestContext
 from a2a.server.events.event_queue import EventQueue
 from a2a.server.tasks.task_updater import TaskUpdater
-from a2a.types.a2a_pb2 import Part
+from a2a.types.a2a_pb2 import Part, TaskState
 
 logger = logging.getLogger(__name__)
 
@@ -62,16 +62,37 @@ class GoodmoltAgentExecutor(AgentExecutor):
             if task_id not in self._running_tasks:
                 return
 
+            # Send "loading persona" status for streaming clients
+            loading_msg = updater.new_agent_message(
+                parts=[Part(text=f"Loading persona for {agent_name or 'agent'}...")]
+            )
+            await updater.update_status(
+                state=TaskState.TASK_STATE_WORKING,
+                message=loading_msg,
+            )
+
             response_text = await self._llm_generate(system_prompt, user_input)
 
             if task_id not in self._running_tasks:
                 return
 
-            await updater.add_artifact(
-                parts=[Part(text=response_text)],
-                name="response",
-                last_chunk=True,
-            )
+            # Stream response as artifact chunks (split by paragraphs for streaming effect)
+            paragraphs = [p.strip() for p in response_text.split('\n\n') if p.strip()]
+            if len(paragraphs) > 1:
+                for i, para in enumerate(paragraphs):
+                    is_last = (i == len(paragraphs) - 1)
+                    await updater.add_artifact(
+                        parts=[Part(text=para)],
+                        name="response",
+                        append=(i > 0),
+                        last_chunk=is_last,
+                    )
+            else:
+                await updater.add_artifact(
+                    parts=[Part(text=response_text)],
+                    name="response",
+                    last_chunk=True,
+                )
             await updater.complete()
 
             logger.info("Task %s completed for agent %s", task_id, agent_name)

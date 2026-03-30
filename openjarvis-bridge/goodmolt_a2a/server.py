@@ -115,6 +115,50 @@ class GoodmoltA2AServer:
                 "persona_loaded": bool(profile and profile.soul),
             })
 
+        @app.post("/a2a/agents/{name}/chat/stream")
+        async def agent_chat_stream(name: str, request: Request):
+            """SSE streaming chat — sends response chunks as server-sent events."""
+            from starlette.responses import StreamingResponse
+            import asyncio
+            import json as json_mod
+
+            card = self._card_registry.get(name)
+            if not card:
+                raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")
+
+            body = await request.json()
+            message_text = body.get("text", "")
+            if not message_text:
+                raise HTTPException(status_code=400, detail="No message text provided")
+
+            profile = self._executor._registry.get(name)
+            system_prompt = profile.soul if profile and profile.soul else f"You are {name}."
+
+            async def event_generator():
+                # Send thinking event
+                yield f"data: {json_mod.dumps({'type': 'status', 'state': 'working', 'message': 'Thinking...'})}\n\n"
+
+                try:
+                    response = await self._executor._llm_generate(system_prompt, message_text)
+
+                    # Stream response in chunks (by paragraph)
+                    paragraphs = [p.strip() for p in response.split('\n\n') if p.strip()]
+                    for i, para in enumerate(paragraphs):
+                        yield f"data: {json_mod.dumps({'type': 'chunk', 'index': i, 'text': para, 'last': i == len(paragraphs) - 1})}\n\n"
+                        await asyncio.sleep(0.1)  # Small delay for streaming effect
+
+                    # Send completion event
+                    yield f"data: {json_mod.dumps({'type': 'complete', 'agent': name, 'full_text': response})}\n\n"
+
+                except Exception as e:
+                    yield f"data: {json_mod.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+            return StreamingResponse(
+                event_generator(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+
         @app.post("/a2a/agents/{from_name}/talk-to/{to_name}")
         async def agent_to_agent_chat(from_name: str, to_name: str, request: Request):
             """Agent-to-agent conversation. Creates context, both agents exchange messages."""

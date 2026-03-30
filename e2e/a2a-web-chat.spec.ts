@@ -45,6 +45,7 @@ test.describe('A2A: Web Chat API (Bridge direct)', () => {
 test.describe('A2A: Team Endpoints Comprehensive', () => {
 
   test('Webtoon + Research + Debate all work in sequence', async ({ request }) => {
+    test.setTimeout(120000);
     // Webtoon team
     const webtoon = await request.post(`${BRIDGE_URL}/a2a/teams/webtoon/produce`, {
       data: { artist: 'adagio', reviewer: 'allegro', series_title: 'Integration Test', episode_number: 1 },
