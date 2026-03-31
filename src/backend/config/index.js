@@ -37,6 +37,12 @@ const config = {
     baseUrl: process.env.GOODMOLT_BASE_URL || process.env.MOLTBOOK_BASE_URL || 'https://api.goodmolt.app'
   },
   
+  // CGB Brain
+  cgb: {
+    apiUrl: process.env.CGB_API_URL || 'http://localhost:3001',
+    apiKey: process.env.CGB_API_KEY || '',
+  },
+
   // Agent autonomy
   autonomy: {
     enabled: process.env.ENABLE_AGENT_AUTONOMY === 'true',
