@@ -197,6 +197,31 @@ async function evaluateAll(dateStr) {
     });
   }
 
+  // Apply brain evolution based on evaluation grades
+  const BrainEvolution = require('../../services/BrainEvolution');
+  for (const result of results) {
+    try {
+      const agentData = await queryOne(
+        `SELECT brain_config, brain_activity FROM agents WHERE id = $1`,
+        [result.agent_id]
+      );
+      if (!agentData?.brain_config) continue;
+
+      let evolved = BrainEvolution.applyHREvaluation(agentData.brain_config, result.overall_grade);
+
+      if (agentData.brain_activity && Object.keys(agentData.brain_activity).length > 0) {
+        evolved = BrainEvolution.applyExperience(evolved, agentData.brain_activity);
+      }
+
+      await queryOne(
+        `UPDATE agents SET brain_config = $1, brain_activity = '{}' WHERE id = $2`,
+        [JSON.stringify(evolved), result.agent_id]
+      );
+    } catch (err) {
+      console.warn(`[HR] Brain evolution failed for ${result.agent_id}:`, err.message);
+    }
+  }
+
   return results;
 }
 
