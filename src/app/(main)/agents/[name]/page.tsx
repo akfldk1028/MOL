@@ -10,6 +10,79 @@ import { Users, ArrowLeft, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { AgentChat } from '@/features/agents/components/agent-chat';
 
+function SajuProfileCard({ persona }: { persona: string }) {
+  // Parse key sections from persona text
+  const dayMasterMatch = persona.match(/Day Master:\s*(.+?)(?:\n|$)/);
+  const patternMatch = persona.match(/Pattern:\s*(.+?)(?:\n|$)/);
+  const strengthMatch = persona.match(/Day Strength:\s*(.+?)(?:\n|$)/);
+  const specialMatch = persona.match(/SPECIAL TRAITS[^]*?(?:\n- (.+?)(?:\n|$))/g);
+  const pillarSection = persona.match(/YEAR pillar.*?HOUR pillar.*?\n.*?\n/s);
+
+  // Extract pillars
+  const pillars: { label: string; stem: string; branch: string }[] = [];
+  const pillarRegex = /(YEAR|MONTH|DAY|HOUR) pillar \[.*?\]:\s*\n\s+(\S+\([^)]+\)).*?\n\s+(\S+\([^)]+\))/g;
+  let m;
+  while ((m = pillarRegex.exec(persona)) !== null) {
+    const labelMap: Record<string, string> = { YEAR: '년주', MONTH: '월주', DAY: '일주', HOUR: '시주' };
+    pillars.push({ label: labelMap[m[1]] || m[1], stem: m[2], branch: m[3] });
+  }
+
+  const specialTraits: string[] = [];
+  const traitRegex = /- (.+?)(?:\n|$)/g;
+  const traitSection = persona.match(/SPECIAL TRAITS[^]*?(?:===|$)/);
+  if (traitSection) {
+    let t;
+    while ((t = traitRegex.exec(traitSection[0])) !== null) {
+      if (!t[1].startsWith('===')) specialTraits.push(t[1]);
+    }
+  }
+
+  if (!dayMasterMatch && pillars.length === 0) return null;
+
+  return (
+    <div className="border rounded-lg p-4 mb-6">
+      <h2 className="font-semibold mb-3">사주 프로필 (四柱)</h2>
+
+      {pillars.length > 0 && (
+        <div className="grid grid-cols-4 gap-2 mb-4">
+          {pillars.map((p) => (
+            <div key={p.label} className="text-center p-2 bg-muted rounded">
+              <div className="text-xs text-muted-foreground">{p.label}</div>
+              <div className="text-sm font-semibold">{p.stem.split('(')[0]}</div>
+              <div className="text-xs">{p.branch.split('(')[0]}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="space-y-1 text-sm">
+        {dayMasterMatch && (
+          <p><span className="font-medium">일주:</span> {dayMasterMatch[1]}</p>
+        )}
+        {patternMatch && (
+          <p><span className="font-medium">격국:</span> {patternMatch[1]}</p>
+        )}
+        {strengthMatch && (
+          <p><span className="font-medium">신강/신약:</span> {strengthMatch[1]}</p>
+        )}
+      </div>
+
+      {specialTraits.length > 0 && (
+        <div className="mt-3">
+          <p className="text-sm font-medium mb-1">특수 성향</p>
+          <div className="flex flex-wrap gap-1">
+            {specialTraits.map((trait) => (
+              <span key={trait} className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                {trait.split(' — ')[0]}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const BIG_FIVE_LABELS: Record<string, string> = {
   openness: 'Openness',
   conscientiousness: 'Conscientiousness',
@@ -139,6 +212,11 @@ export default function AgentProfilePage({ params }: { params: Promise<{ name: s
             ))}
           </div>
         </div>
+      )}
+
+      {/* Saju Profile — parsed from persona */}
+      {agent.persona && (
+        <SajuProfileCard persona={agent.persona} />
       )}
 
       {/* A2A Chat */}

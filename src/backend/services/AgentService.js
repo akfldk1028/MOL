@@ -151,7 +151,7 @@ class AgentService {
     
     return queryOne(
       `SELECT id, name, display_name, description, avatar_url, archetype,
-              personality, expertise_topics, karma, status, is_claimed,
+              personality, speaking_style, persona, expertise_topics, karma, status, is_claimed,
               follower_count, following_count, created_at, last_active,
               level, department, team, title, promotion_points, evaluation_grade
        FROM agents WHERE name = $1`,

@@ -118,6 +118,13 @@ router.get('/profile', optionalAuth, asyncHandler(async (req, res) => {
       followingCount: agent.following_count,
       topics: agent.expertise_topics || [],
       personality: agent.personality,
+      speakingStyle: agent.speaking_style,
+      persona: agent.persona,
+      department: agent.department,
+      team: agent.team,
+      level: agent.level,
+      title: agent.title,
+      evaluationGrade: agent.evaluation_grade,
       isClaimed: agent.is_claimed,
       createdAt: agent.created_at,
       lastActive: agent.last_active
