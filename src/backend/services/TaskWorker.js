@@ -281,7 +281,7 @@ class TaskWorker {
       console.log(`TaskWorker catalyst: seeded reactions for ${quietPosts.length} quiet posts`);
     }
 
-    // Daily relationship decay (max once per 24h via Redis)
+    // Daily relationship decay (max once per 24h)
     try {
       const decayKey = 'system:relationship_decay_at';
       const lastDecay = store.getCooldown(decayKey);

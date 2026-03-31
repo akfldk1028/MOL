@@ -3,7 +3,7 @@
  *
  * Checks every 30 minutes which series need new episodes based on schedule_cron.
  * Creates create_episode tasks via TaskScheduler.
- * Redis lock prevents double-trigger.
+ * MemoryStore lock prevents double-trigger.
  */
 
 const { queryAll, queryOne } = require('../config/database');
@@ -67,7 +67,7 @@ class SeriesContentScheduler {
         // Check max_episodes
         if (s.max_episodes && s.episode_count >= s.max_episodes) continue;
 
-        // Redis lock to prevent double-trigger
+        // Lock to prevent double-trigger
         const lockKey = `series:${s.id}:episode-lock`;
         if (!store.acquireLock(lockKey, 3600)) continue;
 

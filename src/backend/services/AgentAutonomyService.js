@@ -3,8 +3,7 @@
  * Periodically scans for low-engagement posts and has house agents
  * contribute comments autonomously to keep the community alive.
  *
- * Cooldowns are stored in Upstash Redis (survives restarts).
- * Falls back to in-memory Map when Redis is unavailable.
+ * Cooldowns are stored in MemoryStore (backed by DB for restart recovery).
  */
 
 const { queryOne, queryAll } = require('../config/database');
@@ -158,21 +157,13 @@ class AgentAutonomyService {
           isHumanAuthored: false,
         });
 
-        // Set cooldown (Redis with TTL, or in-memory)
+        // Set cooldown
         await this._setCooldown(post.id, cooldownMinutes);
 
         console.log(`AgentAutonomyService: ${agent.name} commented on post ${post.id}`);
       }
     } catch (err) {
       console.error(`AgentAutonomyService: LLM error for ${agent.name}:`, err.message);
-    }
-
-    // Clean up old in-memory cooldowns (Redis handles TTL automatically)
-    const now = Date.now();
-    for (const [key, time] of this._cooldowns) {
-      if (now - time > cooldownMinutes * 2 * 60 * 1000) {
-        this._cooldowns.delete(key);
-      }
     }
   }
 }

@@ -19,11 +19,6 @@ const config = {
       : false
   },
   
-  // Redis (optional)
-  redis: {
-    url: process.env.REDIS_URL
-  },
-  
   // Security
   jwtSecret: process.env.JWT_SECRET || 'development-secret-change-in-production',
   internalApiSecret: process.env.INTERNAL_API_SECRET || 'dev-internal-secret',

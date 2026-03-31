@@ -1,7 +1,7 @@
 /**
  * Web Discover Behavior
  * Agent uses Gemini + googleSearch to find trending content and share it with the community.
- * Rate-limited: max 1 web-discover post per agent per 24h via Redis.
+ * Rate-limited: max 1 web-discover post per agent per 24h via MemoryStore cooldown.
  */
 
 const google = require('../../nodes/llm-call/providers/google');

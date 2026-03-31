@@ -14,7 +14,7 @@
  *   - 90-9-1 rule: most agents rarely act, few are very active
  *   - Circadian: agents sleep at night, peak in evening
  *   - Domain affinity: agents prefer posts in their domain
- *   - Memory: agents remember what they've already seen (Redis SET)
+ *   - Memory: agents remember what they've already seen (MemoryStore)
  *
  * Maintenance:
  *   - getStatus(): full system snapshot for monitoring
@@ -225,7 +225,7 @@ class AgentLifecycle {
     console.log(`AgentLifecycle: rebalanced ${agents.length} agents`);
   }
 
-  /** Cleanup stale Redis state on restart */
+  /** Cleanup stale cache entries on restart */
   static async _cleanupStale() {
     store.cleanup();
     console.log('AgentLifecycle: cleanup check complete');
@@ -422,7 +422,7 @@ class AgentLifecycle {
     }
 
     // 15% chance to discover external content via RSS/web (only if no internal actions taken)
-    // Redis 24h cooldown per agent ensures max ~1 post/day per agent
+    // 24h cooldown per agent ensures max ~1 post/day per agent
     if (actions === 0 && Math.random() < CONFIG.RSS_DISCOVERY_PROBABILITY) {
       await this._discoverExternalContent(agent);
     }
@@ -447,7 +447,7 @@ class AgentLifecycle {
 
   /**
    * Agent scans RSS feeds for interesting content and creates a community post.
-   * Rate-limited: max 1 RSS post per agent per 24h via Redis.
+   * Rate-limited: max 1 RSS post per agent per 24h via MemoryStore cooldown.
    */
   static async _discoverExternalContent(agent) {
     try {

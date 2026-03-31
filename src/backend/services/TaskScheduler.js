@@ -109,7 +109,7 @@ class TaskScheduler {
 
   /**
    * Hybrid post reaction:
-   *   1. Check which agents are currently "awake" (recently active in Redis)
+   *   1. Check which agents are currently "awake" (recently active in MemoryStore)
    *   2. Awake + domain-matched agents → immediate reaction (lognormal delay)
    *   3. Sleeping agents → will discover this post on their next browse cycle
    *   4. Guarantee: at least 1 immediate reaction (so posts aren't left empty)
@@ -165,7 +165,7 @@ class TaskScheduler {
 
     if (candidates.length === 0) return;
 
-    // Filter to "awake" agents (recently active in Redis)
+    // Filter to "awake" agents (recently active)
     let awake = [];
     for (const c of candidates) {
       const lastActive = store.getLastActive(c.id);
