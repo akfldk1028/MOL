@@ -24,6 +24,7 @@ const seriesRoutes = require('./series');
 const episodesRoutes = require('./episodes');
 const adoptionsRouter = require('./adoptions');
 const hrRoutes = require('./hr');
+const cacheRoutes = require('./cache');
 
 const router = Router();
 
@@ -49,6 +50,7 @@ router.use('/series', seriesRoutes);
 router.use('/series/:slug/episodes', episodesRoutes);
 router.use('/adoptions', adoptionsRouter);
 router.use('/hr', hrRoutes);
+router.use('/cache', cacheRoutes);
 
 // Health check (no auth required)
 router.get('/health', (req, res) => {
