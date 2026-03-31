@@ -24,7 +24,7 @@
  */
 
 const { queryOne, queryAll } = require('../config/database');
-const { getRedis } = require('../config/redis');
+const store = require('../config/memory-store');
 const Directive = require('../agent-system/hr/directive');
 
 // ──────────────────────────────────────────
@@ -227,10 +227,7 @@ class AgentLifecycle {
 
   /** Cleanup stale Redis state on restart */
   static async _cleanupStale() {
-    const redis = getRedis();
-    if (!redis) return;
-    // No heavy cleanup needed — TTLs handle expiry.
-    // Just log for observability.
+    store.cleanup();
     console.log('AgentLifecycle: cleanup check complete');
   }
 
@@ -439,11 +436,8 @@ class AgentLifecycle {
     const nextDelay = this._getNextWakeupDelay(tier);
     this._scheduleWakeup(agentId, nextDelay);
 
-    // Update last_active in Redis + DB
-    const redis = getRedis();
-    if (redis) {
-      await redis.set(`agent:${agentId}:last_active`, Date.now(), { ex: 86400 });
-    }
+    // Update last_active in memory + DB
+    store.setLastActive(agentId);
     queryOne('UPDATE agents SET last_active = NOW() WHERE id = $1', [agentId]).catch(() => {});
   }
 
@@ -460,12 +454,8 @@ class AgentLifecycle {
       const blogWatch = require('./skills/blog-watch');
       if (!blogWatch.resolve().available) return;
 
-      const redis = getRedis();
       const rssKey = `agent:${agent.id}:rss_posted`;
-      if (redis) {
-        const already = await redis.get(rssKey);
-        if (already) return; // Already posted from RSS today
-      }
+      if (store.getCooldown(rssKey)) return; // Already posted from RSS today
 
       // Map agent's expertise topics to RSS domain feeds
       const topics = agent.expertise_topics || [];
@@ -538,9 +528,7 @@ class AgentLifecycle {
         return;
       }
 
-      if (redis) {
-        await redis.set(rssKey, '1', { ex: CONFIG.RSS_COOLDOWN_SECONDS });
-      }
+      store.setCooldown(rssKey, '1', CONFIG.RSS_COOLDOWN_SECONDS);
 
       // Trigger other agents to react to this post
       if (post) {
@@ -569,12 +557,6 @@ class AgentLifecycle {
   // ──────────────────────────────────────────
 
   static async _browseFeed(agent) {
-    const redis = getRedis();
-    if (!redis) {
-      // Without Redis, agent has no memory of browsed posts.
-      // Fall back to only scanning posts with no existing comments from this agent.
-      return this._browseFeedNoRedis(agent);
-    }
     let actionsThisCycle = 0;
 
     // Get recent posts the agent hasn't seen
@@ -592,15 +574,8 @@ class AgentLifecycle {
 
     if (posts.length === 0) return 0;
 
-    // Filter out already-browsed posts (Redis SET)
-    const browsedKey = `agent:${agent.id}:browsed_posts`;
-    let browsedSet = new Set();
-    if (redis) {
-      const browsed = await redis.smembers(browsedKey);
-      browsedSet = new Set(browsed);
-    }
-
-    const unseenPosts = posts.filter(p => !browsedSet.has(p.id));
+    // Filter out already-browsed posts (MemoryStore)
+    const unseenPosts = posts.filter(p => !store.hasBrowsed(agent.id, p.id));
     if (unseenPosts.length === 0) return 0;
 
     // Batch interest check — one HTTP call for all unseen posts
@@ -611,10 +586,7 @@ class AgentLifecycle {
       if (actionsThisCycle >= CONFIG.MAX_ACTIONS_PER_WAKEUP) break;
 
       // Mark as seen
-      if (redis) {
-        await redis.sadd(browsedKey, post.id);
-        await redis.expire(browsedKey, CONFIG.BROWSED_POSTS_TTL);
-      }
+      store.addBrowsed(agent.id, post.id);
 
       // Use pre-calculated interest score
       const interest = interestScores[i];
@@ -632,11 +604,8 @@ class AgentLifecycle {
       if (alreadyCommented) continue;
 
       // Cooldown check
-      if (redis) {
-        const cooldownKey = `autonomy:agent:${agent.id}:post:${post.id}`;
-        const onCooldown = await redis.get(cooldownKey);
-        if (onCooldown) continue;
-      }
+      const cooldownKey = `autonomy:agent:${agent.id}:post:${post.id}`;
+      if (store.getCooldown(cooldownKey)) continue;
 
       // Decide to act → schedule with natural delay
       const delayMinutes = lognormalMinutes(CONFIG.RESPONSE_DELAY_MU, CONFIG.RESPONSE_DELAY_SIGMA);
@@ -681,61 +650,6 @@ class AgentLifecycle {
   // ──────────────────────────────────────────
   // Interest scoring
   // ──────────────────────────────────────────
-
-  /** Fallback browse when Redis is unavailable — uses DB to skip already-commented posts */
-  static async _browseFeedNoRedis(agent) {
-    let actionsThisCycle = 0;
-
-    // Only get posts this agent hasn't commented on (DB-level filter)
-    const posts = await queryAll(
-      `SELECT p.id, p.title, p.content, p.author_id, p.comment_count,
-              p.post_type, p.created_at, p.score
-       FROM posts p
-       WHERE p.created_at > NOW() - ($3 || ' hours')::INTERVAL
-         AND p.is_deleted = false
-         AND p.author_id != $1
-         AND NOT EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id AND c.author_id = $1)
-         AND NOT EXISTS (SELECT 1 FROM agent_tasks t WHERE t.target_id = p.id AND t.agent_id = $1 AND t.status IN ('pending','processing'))
-       ORDER BY p.created_at DESC
-       LIMIT $2`,
-      [agent.id, CONFIG.FEED_SCAN_LIMIT, String(CONFIG.FEED_MAX_AGE_HOURS)]
-    );
-
-    if (posts.length === 0) return 0;
-
-    // Batch interest check
-    const interestScores = await this._batchInterestCheck(agent, posts);
-
-    for (let i = 0; i < posts.length; i++) {
-      const post = posts[i];
-      if (actionsThisCycle >= CONFIG.MAX_ACTIONS_PER_WAKEUP) break;
-
-      const interest = interestScores[i];
-      const tier = this._getAgentTier(agent);
-      const tierConfig = CONFIG.TIER_CONFIG[tier];
-      const adjustedThreshold = CONFIG.INTEREST_THRESHOLD - (tierConfig.interestBoost || 0);
-      if (interest < adjustedThreshold) continue;
-
-      const delayMinutes = lognormalMinutes(CONFIG.RESPONSE_DELAY_MU, CONFIG.RESPONSE_DELAY_SIGMA);
-      const clampedDelay = Math.max(1, Math.min(60, delayMinutes));
-
-      let taskType = 'react_to_post';
-      let targetId = post.id;
-      let targetType = 'post';
-      if (post.post_type === 'question') {
-        const q = await queryOne('SELECT id FROM questions WHERE post_id = $1', [post.id]);
-        if (q) { taskType = 'respond_to_question'; targetId = q.id; targetType = 'question'; }
-      }
-
-      const TaskScheduler = require('./TaskScheduler');
-      await TaskScheduler.createTask({ type: taskType, agentId: agent.id, targetId, targetType, delayMinutes: clampedDelay, chainDepth: 0 });
-      this._recordTrace(agent, taskType, post, null, interest);
-      actionsThisCycle++;
-      this._stats.totalActions++;
-    }
-
-    return actionsThisCycle;
-  }
 
   /**
    * Keyword matching fallback when OpenJarvis is unavailable.
