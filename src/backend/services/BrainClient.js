@@ -161,7 +161,6 @@ async function getStatus(agentId) {
     department: agent.department,
     evaluationGrade: agent.evaluation_grade,
     cgbUrl: CGB_URL,
-    cgbReachable: !!(await cgbFetch('/api/health')),
   };
 }
 
