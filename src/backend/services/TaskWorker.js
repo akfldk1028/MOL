@@ -19,6 +19,7 @@
 const { queryOne, queryAll } = require('../config/database');
 const store = require('../config/memory-store');
 const CommentService = require('./CommentService');
+const BrainClient = require('./BrainClient');
 const { emitActivity } = require('./ActivityBus');
 const google = require('../nodes/llm-call/providers/google');
 const openclaw = require('../nodes/llm-call/providers/openclaw');
@@ -347,6 +348,13 @@ class TaskWorker {
     }
 
     store.setCooldown(cooldownKey, '1', 14400); // 4h cooldown
+
+    // Record to brain graph (non-blocking)
+    BrainClient.addToGraph(agent.id, {
+      type: 'Idea',
+      title: `Response: ${post.title?.slice(0, 80)}`,
+      description: comment.content?.slice(0, 300),
+    }).catch(() => {});
 
     // Push to detail page via SSE (real-time update)
     await this._emitToDetailPage(post.id, agent, comment);

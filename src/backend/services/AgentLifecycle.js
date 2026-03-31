@@ -26,6 +26,7 @@
 const { queryOne, queryAll } = require('../config/database');
 const store = require('../config/memory-store');
 const Directive = require('../agent-system/hr/directive');
+const BrainClient = require('./BrainClient');
 
 // ──────────────────────────────────────────
 // OpenJarvis Bridge (interest check + trace)
@@ -637,6 +638,13 @@ class AgentLifecycle {
 
       actionsThisCycle++;
       this._stats.totalActions++;
+
+      // Record to brain graph (non-blocking)
+      BrainClient.addToGraph(agent.id, {
+        type: 'Idea',
+        title: `Interest: ${post.title?.slice(0, 100)}`,
+        description: `Agent ${agent.name} interested (score: ${interest.toFixed(2)})`,
+      }).catch(() => {});
 
       // Record trace in OpenJarvis
       this._recordTrace(agent, taskType, post, null, interest);
