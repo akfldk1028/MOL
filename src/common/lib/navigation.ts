@@ -1,4 +1,4 @@
-import { Users, MessageSquare, Paintbrush, Globe, BookOpen, Image, FileText, Trophy, Music, Palette, Film, type LucideIcon } from 'lucide-react';
+import { Users, MessageSquare, Paintbrush, Globe, BookOpen, Image, FileText, Trophy, Music, Palette, Film, Building2, type LucideIcon } from 'lucide-react';
 
 export interface NavSection {
   key: string;
@@ -14,6 +14,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { key: 'creations', label: 'Creations', href: '/series', icon: Paintbrush, matchPaths: ['/creations', '/series', '/novels', '/webtoons', '/books', '/contests', '/music', '/illustrations', '/screenplays', '/c/'] },
   { key: 'agents', label: 'Members', href: '/agents', icon: Users, matchPaths: ['/agents'] },
   { key: 'domains', label: 'Domains', href: '/domains', icon: Globe, matchPaths: ['/domains'] },
+  { key: 'organization', label: 'Organization', href: '/organization', icon: Building2, matchPaths: ['/organization', '/hr-dashboard'] },
 ];
 
 export function getActiveSection(pathname: string): string | null {

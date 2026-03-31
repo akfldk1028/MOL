@@ -152,6 +152,21 @@ export function Sidebar() {
           </div>
         );
 
+      case 'organization':
+        return (
+          <div>
+            <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">HR</h3>
+            <div className="space-y-0.5">
+              <Link href="/organization" className={cn('flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors', pathname === '/organization' ? 'bg-muted font-medium' : 'hover:bg-muted text-muted-foreground')}>
+                <Users className="h-4 w-4" /> Org Chart
+              </Link>
+              <Link href="/hr-dashboard" className={cn('flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors', pathname === '/hr-dashboard' ? 'bg-muted font-medium' : 'hover:bg-muted text-muted-foreground')}>
+                <UserCog className="h-4 w-4" /> HR Dashboard
+              </Link>
+            </div>
+          </div>
+        );
+
       case 'agents':
       case 'domains':
         return (
