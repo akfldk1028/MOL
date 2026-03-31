@@ -17,7 +17,7 @@
  */
 
 const { queryOne, queryAll } = require('../config/database');
-const { getRedis } = require('../config/redis');
+const store = require('../config/memory-store');
 const CommentService = require('./CommentService');
 const { emitActivity } = require('./ActivityBus');
 const google = require('../nodes/llm-call/providers/google');
@@ -271,14 +271,13 @@ class TaskWorker {
 
     // Daily relationship decay (max once per 24h via Redis)
     try {
-      const redis = getRedis();
       const decayKey = 'system:relationship_decay_at';
-      const lastDecay = redis ? await redis.get(decayKey) : null;
+      const lastDecay = store.getCooldown(decayKey);
       const dayMs = 24 * 60 * 60 * 1000;
       if (!lastDecay || Date.now() - Number(lastDecay) > dayMs) {
         const RelationshipGraph = require('../agent-system/relationships');
         await RelationshipGraph.applyDecay(0.995);
-        if (redis) await redis.set(decayKey, String(Date.now()), { ex: 86400 });
+        store.setCooldown(decayKey, String(Date.now()), 86400);
         console.log('TaskWorker catalyst: applied daily relationship decay');
       }
     } catch (err) {
@@ -303,12 +302,8 @@ class TaskWorker {
     if (!post) return;
 
     // Atomic lock + duplicate check (prevents TOCTOU race)
-    const redis = getRedis();
     const lockKey = `autonomy:lock:post:${post.id}:agent:${agent.id}`;
-    if (redis) {
-      const acquired = await redis.set(lockKey, '1', { NX: true, EX: 300 });
-      if (!acquired) return; // another task already handling this
-    }
+    if (!store.acquireLock(lockKey, 300)) return;
 
     // Duplicate check (belt + suspenders with the lock above)
     const existing = await queryOne(
@@ -317,12 +312,9 @@ class TaskWorker {
     );
     if (existing) return;
 
-    // Redis cooldown check
+    // Cooldown check
     const cooldownKey = `autonomy:agent:${agent.id}:post:${post.id}`;
-    if (redis) {
-      const onCooldown = await redis.get(cooldownKey);
-      if (onCooldown) return;
-    }
+    if (store.getCooldown(cooldownKey)) return;
 
     // Resolve skills for this post type (search, vision, etc.)
     const skills = await AgentSkills.resolveForPost(post.id);
@@ -342,9 +334,7 @@ class TaskWorker {
       } catch (err) { console.warn('Relationship update skipped:', err.message); }
     }
 
-    if (redis) {
-      await redis.set(cooldownKey, '1', { ex: 14400 }); // 4h cooldown
-    }
+    store.setCooldown(cooldownKey, '1', 14400); // 4h cooldown
 
     // Push to detail page via SSE (real-time update)
     await this._emitToDetailPage(post.id, agent, comment);
@@ -382,12 +372,8 @@ class TaskWorker {
     if (targetComment.author_id === agent.id) return; // don't reply to self
 
     // Atomic lock + duplicate check (prevents TOCTOU race)
-    const redis = getRedis();
     const lockKey = `autonomy:lock:reply:${targetComment.id}:agent:${agent.id}`;
-    if (redis) {
-      const acquired = await redis.set(lockKey, '1', { NX: true, EX: 300 });
-      if (!acquired) return;
-    }
+    if (!store.acquireLock(lockKey, 300)) return;
 
     // Duplicate check
     const existing = await queryOne(
@@ -530,12 +516,8 @@ class TaskWorker {
     if (!question) return;
 
     // Duplicate check (don't comment twice on same question)
-    const redis = getRedis();
     const lockKey = `autonomy:lock:question:${question.id}:agent:${agent.id}`;
-    if (redis) {
-      const acquired = await redis.set(lockKey, '1', { NX: true, EX: 300 });
-      if (!acquired) return;
-    }
+    if (!store.acquireLock(lockKey, 300)) return;
 
     const existing = await queryOne(
       `SELECT id FROM comments WHERE post_id = $1 AND author_id = $2 LIMIT 1`,
@@ -619,12 +601,8 @@ class TaskWorker {
     if (!post) return;
 
     // Double-check: still no synthesis comment?
-    const redis = getRedis();
     const synthKey = `autonomy:synthesis:post:${post.id}`;
-    if (redis) {
-      const exists = await redis.get(synthKey);
-      if (exists) return;
-    }
+    if (store.getCooldown(synthKey)) return;
 
     // Gather all comments on this post
     const comments = await queryAll(
@@ -673,10 +651,8 @@ class TaskWorker {
     );
     await this._incrementDailyCount(agent.id);
 
-    // Mark synthesis done in Redis (24h TTL, prevents re-triggering)
-    if (redis) {
-      await redis.set(synthKey, comment.id, { ex: 86400 });
-    }
+    // Mark synthesis done (24h TTL, prevents re-triggering)
+    store.setCooldown(synthKey, comment.id, 86400);
 
     console.log(`TaskWorker: ${agent.name} synthesized discussion on post ${post.id}`);
 
@@ -924,16 +900,11 @@ class TaskWorker {
     );
     if (existingTask) return;
 
-    // Redis lock for additional duplicate prevention
-    const redis = getRedis();
+    // Lock for additional duplicate prevention
     const synthKey = `autonomy:synthesis:post:${postId}`;
-    if (redis) {
-      const exists = await redis.get(synthKey);
-      if (exists) return;
-      const lockKey = `autonomy:lock:synthesis:${postId}`;
-      const acquired = await redis.set(lockKey, '1', { NX: true, EX: 600 });
-      if (!acquired) return;
-    }
+    if (store.getCooldown(synthKey)) return;
+    const lockKey = `autonomy:lock:synthesis:${postId}`;
+    if (!store.acquireLock(lockKey, 600)) return;
 
     // Pick a synthesizer agent (one that has NOT commented on this post yet)
     const agent = await queryOne(
