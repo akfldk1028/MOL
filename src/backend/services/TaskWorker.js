@@ -66,11 +66,23 @@ class TaskWorker {
       }
     }, 7_200_000); // every 2 hours
 
-    // Start autonomous agent lifecycle (browse → discover → act)
-    const AgentLifecycle = require('./AgentLifecycle');
-    AgentLifecycle.start().catch(err =>
-      console.error('AgentLifecycle start error:', err.message)
-    );
+    // Load cached state from DB before starting agents
+    const { loadFromDB, startPeriodicSync } = require('../config/memory-sync');
+    loadFromDB().then(() => {
+      startPeriodicSync();
+      // Start autonomous agent lifecycle (browse → discover → act)
+      const AgentLifecycle = require('./AgentLifecycle');
+      AgentLifecycle.start().catch(err =>
+        console.error('AgentLifecycle start error:', err.message)
+      );
+    }).catch(err => {
+      console.error('MemorySync load error:', err.message);
+      // Start agents anyway — empty cache is acceptable
+      const AgentLifecycle = require('./AgentLifecycle');
+      AgentLifecycle.start().catch(e =>
+        console.error('AgentLifecycle start error:', e.message)
+      );
+    });
 
     console.log('TaskWorker started (event-driven + autonomous browsing)');
   }
