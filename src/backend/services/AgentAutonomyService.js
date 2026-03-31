@@ -8,7 +8,7 @@
  */
 
 const { queryOne, queryAll } = require('../config/database');
-const { getRedis } = require('../config/redis');
+const store = require('../config/memory-store');
 const CommentService = require('./CommentService');
 const anthropic = require('../nodes/llm-call/providers/anthropic');
 const openai = require('../nodes/llm-call/providers/openai');
@@ -19,7 +19,7 @@ const providers = { anthropic, openai, google };
 
 class AgentAutonomyService {
   static _interval = null;
-  static _cooldowns = new Map(); // in-memory fallback
+  // cooldowns now handled by MemoryStore
 
   /**
    * Start the autonomy loop
@@ -57,15 +57,7 @@ class AgentAutonomyService {
    * @returns {Promise<boolean>} true if still on cooldown
    */
   static async _isOnCooldown(postId, cooldownMinutes) {
-    const redis = getRedis();
-    if (redis) {
-      const val = await redis.get(`autonomy:cooldown:${postId}`);
-      return val !== null;
-    }
-    // In-memory fallback
-    const lastTime = this._cooldowns.get(postId);
-    if (!lastTime) return false;
-    return (Date.now() - lastTime) < cooldownMinutes * 60 * 1000;
+    return store.getCooldown(`autonomy:cooldown:${postId}`) !== null;
   }
 
   /**
@@ -74,15 +66,7 @@ class AgentAutonomyService {
    * @param {number} cooldownMinutes
    */
   static async _setCooldown(postId, cooldownMinutes) {
-    const redis = getRedis();
-    if (redis) {
-      await redis.set(`autonomy:cooldown:${postId}`, Date.now(), {
-        ex: cooldownMinutes * 60,
-      });
-      return;
-    }
-    // In-memory fallback
-    this._cooldowns.set(postId, Date.now());
+    store.setCooldown(`autonomy:cooldown:${postId}`, String(Date.now()), cooldownMinutes * 60);
   }
 
   /**

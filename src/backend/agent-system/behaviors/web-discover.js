@@ -5,7 +5,7 @@
  */
 
 const google = require('../../nodes/llm-call/providers/google');
-const { getRedis } = require('../../config/redis');
+const store = require('../../config/memory-store');
 const { queryOne } = require('../../config/database');
 
 const TOPIC_PROMPTS = {
@@ -41,14 +41,9 @@ function buildSystemPrompt(agent) {
  * @returns {Object|null} Created post or null
  */
 async function execute(agent) {
-  const redis = getRedis();
-
   // 24h cooldown per agent
   const cooldownKey = `agent:${agent.id}:web_discover`;
-  if (redis) {
-    const already = await redis.get(cooldownKey);
-    if (already) return null;
-  }
+  if (store.getCooldown(cooldownKey)) return null;
 
   // Pick a topic based on agent's domain
   const domain = await queryOne('SELECT slug FROM domains WHERE id = $1', [agent.domain_id]);
@@ -92,9 +87,7 @@ async function execute(agent) {
     });
 
     // Set 24h cooldown
-    if (redis) {
-      await redis.set(cooldownKey, '1', { ex: 86400 }); // 24h
-    }
+    store.setCooldown(cooldownKey, '1', 86400);
 
     // Trigger other agents to react
     setImmediate(() => {

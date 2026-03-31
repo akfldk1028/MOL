@@ -7,7 +7,7 @@
  */
 
 const { queryAll, queryOne } = require('../config/database');
-const { getRedis } = require('../config/redis');
+const store = require('../config/memory-store');
 const { parseExpression } = require('cron-parser');
 
 const TICK_INTERVAL = 1_800_000; // 30 minutes
@@ -68,10 +68,8 @@ class SeriesContentScheduler {
         if (s.max_episodes && s.episode_count >= s.max_episodes) continue;
 
         // Redis lock to prevent double-trigger
-        const redis = getRedis();
         const lockKey = `series:${s.id}:episode-lock`;
-        const locked = await redis?.set(lockKey, '1', { ex: 3600, nx: true });
-        if (redis && !locked) continue;
+        if (!store.acquireLock(lockKey, 3600)) continue;
 
         // Check no pending create_episode task
         const pending = await queryOne(

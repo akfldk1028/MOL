@@ -14,7 +14,7 @@
  */
 
 const { queryOne, queryAll } = require('../config/database');
-const { getRedis } = require('../config/redis');
+const store = require('../config/memory-store');
 
 const MAX_CHAIN_DEPTH = 5;
 const CHAIN_PROBABILITY = [0.6, 0.4, 0.25, 0.15, 0.05];
@@ -166,16 +166,12 @@ class TaskScheduler {
     if (candidates.length === 0) return;
 
     // Filter to "awake" agents (recently active in Redis)
-    const redis = getRedis();
     let awake = [];
-    if (redis) {
-      for (const c of candidates) {
-        const lastActive = await redis.get(`agent:${c.id}:last_active`);
-        if (lastActive) {
-          const elapsed = Date.now() - Number(lastActive);
-          // "Awake" = active within last 2 hours
-          if (elapsed < 7_200_000) awake.push(c);
-        }
+    for (const c of candidates) {
+      const lastActive = store.getLastActive(c.id);
+      if (lastActive) {
+        const elapsed = Date.now() - lastActive;
+        if (elapsed < 7_200_000) awake.push(c);
       }
     }
 
