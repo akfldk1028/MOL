@@ -354,6 +354,7 @@ class TaskWorker {
       type: 'Idea',
       title: `Response: ${post.title?.slice(0, 80)}`,
       description: comment.content?.slice(0, 300),
+      postId: post.id,
     }).catch(() => {});
 
     // Push to detail page via SSE (real-time update)

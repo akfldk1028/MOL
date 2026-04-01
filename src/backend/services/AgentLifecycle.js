@@ -644,6 +644,7 @@ class AgentLifecycle {
         type: 'Idea',
         title: `Interest: ${post.title?.slice(0, 100)}`,
         description: `Agent ${agent.name} interested (score: ${interest.toFixed(2)})`,
+        postId: post.id,
       }).catch(() => {});
 
       // Record trace in OpenJarvis

@@ -150,6 +150,25 @@ async function addToGraph(agentId, node) {
       }).catch(() => {});
     }
 
+    // Connect to related nodes (same topic → SIMILAR_TO via embedding search)
+    const searchTitle = (node.title || '').replace(/^(Interest|Response):\s*/, '');
+    if (searchTitle.length > 10) {
+      const related = await cgbFetch(
+        `/api/graph/search?q=${encodeURIComponent(searchTitle.slice(0, 80))}&limit=5`
+      );
+      const relatedNodes = related?.data?.results || [];
+      for (const other of relatedNodes) {
+        if (other.id !== result.data.id) {
+          cgbFetch('/api/v1/graph/edges', {
+            method: 'POST',
+            body: { sourceId: result.data.id, targetId: other.id, type: 'SIMILAR_TO' },
+            timeout: 10000,
+          }).catch(() => {});
+          break; // 가장 유사한 1개만
+        }
+      }
+    }
+
     // Promote to domain layer if score >= 40
     const score = result.data.score || 0;
     if ((bc.write_permission === 'full' || bc.write_permission === 'trusted' || bc.write_permission === 'auto') && score >= 40) {

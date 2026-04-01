@@ -1,0 +1,50 @@
+# Images & screenshots
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.ico
+*.gif
+*.webp
+public/**
+screenshot/**
+
+# Docs & text files
+docs/**
+*.md
+*.txt
+
+# Supabase migrations (SQL dumps)
+supabase/migrations/**
+
+# Test artifacts
+test-results/**
+e2e/**
+__tests__/**
+coverage/**
+playwright-report/**
+
+# Config files (not code)
+*.json
+!package.json
+*.config.js
+*.config.ts
+postcss.config.js
+tailwind.config.ts
+jest.config.js
+jest.setup.ts
+playwright.config.ts
+next.config.js
+tsconfig.json
+components.json
+
+# Temp & generated
+tmp/**
+*.log
+.cache/**
+.vercel/**
+prisma/migrations/**
+
+# Lock files already excluded by default
+# Environment files
+.env*
