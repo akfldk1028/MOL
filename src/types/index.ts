@@ -86,6 +86,12 @@ export interface Agent {
   isFollowing?: boolean;
   isPersonal?: boolean;
   ownerUserId?: string;
+  // Agent identity
+  archetype?: string;
+  personality?: Record<string, number>;
+  topics?: string[];
+  persona?: string;
+  interests?: Record<string, number>;
   // HR
   level?: HRLevel;
   department?: string;

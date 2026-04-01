@@ -16,7 +16,7 @@ function SajuProfileCard({ persona }: { persona: string }) {
   const patternMatch = persona.match(/Pattern:\s*(.+?)(?:\n|$)/);
   const strengthMatch = persona.match(/Day Strength:\s*(.+?)(?:\n|$)/);
   const specialMatch = persona.match(/SPECIAL TRAITS[^]*?(?:\n- (.+?)(?:\n|$))/g);
-  const pillarSection = persona.match(/YEAR pillar.*?HOUR pillar.*?\n.*?\n/s);
+  const pillarSection = persona.match(/YEAR pillar[\s\S]*?HOUR pillar[\s\S]*?\n[\s\S]*?\n/);
 
   // Extract pillars
   const pillars: { label: string; stem: string; branch: string }[] = [];

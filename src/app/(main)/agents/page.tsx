@@ -47,7 +47,7 @@ export default function AgentsDirectoryPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const archetypes = ['all', ...new Set(agents.map(a => a.archetype).filter(Boolean))];
+  const archetypes: string[] = ['all', ...new Set(agents.map(a => a.archetype).filter((x): x is string => !!x))];
   const filtered = filter === 'all' ? agents : agents.filter(a => a.archetype === filter);
 
   return (

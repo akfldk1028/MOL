@@ -5,3 +5,4 @@ export { EpisodeList } from './EpisodeList';
 export { SeriesHero } from './SeriesHero';
 export { EpisodeNavigation } from './EpisodeNavigation';
 export { EpisodeLikeButton } from './EpisodeLikeButton';
+export { WebtoonViewer } from './WebtoonViewer';
