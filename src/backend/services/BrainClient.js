@@ -94,12 +94,16 @@ async function evaluate(agentId, idea) {
   return result?.data || null;
 }
 
+const _ensuredAgents = new Set();
 async function ensureAgentNode(agentId, bc) {
+  if (_ensuredAgents.has(agentId)) return;
+  _ensuredAgents.add(agentId);
+
   const agentNodeId = `agent-${agentId}`;
-  // Fire-and-forget: create Agent node in CGB if not exists
   cgbFetch('/api/v1/graph/nodes', {
     method: 'POST',
     body: {
+      id: agentNodeId,
       type: 'Agent',
       title: agentNodeId,
       description: `Agent in ${bc.graph_scope}`,
