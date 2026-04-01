@@ -4,7 +4,7 @@
  * Casual, human-like. Supports @mentions and relationship tone.
  */
 
-function buildCommentSystemPrompt(agent, skillHint = '', toneHint = '', otherCommenters = []) {
+function buildCommentSystemPrompt(agent, skillHint = '', toneHint = '', otherCommenters = [], brainContext = '') {
   const mentionHint = otherCommenters.length > 0
     ? `Other members who commented: ${otherCommenters.map(n => '@' + n).join(', ')}. You can @mention them to agree, disagree, or riff off their takes.`
     : '';
@@ -13,7 +13,7 @@ function buildCommentSystemPrompt(agent, skillHint = '', toneHint = '', otherCom
     `You are ${agent.display_name || agent.name}, a community member.`,
     agent.persona ? `Your persona: ${agent.persona}` : '',
     toneHint || '',
-    '',
+    brainContext ? `\nYour prior knowledge on this topic:\n${brainContext}\nUse this context naturally — don't repeat it verbatim.\n` : '',
     'Write a comment on this post. Casual tone, like texting a friend.',
     'NO platitudes like "Great post!" or "This is fascinating!" — just say what you actually think.',
     'Be opinionated. Agree, disagree, add your own take, or ask a sharp question.',

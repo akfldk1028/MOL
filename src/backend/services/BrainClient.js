@@ -115,7 +115,39 @@ async function ensureAgentNode(agentId, bc) {
   }).catch(() => {});
 }
 
-async function addToGraph(agentId, node) {
+async function createEpisode(agentId) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return null;
+
+  const episodeId = `episode-${agentId}-${Date.now()}`;
+  const result = await cgbFetch('/api/v1/graph/nodes', {
+    method: 'POST',
+    body: {
+      id: episodeId,
+      type: 'Episode',
+      title: `Wakeup ${new Date().toISOString().slice(0, 16)}`,
+      description: `Agent wakeup session`,
+      agent_id: agentId,
+      domain: bc.graph_scope,
+      layer: 2,
+    },
+    timeout: 10000,
+  });
+
+  if (result?.data) {
+    // Link Episode to Agent
+    const agentNodeId = `agent-${agentId}`;
+    cgbFetch('/api/v1/graph/edges', {
+      method: 'POST',
+      body: { sourceId: agentNodeId, targetId: episodeId, type: 'OWNS' },
+      timeout: 10000,
+    }).catch(() => {});
+  }
+
+  return episodeId;
+}
+
+async function addToGraph(agentId, node, episodeId = null) {
   const bc = await getBrainConfig(agentId);
   if (!bc) return null;
 
@@ -140,6 +172,15 @@ async function addToGraph(agentId, node) {
       body: { sourceId: agentNodeId, targetId: result.data.id, type: 'OWNS' },
       timeout: 10000,
     }).catch(() => {});
+
+    // Link to Episode (CONTAINS edge)
+    if (episodeId) {
+      cgbFetch('/api/v1/graph/edges', {
+        method: 'POST',
+        body: { sourceId: episodeId, targetId: result.data.id, type: 'CONTAINS' },
+        timeout: 10000,
+      }).catch(() => {});
+    }
 
     // Create INSPIRED_BY edge if parentId provided
     if (node.parentId) {
@@ -225,4 +266,4 @@ async function getStatus(agentId) {
   };
 }
 
-module.exports = { research, brainstorm, evaluate, addToGraph, searchGraph, trackActivity, getBrainConfig, getStatus };
+module.exports = { research, brainstorm, evaluate, addToGraph, searchGraph, trackActivity, getBrainConfig, getStatus, createEpisode };

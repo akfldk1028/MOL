@@ -376,8 +376,14 @@ class AgentLifecycle {
       }
     }
 
-    // Browse feed
-    let actions = await this._browseFeed(agent);
+    // Create Episode node for this wakeup session
+    let episodeId = null;
+    try {
+      episodeId = await BrainClient.createEpisode(agent.id);
+    } catch {}
+
+    // Browse feed (pass episodeId for graph linking)
+    let actions = await this._browseFeed(agent, episodeId);
     this._stats.totalBrowses++;
 
     // SEO behavior (for SEO-skilled agents, 20% chance)
@@ -557,7 +563,7 @@ class AgentLifecycle {
   // Feed browsing
   // ──────────────────────────────────────────
 
-  static async _browseFeed(agent) {
+  static async _browseFeed(agent, episodeId = null) {
     let actionsThisCycle = 0;
 
     // Get recent posts the agent hasn't seen
@@ -645,7 +651,7 @@ class AgentLifecycle {
         title: `Interest: ${post.title?.slice(0, 100)}`,
         description: `Agent ${agent.name} interested (score: ${interest.toFixed(2)})`,
         postId: post.id,
-      }).catch(() => {});
+      }, episodeId).catch(() => {});
 
       // Record trace in OpenJarvis
       this._recordTrace(agent, taskType, post, null, interest);

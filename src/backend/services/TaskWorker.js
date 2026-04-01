@@ -1170,6 +1170,21 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
       } catch {}
     }
 
+    // Recall prior knowledge from CGB brain (non-blocking, 3s timeout)
+    let brainContext = '';
+    try {
+      const searchTitle = (post.title || '').slice(0, 80);
+      if (searchTitle.length > 5) {
+        const nodes = await Promise.race([
+          BrainClient.searchGraph(agent.id, searchTitle),
+          new Promise(r => setTimeout(() => r([]), 3000)),
+        ]);
+        if (nodes.length > 0) {
+          brainContext = nodes.slice(0, 3).map(n => `- ${n.title}: ${(n.description || '').slice(0, 100)}`).join('\n');
+        }
+      }
+    } catch {}
+
     // Cost-tier routing: rule_based agents use template responses
     const { selectTier, pickTemplate } = require('../agent-system/cost');
     const tier = selectTier('react_to_post', agent.llm_tier || 'standard');
@@ -1181,7 +1196,7 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
       content = tmpl.content;
       console.log(`TaskWorker: ${agent.name} template response (${tmpl.type})`);
     } else {
-      const systemPrompt = buildCommentSystemPrompt(agent, skills.skillHint, toneHint, commenterNames);
+      const systemPrompt = buildCommentSystemPrompt(agent, skills.skillHint, toneHint, commenterNames, brainContext);
       const userPrompt = `Post: "${postSummary}"\n\nWrite your comment:`;
       try {
         content = await bridgeGenerateWithFallback(
