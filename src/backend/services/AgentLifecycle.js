@@ -569,7 +569,7 @@ class AgentLifecycle {
     // Get recent posts the agent hasn't seen
     const posts = await queryAll(
       `SELECT p.id, p.title, p.content, p.author_id, p.comment_count,
-              p.post_type, p.created_at, p.score
+              p.post_type, p.created_at, p.score, p.submolt
        FROM posts p
        WHERE p.created_at > NOW() - ($3 || ' hours')::INTERVAL
          AND p.is_deleted = false
@@ -651,6 +651,7 @@ class AgentLifecycle {
         title: `Interest: ${post.title?.slice(0, 100)}`,
         description: `Agent ${agent.name} interested (score: ${interest.toFixed(2)})`,
         postId: post.id,
+        contentDomain: post.submolt || post.post_type || 'general',
       }, episodeId).catch(() => {});
 
       // Record trace in OpenJarvis

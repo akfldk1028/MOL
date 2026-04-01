@@ -355,6 +355,7 @@ class TaskWorker {
       title: `Response: ${post.title?.slice(0, 80)}`,
       description: comment.content?.slice(0, 300),
       postId: post.id,
+      contentDomain: post.submolt || post.post_type || 'general',
     }).catch(() => {});
 
     // Push to detail page via SSE (real-time update)
