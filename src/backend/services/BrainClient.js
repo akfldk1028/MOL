@@ -94,9 +94,29 @@ async function evaluate(agentId, idea) {
   return result?.data || null;
 }
 
+async function ensureAgentNode(agentId, bc) {
+  const agentNodeId = `agent-${agentId}`;
+  // Fire-and-forget: create Agent node in CGB if not exists
+  cgbFetch('/api/v1/graph/nodes', {
+    method: 'POST',
+    body: {
+      type: 'Agent',
+      title: agentNodeId,
+      description: `Agent in ${bc.graph_scope}`,
+      agent_id: agentId,
+      domain: bc.graph_scope,
+      layer: 2,
+    },
+    timeout: 10000,
+  }).catch(() => {});
+}
+
 async function addToGraph(agentId, node) {
   const bc = await getBrainConfig(agentId);
   if (!bc) return null;
+
+  // Ensure Agent node exists in CGB
+  ensureAgentNode(agentId, bc);
 
   const enrichedNode = { ...node, agent_id: agentId, domain: bc.graph_scope, layer: 2 };
 
@@ -109,6 +129,24 @@ async function addToGraph(agentId, node) {
   if (result?.data) {
     await trackActivity(agentId, 'graph_add');
 
+    // Create OWNS edge (Agent → Idea)
+    const agentNodeId = `agent-${agentId}`;
+    cgbFetch('/api/v1/graph/edges', {
+      method: 'POST',
+      body: { sourceId: agentNodeId, targetId: result.data.id, type: 'OWNS' },
+      timeout: 10000,
+    }).catch(() => {});
+
+    // Create INSPIRED_BY edge if parentId provided
+    if (node.parentId) {
+      cgbFetch('/api/v1/graph/edges', {
+        method: 'POST',
+        body: { sourceId: result.data.id, targetId: node.parentId, type: 'INSPIRED_BY' },
+        timeout: 10000,
+      }).catch(() => {});
+    }
+
+    // Promote to domain layer if score >= 40
     const score = result.data.score || 0;
     if ((bc.write_permission === 'full' || bc.write_permission === 'trusted' || bc.write_permission === 'auto') && score >= 40) {
       cgbFetch('/api/v1/graph/nodes', {
