@@ -94,6 +94,76 @@ async function evaluate(agentId, idea) {
   return result?.data || null;
 }
 
+/** Extract key concepts from content → Concept nodes + USES_CONCEPT edges */
+async function extractConcepts(agentId, ideaNodeId, node, bc) {
+  const text = `${node.title || ''} ${node.description || ''}`.trim();
+  if (text.length < 30) return; // too short
+
+  // 10% 확률로만 실행 (비용 절감, 모든 노드에 하면 API 비용 폭발)
+  if (Math.random() > 0.10) return;
+
+  try {
+    const google = require('../nodes/llm-call/providers/google');
+    const raw = await Promise.race([
+      google.call('gemini-2.5-flash-lite',
+        'You extract key concepts from text. Return ONLY a JSON array of 2-3 concepts. Each concept: {"name": "short name", "description": "one sentence explanation"}. No markdown, no extra text.',
+        `Extract key concepts from: "${text.slice(0, 500)}"`,
+        { maxOutputTokens: 200 }
+      ),
+      new Promise(r => setTimeout(() => r(null), 8000)),
+    ]);
+
+    if (!raw) return;
+
+    // Parse JSON from LLM response
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) return;
+    const concepts = JSON.parse(match[0]);
+    if (!Array.isArray(concepts) || concepts.length === 0) return;
+
+    for (const concept of concepts.slice(0, 3)) {
+      if (!concept.name) continue;
+
+      // Create or reuse Concept node (deterministic ID by name)
+      const conceptId = `concept-${concept.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50)}`;
+
+      const conceptResult = await cgbFetch('/api/v1/graph/nodes', {
+        method: 'POST',
+        body: {
+          id: conceptId,
+          type: 'Concept',
+          title: concept.name,
+          description: concept.description || concept.name,
+          agent_id: agentId,
+          domain: bc.graph_scope,
+          layer: 1, // domain level (shared within department)
+        },
+        timeout: 10000,
+      });
+
+      if (conceptResult?.data) {
+        // Idea → USES_CONCEPT → Concept
+        cgbFetch('/api/v1/graph/edges', {
+          method: 'POST',
+          body: { sourceId: ideaNodeId, targetId: conceptId, type: 'USES_CONCEPT' },
+          timeout: 10000,
+        }).catch(() => {});
+
+        // Agent → OWNS → Concept
+        cgbFetch('/api/v1/graph/edges', {
+          method: 'POST',
+          body: { sourceId: `agent-${agentId}`, targetId: conceptId, type: 'OWNS' },
+          timeout: 10000,
+        }).catch(() => {});
+      }
+    }
+
+    await trackActivity(agentId, 'concept_extract');
+  } catch (err) {
+    // Silent fail — concept extraction is optional
+  }
+}
+
 const _ensuredAgents = new Set();
 async function ensureAgentNode(agentId, bc) {
   if (_ensuredAgents.has(agentId)) return;
@@ -209,6 +279,9 @@ async function addToGraph(agentId, node, episodeId = null) {
         }
       }
     }
+
+    // Extract concepts (knowledge acquisition — 공부)
+    extractConcepts(agentId, result.data.id, node, bc).catch(() => {});
 
     // Promote to domain layer if score >= 40
     const score = result.data.score || 0;

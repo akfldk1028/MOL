@@ -1181,7 +1181,16 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
           new Promise(r => setTimeout(() => r([]), 3000)),
         ]);
         if (nodes.length > 0) {
-          brainContext = nodes.slice(0, 3).map(n => `- ${n.title}: ${(n.description || '').slice(0, 100)}`).join('\n');
+          const concepts = nodes.filter(n => n.type === 'Concept').slice(0, 3);
+          const ideas = nodes.filter(n => n.type !== 'Concept').slice(0, 2);
+          const parts = [];
+          if (concepts.length > 0) {
+            parts.push('Key concepts you know: ' + concepts.map(c => c.title).join(', '));
+          }
+          if (ideas.length > 0) {
+            parts.push(...ideas.map(n => `- ${n.title}: ${(n.description || '').slice(0, 80)}`));
+          }
+          brainContext = parts.join('\n');
         }
       }
     } catch {}
