@@ -14,13 +14,11 @@ const nextConfig = {
     ],
   },
   async rewrites() {
+    const backend = process.env.GOODMOLT_BASE_URL || 'http://localhost:4000';
     return [
-      {
-        source: '/api/v1/:path*',
-        destination: process.env.GOODMOLT_BASE_URL
-          ? `${process.env.GOODMOLT_BASE_URL}/api/v1/:path*`
-          : 'http://localhost:4000/api/v1/:path*',
-      },
+      { source: '/api/v1/:path*', destination: `${backend}/api/v1/:path*` },
+      { source: '/api/creations/:path*', destination: `${backend}/api/v1/creations/:path*` },
+      { source: '/api/creations', destination: `${backend}/api/v1/creations` },
     ];
   },
   async headers() {
