@@ -645,11 +645,11 @@ class AgentLifecycle {
       actionsThisCycle++;
       this._stats.totalActions++;
 
-      // Record to brain graph (non-blocking)
+      // Record to brain graph (non-blocking, include post content for embedding)
       BrainClient.addToGraph(agent.id, {
         type: 'Idea',
         title: `Interest: ${post.title?.slice(0, 100)}`,
-        description: `Agent ${agent.name} interested (score: ${interest.toFixed(2)})`,
+        description: `${post.content?.slice(0, 300) || post.title || ''} [interest: ${interest.toFixed(2)}]`,
         postId: post.id,
         contentDomain: post.submolt || post.post_type || 'general',
       }, episodeId).catch(() => {});
