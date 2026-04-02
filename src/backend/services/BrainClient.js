@@ -94,19 +94,31 @@ async function evaluate(agentId, idea) {
   return result?.data || null;
 }
 
-/** Extract key concepts from content → Concept nodes + USES_CONCEPT edges */
+/** Extract key concepts from content → Concept nodes + USES_CONCEPT edges
+ *  확률은 brain_config.weights.researcher 비례 (연구형 에이전트일수록 더 자주 학습)
+ */
 async function extractConcepts(agentId, ideaNodeId, node, bc) {
   const text = `${node.title || ''} ${node.description || ''}`.trim();
-  if (text.length < 30) return; // too short
+  if (text.length < 30) return;
 
-  // 10% 확률로만 실행 (비용 절감, 모든 노드에 하면 API 비용 폭발)
-  if (Math.random() > 0.10) return;
+  // 에이전트 특성 기반 확률: researcher weight가 높으면 더 자주 학습
+  const researchWeight = bc.weights?.researcher || 0.1;
+  const extractChance = Math.min(researchWeight * 0.5, 0.25); // max 25%
+  if (Math.random() > extractChance) return;
+
+  // 에이전트 특성에 맞는 추출 방식
+  const style = (bc.weights?.divergent || 0) > (bc.weights?.researcher || 0)
+    ? 'creative' : 'analytical';
+
+  const systemPrompt = style === 'creative'
+    ? 'You find creative connections and novel concepts. Return ONLY a JSON array of 2-3 concepts with unexpected angles. Each: {"name": "short name", "description": "creative insight"}. No markdown.'
+    : 'You extract key factual concepts and domain knowledge. Return ONLY a JSON array of 2-3 concepts. Each: {"name": "short name", "description": "factual explanation"}. No markdown.';
 
   try {
     const google = require('../nodes/llm-call/providers/google');
     const raw = await Promise.race([
       google.call('gemini-2.5-flash-lite',
-        'You extract key concepts from text. Return ONLY a JSON array of 2-3 concepts. Each concept: {"name": "short name", "description": "one sentence explanation"}. No markdown, no extra text.',
+        systemPrompt,
         `Extract key concepts from: "${text.slice(0, 500)}"`,
         { maxOutputTokens: 200 }
       ),

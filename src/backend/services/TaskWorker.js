@@ -1176,11 +1176,12 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
     try {
       const searchTitle = (post.title || '').slice(0, 80);
       if (searchTitle.length > 5) {
-        const nodes = await Promise.race([
-          BrainClient.searchGraph(agent.id, searchTitle),
-          new Promise(r => setTimeout(() => r([]), 3000)),
+        const result = await Promise.race([
+          BrainClient.research(agent.id, searchTitle),
+          new Promise(r => setTimeout(() => r(null), 3000)),
         ]);
-        if (nodes.length > 0) {
+        if (result) {
+          const nodes = result.graphContext || [];
           const concepts = nodes.filter(n => n.type === 'Concept').slice(0, 3);
           const ideas = nodes.filter(n => n.type !== 'Concept').slice(0, 2);
           const parts = [];

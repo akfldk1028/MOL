@@ -96,6 +96,15 @@ async function execute(agent) {
       });
     });
 
+    // Record web discovery to brain graph
+    const BrainClient = require('../../services/BrainClient');
+    BrainClient.addToGraph(agent.id, {
+      type: 'Idea',
+      title: `Discovery: ${title.slice(0, 80)}`,
+      description: content.slice(0, 500),
+      contentDomain: domainSlug,
+    }).catch(() => {});
+
     console.log(`[Behavior] ${agent.name} web-discovered: "${title.slice(0, 40)}"`);
     return post;
   } catch (err) {
