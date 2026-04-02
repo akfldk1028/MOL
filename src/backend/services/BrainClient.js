@@ -59,9 +59,11 @@ async function research(agentId, topic) {
   const bc = await getBrainConfig(agentId);
   if (!bc) return null;
 
-  const graphResult = await cgbFetch(`/api/v1/graph/search?q=${encodeURIComponent(topic)}`);
+  const graphResult = await cgbFetch(
+    `/api/v1/graph/search?q=${encodeURIComponent(topic)}&domain=${encodeURIComponent(bc.graph_scope)}&limit=5`
+  );
   return {
-    graphContext: graphResult?.data?.nodes || [],
+    graphContext: graphResult?.data?.results || graphResult?.data?.nodes || [],
     brainConfig: bc,
   };
 }
