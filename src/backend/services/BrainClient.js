@@ -219,12 +219,26 @@ async function createEpisode(agentId) {
   });
 
   if (result?.data) {
-    // Link Episode to Agent
     const agentNodeId = `agent-${agentId}`;
+
+    // Agent → OWNS → Episode
     cgbFetch('/api/v1/graph/edges', {
       method: 'POST',
       body: { sourceId: agentNodeId, targetId: episodeId, type: 'OWNS' },
       timeout: 10000,
+    }).catch(() => {});
+
+    // FOLLOWED_BY: 이전 Episode → 현재 Episode (시간순 체인)
+    cgbFetch(`/api/v1/graph/search?q=Wakeup&agent_id=${agentId}&limit=2`).then(prev => {
+      const prevEpisodes = (prev?.data?.results || prev?.data?.nodes || [])
+        .filter(n => n.type === 'Episode' && n.id !== episodeId);
+      if (prevEpisodes.length > 0) {
+        cgbFetch('/api/v1/graph/edges', {
+          method: 'POST',
+          body: { sourceId: prevEpisodes[0].id, targetId: episodeId, type: 'FOLLOWED_BY' },
+          timeout: 10000,
+        }).catch(() => {});
+      }
     }).catch(() => {});
   }
 
@@ -294,8 +308,7 @@ async function addToGraph(agentId, node, episodeId = null) {
       }
     }
 
-    // Extract concepts (knowledge acquisition — 공부)
-    extractConcepts(agentId, result.data.id, node, bc).catch(() => {});
+    // Concept extraction moved to CGB cron/reflect (batch, 100% coverage)
 
     // Promote to domain layer if score >= 40
     const score = result.data.score || 0;
