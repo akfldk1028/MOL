@@ -337,7 +337,7 @@ async function searchGraph(agentId, query) {
 async function trackActivity(agentId, type) {
   try {
     await queryOne(
-      `UPDATE agents SET brain_activity = COALESCE(brain_activity, '{}'::jsonb) || jsonb_build_object($1, COALESCE((brain_activity->>$1)::int, 0) + 1)
+      `UPDATE agents SET brain_activity = COALESCE(brain_activity, '{}'::jsonb) || jsonb_build_object($1::text, (COALESCE((brain_activity->>$1::text)::int, 0) + 1)::text::jsonb)
        WHERE id = $2`,
       [type, agentId]
     );
