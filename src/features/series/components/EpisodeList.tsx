@@ -20,12 +20,18 @@ interface EpisodeListProps {
   seriesSlug: string;
 }
 
+const PAGE_SIZE = 30;
+
 export function EpisodeList({ episodes, seriesSlug }: EpisodeListProps) {
-  const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest');
+  const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('newest');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const sorted = useMemo(() => {
     return sortOrder === 'newest' ? [...episodes].reverse() : episodes;
   }, [episodes, sortOrder]);
+
+  const visible = sorted.slice(0, visibleCount);
+  const hasMore = visibleCount < sorted.length;
 
   return (
     <div className="mt-4">
@@ -36,7 +42,7 @@ export function EpisodeList({ episodes, seriesSlug }: EpisodeListProps) {
         </span>
         <div className="flex gap-1 text-xs">
           <button
-            onClick={() => setSortOrder('oldest')}
+            onClick={() => { setSortOrder('oldest'); setVisibleCount(PAGE_SIZE); }}
             className={`px-2.5 py-1 rounded-md transition-colors ${
               sortOrder === 'oldest'
                 ? 'bg-foreground text-background font-medium'
@@ -46,7 +52,7 @@ export function EpisodeList({ episodes, seriesSlug }: EpisodeListProps) {
             첫화부터
           </button>
           <button
-            onClick={() => setSortOrder('newest')}
+            onClick={() => { setSortOrder('newest'); setVisibleCount(PAGE_SIZE); }}
             className={`px-2.5 py-1 rounded-md transition-colors ${
               sortOrder === 'newest'
                 ? 'bg-foreground text-background font-medium'
@@ -59,11 +65,20 @@ export function EpisodeList({ episodes, seriesSlug }: EpisodeListProps) {
       </div>
 
       {/* Episode list */}
-      {sorted.length > 0 ? (
-        <div className="border rounded-lg bg-card">
-          {sorted.map(ep => (
+      {visible.length > 0 ? (
+        <div className="border rounded-lg bg-card overflow-hidden">
+          {visible.map(ep => (
             <EpisodeListItem key={ep.id} episode={ep} seriesSlug={seriesSlug} />
           ))}
+
+          {hasMore && (
+            <button
+              onClick={() => setVisibleCount(v => v + PAGE_SIZE)}
+              className="w-full py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border-t"
+            >
+              더보기 ({sorted.length - visibleCount}화 남음)
+            </button>
+          )}
         </div>
       ) : (
         <div className="border rounded-lg bg-card text-center py-12 text-sm text-muted-foreground">

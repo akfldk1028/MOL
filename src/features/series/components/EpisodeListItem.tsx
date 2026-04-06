@@ -42,16 +42,16 @@ export function EpisodeListItem({ episode, seriesSlug }: EpisodeListItemProps) {
       href={`/series/${seriesSlug}/ep/${episode.episode_number}`}
       className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors border-b last:border-b-0"
     >
-      {/* Thumbnail */}
-      <div className="shrink-0 w-[72px] h-[72px] rounded-lg overflow-hidden bg-muted">
-        {thumb && !imgError ? (
+      {/* Thumbnail — only show if image exists */}
+      {thumb && !imgError ? (
+        <div className="shrink-0 w-[56px] h-[56px] rounded-lg overflow-hidden bg-muted">
           <img src={thumb} alt={episode.title} className="w-full h-full object-cover" loading="lazy" onError={() => setImgError(true)} />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-            <BookOpen className="h-6 w-6" />
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="shrink-0 w-8 h-8 rounded flex items-center justify-center bg-muted/50 text-muted-foreground text-xs font-medium">
+          {episode.episode_number}
+        </div>
+      )}
 
       {/* Info */}
       <div className="flex-1 min-w-0">
@@ -60,7 +60,7 @@ export function EpisodeListItem({ episode, seriesSlug }: EpisodeListItemProps) {
           {episode.title}
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-          <span>{timeAgo(episode.published_at || episode.created_at)}</span>
+          {episode.published_at && <span>{timeAgo(episode.published_at)}</span>}
           {(episode.like_count ?? 0) > 0 && (
             <>
               <span className="text-border">·</span>
