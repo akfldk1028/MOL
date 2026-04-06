@@ -9,18 +9,10 @@ import { Spinner, Avatar, AvatarImage, AvatarFallback } from '@/common/ui';
 import { BlurFade } from '@/common/ui/blur-fade';
 import { ShimmerButton } from '@/common/ui/shimmer-button';
 import {
-  Bot, MessageCircle, BookOpen, Image, FileText, Trophy,
+  Bot, MessageCircle,
   Sparkles, Flame, Clock, TrendingUp, Zap,
   MessageSquare, ArrowUpRight,
 } from 'lucide-react';
-import type { Creation } from '@/types';
-
-const TYPE_ICON: Record<string, { icon: typeof BookOpen; bg: string; color: string; label: string }> = {
-  novel: { icon: BookOpen, bg: 'bg-violet-500/10', color: 'text-violet-600 dark:text-violet-400', label: 'Novel' },
-  webtoon: { icon: Image, bg: 'bg-pink-500/10', color: 'text-pink-600 dark:text-pink-400', label: 'Webtoon' },
-  book: { icon: FileText, bg: 'bg-sky-500/10', color: 'text-sky-600 dark:text-sky-400', label: 'Book' },
-  contest: { icon: Trophy, bg: 'bg-amber-500/10', color: 'text-amber-600 dark:text-amber-400', label: 'Contest' },
-};
 
 const FEED_TABS = [
   { key: 'hot', label: 'Hot', icon: Flame },
@@ -47,19 +39,19 @@ interface AgentPreview {
 }
 
 export default function HomePage() {
-  const [creations, setCreations] = useState<Creation[]>([]);
+  const [posts, setPosts] = useState<any[]>([]);
   const [activeAgents, setActiveAgents] = useState<AgentPreview[]>([]);
   const [agentCount, setAgentCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('hot');
   const router = useRouter();
 
-  // Fetch creations when tab changes
+  // Fetch community posts when tab changes
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/creations?sort=${activeTab}&limit=20`)
-      .then(res => res.ok ? res.json() : { creations: [] })
-      .then(data => setCreations(data.creations || []))
+    fetch(`/api/v1/posts?sort=${activeTab}&limit=20`)
+      .then(res => res.ok ? res.json() : { data: [] })
+      .then(data => setPosts(data.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [activeTab]);
@@ -172,54 +164,50 @@ export default function HomePage() {
               <div className="flex justify-center py-12">
                 <Spinner />
               </div>
-            ) : creations.length > 0 ? (
+            ) : posts.length > 0 ? (
               <div className="mt-2 space-y-1.5">
-                {creations.map((creation) => {
-                  const type = (creation as any).creation_type || creation.creationType || 'novel';
-                  const t = TYPE_ICON[type] || TYPE_ICON.novel;
-                  const Icon = t.icon;
-                  const agentCnt = (creation as any).agent_count ?? creation.agentCount ?? 0;
-                  const commentCnt = (creation as any).comment_count ?? creation.commentCount ?? 0;
+                {posts.map((post) => {
+                  const commentCnt = post.comment_count ?? 0;
+                  const submolt = post.submolt || post.submolt_slug;
                   return (
                     <Link
-                      key={creation.id}
-                      href={`/c/${creation.id}`}
-                      className="flex items-center gap-3 px-4 py-3 rounded-lg border bg-card transition-all duration-200 hover:shadow-md hover:border-foreground/10 group"
+                      key={post.id}
+                      href={`/community/${post.id}`}
+                      className="flex items-start gap-3 px-4 py-3 rounded-lg border bg-card transition-all duration-200 hover:shadow-md hover:border-foreground/10 group"
                     >
-                      <div className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${t.bg} transition-transform group-hover:scale-105`}>
-                        <Icon className={`h-5 w-5 ${t.color}`} />
-                      </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium leading-snug line-clamp-1 group-hover:text-foreground">
-                          {creation.title}
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                          {submolt && (
+                            <span className="font-medium text-foreground bg-muted px-1.5 py-0.5 rounded text-[10px]">
+                              m/{submolt}
+                            </span>
+                          )}
+                          <span>{post.author_display_name || post.author_name}</span>
+                          <span className="text-border">·</span>
+                          <span>{timeAgo(post.created_at)}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-                          <span>{t.label}</span>
-                          <span className="text-border">·</span>
-                          <span>{(creation as any).created_by_name || creation.createdByName || 'anonymous'}</span>
-                          <span className="text-border">·</span>
-                          <span>{timeAgo((creation as any).created_at || creation.createdAt)}</span>
-                          {creation.genre && (
-                            <>
-                              <span className="text-border">·</span>
-                              <span>{creation.genre}</span>
-                            </>
+                        <div className="text-sm font-medium leading-snug line-clamp-1 group-hover:text-foreground">
+                          {post.title}
+                        </div>
+                        {post.content && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {post.content.slice(0, 200)}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                          {commentCnt > 0 && (
+                            <span className="flex items-center gap-1">
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              {commentCnt}
+                            </span>
+                          )}
+                          {post.score > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Zap className="h-3.5 w-3.5" />
+                              {post.score}
+                            </span>
                           )}
                         </div>
-                      </div>
-                      <div className="shrink-0 flex items-center gap-3 text-xs text-muted-foreground">
-                        {agentCnt > 0 && (
-                          <span className="flex items-center gap-1">
-                            <Bot className="h-3.5 w-3.5" />
-                            {agentCnt}
-                          </span>
-                        )}
-                        {commentCnt > 0 && (
-                          <span className="flex items-center gap-1">
-                            <MessageCircle className="h-3.5 w-3.5" />
-                            {commentCnt}
-                          </span>
-                        )}
                       </div>
                     </Link>
                   );
