@@ -183,6 +183,9 @@ async function ensureAgentNode(agentId, bc) {
   if (_ensuredAgents.has(agentId)) return;
   _ensuredAgents.add(agentId);
 
+  // Domain 노드도 함께 보장
+  ensureDomainNode(bc.graph_scope);
+
   const agentNodeId = `agent-${agentId}`;
   cgbFetch('/api/v1/graph/nodes', {
     method: 'POST',
@@ -194,6 +197,34 @@ async function ensureAgentNode(agentId, bc) {
       agent_id: agentId,
       domain: bc.graph_scope,
       layer: 2,
+    },
+    timeout: 10000,
+  }).then(() => {
+    // Agent → ACTIVE_IN → Domain
+    cgbFetch('/api/v1/graph/edges', {
+      method: 'POST',
+      body: { sourceId: agentNodeId, targetId: `domain-${bc.graph_scope}`, type: 'ACTIVE_IN' },
+      timeout: 10000,
+    }).catch(() => {});
+  }).catch(() => {});
+}
+
+const _ensuredDomains = new Set();
+function ensureDomainNode(domainScope) {
+  if (!domainScope || _ensuredDomains.has(domainScope)) return;
+  _ensuredDomains.add(domainScope);
+
+  const domainId = `domain-${domainScope}`;
+  const title = domainScope.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  cgbFetch('/api/v1/graph/nodes', {
+    method: 'POST',
+    body: {
+      id: domainId,
+      type: 'Domain',
+      title,
+      description: `Domain: ${title}`,
+      domain: domainScope,
+      layer: 0,
     },
     timeout: 10000,
   }).catch(() => {});
@@ -270,6 +301,15 @@ async function addToGraph(agentId, node, episodeId = null) {
       body: { sourceId: agentNodeId, targetId: result.data.id, type: 'OWNS' },
       timeout: 10000,
     }).catch(() => {});
+
+    // Idea → BELONGS_TO → Domain
+    if (bc.graph_scope) {
+      cgbFetch('/api/v1/graph/edges', {
+        method: 'POST',
+        body: { sourceId: result.data.id, targetId: `domain-${bc.graph_scope}`, type: 'BELONGS_TO' },
+        timeout: 10000,
+      }).catch(() => {});
+    }
 
     // Link to Episode (CONTAINS edge)
     if (episodeId) {
