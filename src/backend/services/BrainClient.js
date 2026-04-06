@@ -282,17 +282,18 @@ async function createEpisode(agentId) {
     }).catch(() => {});
 
     // FOLLOWED_BY: 이전 Episode → 현재 Episode (시간순 체인)
-    cgbFetch(`/api/v1/graph/search?q=Wakeup&agent_id=${agentId}&limit=2`).then(prev => {
-      const prevEpisodes = (prev?.data?.results || prev?.data?.nodes || [])
-        .filter(n => n.type === 'Episode' && n.id !== episodeId);
+    // nodes API는 created_at.desc 정렬 → limit=2로 현재+이전 Episode 조회
+    cgbFetch(`/api/v1/graph/nodes?type=Episode&agent_id=${agentId}&limit=2`).then(prev => {
+      const prevEpisodes = (prev?.data?.nodes || [])
+        .filter(n => n.id !== episodeId);
       if (prevEpisodes.length > 0) {
         cgbFetch('/api/v1/graph/edges', {
           method: 'POST',
           body: { sourceId: prevEpisodes[0].id, targetId: episodeId, type: 'FOLLOWED_BY' },
           timeout: 10000,
-        }).catch(() => {});
+        }).catch(e => console.warn(`BrainClient: FOLLOWED_BY edge failed: ${e.message}`));
       }
-    }).catch(() => {});
+    }).catch(e => console.warn(`BrainClient: FOLLOWED_BY lookup failed: ${e.message}`));
   }
 
   return episodeId;

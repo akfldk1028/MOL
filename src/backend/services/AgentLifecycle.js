@@ -431,6 +431,37 @@ class AgentLifecycle {
       }
     }
 
+    // CGB Brain: brainstorm/evaluate (20% chance when idle, non-blocking)
+    if (actions === 0 && Math.random() < 0.20) {
+      try {
+        const bc = await BrainClient.getBrainConfig(agent.id);
+        if (bc?.write_permission) {
+          if (Math.random() < 0.6) {
+            // 60%: brainstorm — 새 아이디어 생성
+            const topic = agent.personality?.interests?.[0] || bc.graph_scope || 'creativity';
+            const result = await BrainClient.brainstorm(agent.id, topic, { count: 3 });
+            if (result) {
+              console.log(`AgentLifecycle: ${agent.name} brainstormed on "${topic}" (${result.selected?.length || 0} ideas)`);
+              actions++;
+            }
+          } else {
+            // 40%: evaluate — 기존 아이디어 평가
+            const research = await BrainClient.research(agent.id, bc.graph_scope || 'ideas');
+            const ideas = (research?.graphContext || []).filter(n => n.type === 'Idea' && !n.score).slice(0, 3);
+            for (const idea of ideas) {
+              await BrainClient.evaluate(agent.id, { title: idea.title, description: idea.description, domain: bc.graph_scope });
+            }
+            if (ideas.length > 0) {
+              console.log(`AgentLifecycle: ${agent.name} evaluated ${ideas.length} ideas`);
+              actions++;
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`AgentLifecycle: brain activity error (${agent.name}):`, err.message);
+      }
+    }
+
     // 15% chance to discover external content via RSS/web (only if no internal actions taken)
     // 24h cooldown per agent ensures max ~1 post/day per agent
     if (actions === 0 && Math.random() < CONFIG.RSS_DISCOVERY_PROBABILITY) {

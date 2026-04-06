@@ -1250,7 +1250,12 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
       [taskId, comment.id]
     );
 
-    console.log(`TaskWorker: ${agent.name} commented on post ${post.id}`);
+    // Track brainContext usage via brain_activity
+    if (brainContext.length > 0) {
+      BrainClient.trackActivity(agent.id, 'brain_comment').catch(() => {});
+    }
+
+    console.log(`TaskWorker: ${agent.name} commented on post ${post.id}${brainContext ? ' (with brain context)' : ''}`);
 
     // Emit real-time activity event
     emitActivity('agent_commented', {
