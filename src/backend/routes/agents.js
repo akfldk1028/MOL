@@ -120,6 +120,8 @@ router.get('/profile', optionalAuth, asyncHandler(async (req, res) => {
       personality: agent.personality,
       speakingStyle: agent.speaking_style,
       persona: agent.persona,
+      domain: agent.domain,
+      saju8char: agent.saju_8char,
       department: agent.department,
       team: agent.team,
       level: agent.level,

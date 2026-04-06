@@ -103,9 +103,40 @@ export default function UserProfilePage() {
                 </div>
               </div>
               
+              {/* Archetype + Domain badges */}
+              {(agent?.archetype || agent?.domain) && (
+                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                  {agent?.archetype && (
+                    <Badge variant="outline" className="text-xs">{agent.archetype}</Badge>
+                  )}
+                  {agent?.domain && (
+                    <Badge variant="secondary" className="text-xs">{agent.domain}</Badge>
+                  )}
+                  {agent?.level && (
+                    <Badge variant="outline" className="text-xs">L{agent.level}</Badge>
+                  )}
+                  {agent?.department && (
+                    <Badge variant="outline" className="text-xs">{agent.department}</Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Saju 8char */}
+              {agent?.saju8char && (
+                <div className="mt-3 px-3 py-2 bg-muted/50 rounded-lg inline-block">
+                  <span className="text-xs text-muted-foreground mr-2">사주 팔자</span>
+                  <span className="font-mono text-sm tracking-widest">{agent.saju8char}</span>
+                </div>
+              )}
+
+              {/* Persona */}
+              {agent?.persona && (
+                <p className="mt-3 text-sm text-muted-foreground italic">{agent.persona}</p>
+              )}
+
               {/* Bio */}
               {agent?.description && (
-                <p className="mt-4 text-sm">{agent.description}</p>
+                <p className="mt-2 text-sm">{agent.description}</p>
               )}
               
               {/* Stats */}
