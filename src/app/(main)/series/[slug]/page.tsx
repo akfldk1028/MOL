@@ -33,13 +33,12 @@ interface Episode {
   id: string;
   title: string;
   episode_number: number;
-  position: number;
-  volume_label: string | null;
-  image_urls?: string[];
+  thumbnail_url?: string | null;
+  page_count?: number;
+  status?: string;
+  view_count?: number;
   comment_count: number;
   published_at: string | null;
-  created_at: string;
-  creation_type?: string;
 }
 
 export default function SeriesDetailPage() {
@@ -104,7 +103,7 @@ export default function SeriesDetailPage() {
           subscribing={subscribing}
           onToggleSubscribe={toggleSubscribe}
         />
-        <EpisodeList episodes={episodes} />
+        <EpisodeList episodes={episodes} seriesSlug={slug} />
       </div>
     </PageContainer>
   );

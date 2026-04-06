@@ -7,44 +7,24 @@ interface Episode {
   id: string;
   title: string;
   episode_number: number;
-  position: number;
-  volume_label: string | null;
-  image_urls?: string[];
+  thumbnail_url?: string | null;
+  page_count?: number;
+  status?: string;
+  view_count?: number;
   comment_count: number;
   published_at: string | null;
-  created_at: string;
-  creation_type?: string;
 }
 
 interface EpisodeListProps {
   episodes: Episode[];
+  seriesSlug: string;
 }
 
-export function EpisodeList({ episodes }: EpisodeListProps) {
+export function EpisodeList({ episodes, seriesSlug }: EpisodeListProps) {
   const [sortOrder, setSortOrder] = useState<'oldest' | 'newest'>('oldest');
 
-  // Sort + group by volume_label (memoized together)
-  const grouped = useMemo(() => {
-    const sorted = sortOrder === 'newest' ? [...episodes].reverse() : episodes;
-    const groups: { label: string | null; episodes: Episode[] }[] = [];
-    let currentLabel: string | null = null;
-    let currentGroup: Episode[] = [];
-
-    for (const ep of sorted) {
-      if (ep.volume_label !== currentLabel) {
-        if (currentGroup.length > 0) {
-          groups.push({ label: currentLabel, episodes: currentGroup });
-        }
-        currentLabel = ep.volume_label;
-        currentGroup = [ep];
-      } else {
-        currentGroup.push(ep);
-      }
-    }
-    if (currentGroup.length > 0) {
-      groups.push({ label: currentLabel, episodes: currentGroup });
-    }
-    return groups;
+  const sorted = useMemo(() => {
+    return sortOrder === 'newest' ? [...episodes].reverse() : episodes;
   }, [episodes, sortOrder]);
 
   return (
@@ -79,21 +59,12 @@ export function EpisodeList({ episodes }: EpisodeListProps) {
       </div>
 
       {/* Episode list */}
-      {grouped.length > 0 ? (
-        grouped.map((group, gi) => (
-          <div key={gi}>
-            {group.label && (
-              <div className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide bg-muted/30 border-x border-t first:rounded-t-lg">
-                {group.label}
-              </div>
-            )}
-            <div className={`border-x border-b bg-card ${gi === 0 && !group.label ? 'border-t rounded-t-lg' : ''} ${gi === grouped.length - 1 ? 'rounded-b-lg' : ''}`}>
-              {group.episodes.map(ep => (
-                <EpisodeListItem key={ep.id} episode={ep} />
-              ))}
-            </div>
-          </div>
-        ))
+      {sorted.length > 0 ? (
+        <div className="border rounded-lg bg-card">
+          {sorted.map(ep => (
+            <EpisodeListItem key={ep.id} episode={ep} seriesSlug={seriesSlug} />
+          ))}
+        </div>
       ) : (
         <div className="border rounded-lg bg-card text-center py-12 text-sm text-muted-foreground">
           No episodes yet. The first one is coming soon.

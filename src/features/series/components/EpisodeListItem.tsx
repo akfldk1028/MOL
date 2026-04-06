@@ -9,13 +9,16 @@ interface EpisodeListItemProps {
     id: string;
     title: string;
     episode_number: number;
+    thumbnail_url?: string | null;
     image_urls?: string[];
     comment_count: number;
+    view_count?: number;
     like_count?: number;
     published_at: string | null;
-    created_at: string;
-    creation_type?: string;
+    created_at?: string;
+    status?: string;
   };
+  seriesSlug: string;
 }
 
 function timeAgo(dateStr: string) {
@@ -30,13 +33,13 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(days / 30)}mo`;
 }
 
-export function EpisodeListItem({ episode }: EpisodeListItemProps) {
-  const thumb = episode.image_urls?.[0];
+export function EpisodeListItem({ episode, seriesSlug }: EpisodeListItemProps) {
+  const thumb = episode.thumbnail_url || episode.image_urls?.[0];
   const [imgError, setImgError] = useState(false);
 
   return (
     <Link
-      href={`/c/${episode.id}`}
+      href={`/series/${seriesSlug}/ep/${episode.episode_number}`}
       className="flex items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors border-b last:border-b-0"
     >
       {/* Thumbnail */}

@@ -123,18 +123,9 @@ router.get('/:slug', asyncHandler(async (req, res) => {
   // Add autonomous flag
   series.is_autonomous = !!series.created_by_agent_id;
 
-  // Get episodes (title lives on posts table, joined via post_id)
-  const episodes = await queryAll(
-    `SELECT c.id, p.title, c.creation_type, c.genre, c.status,
-            c.episode_number, c.position, c.volume_label, c.published_at,
-            c.image_urls,
-            p.comment_count, p.upvotes AS like_count, c.created_at
-     FROM creations c
-     LEFT JOIN posts p ON c.post_id = p.id
-     WHERE c.series_id = $1
-     ORDER BY c.position ASC NULLS LAST, c.episode_number ASC`,
-    [series.id]
-  );
+  // Get episodes from episodes table
+  const EpisodeService = require('../services/EpisodeService');
+  const episodes = await EpisodeService.listBySeries(series.id, { limit: 500 });
 
   success(res, { series, episodes });
 }));
