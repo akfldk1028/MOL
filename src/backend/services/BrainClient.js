@@ -178,16 +178,18 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
   }
 }
 
-const _ensuredAgents = new Set();
+const _ensuredAgents = new Map(); // id → timestamp
+const ENSURE_TTL = 3600_000; // 1 hour
+
 async function ensureAgentNode(agentId, bc) {
-  if (_ensuredAgents.has(agentId)) return;
-  _ensuredAgents.add(agentId);
+  const now = Date.now();
+  if (_ensuredAgents.has(agentId) && (now - _ensuredAgents.get(agentId)) < ENSURE_TTL) return;
 
   // Domain 노드도 함께 보장
   ensureDomainNode(bc.graph_scope);
 
   const agentNodeId = `agent-${agentId}`;
-  cgbFetch('/api/v1/graph/nodes', {
+  const result = await cgbFetch('/api/v1/graph/nodes', {
     method: 'POST',
     body: {
       id: agentNodeId,
@@ -199,20 +201,25 @@ async function ensureAgentNode(agentId, bc) {
       layer: 2,
     },
     timeout: 10000,
-  }).then(() => {
+  });
+
+  if (result) {
+    _ensuredAgents.set(agentId, now);
     // Agent → ACTIVE_IN → Domain
     cgbFetch('/api/v1/graph/edges', {
       method: 'POST',
       body: { sourceId: agentNodeId, targetId: `domain-${bc.graph_scope}`, type: 'ACTIVE_IN' },
       timeout: 10000,
     }).catch(() => {});
-  }).catch(() => {});
+  }
 }
 
-const _ensuredDomains = new Set();
+const _ensuredDomains = new Map(); // scope → timestamp
+
 function ensureDomainNode(domainScope) {
-  if (!domainScope || _ensuredDomains.has(domainScope)) return;
-  _ensuredDomains.add(domainScope);
+  if (!domainScope) return;
+  const now = Date.now();
+  if (_ensuredDomains.has(domainScope) && (now - _ensuredDomains.get(domainScope)) < ENSURE_TTL) return;
 
   const domainId = `domain-${domainScope}`;
   const title = domainScope.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
@@ -227,6 +234,8 @@ function ensureDomainNode(domainScope) {
       layer: 0,
     },
     timeout: 10000,
+  }).then(result => {
+    if (result) _ensuredDomains.set(domainScope, now);
   }).catch(() => {});
 }
 
@@ -333,7 +342,7 @@ async function addToGraph(agentId, node, episodeId = null) {
     const searchTitle = (node.title || '').replace(/^(Interest|Response):\s*/, '');
     if (searchTitle.length > 10) {
       const related = await cgbFetch(
-        `/api/graph/search?q=${encodeURIComponent(searchTitle.slice(0, 80))}&limit=5`
+        `/api/v1/graph/search?q=${encodeURIComponent(searchTitle.slice(0, 80))}&limit=5`
       );
       const relatedNodes = related?.data?.results || [];
       for (const other of relatedNodes) {

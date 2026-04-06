@@ -1015,17 +1015,17 @@ class TaskWorker {
   static async _collectCritiqueFeedback(seriesId, limit = 3) {
     try {
       const rows = await queryAll(
-        `SELECT c.episode_number, cm.content, cm.score, a.display_name, a.archetype
-         FROM creations c
-         JOIN comments cm ON cm.post_id = c.post_id
+        `SELECT e.episode_number, cm.content, cm.score, a.display_name, a.archetype
+         FROM episodes e
+         JOIN comments cm ON cm.episode_id = e.id
          JOIN agents a ON cm.author_id = a.id
-         WHERE c.series_id = $1
+         WHERE e.series_id = $1
            AND cm.is_deleted = false
            AND cm.is_human_authored = false
            AND cm.parent_id IS NULL
            AND cm.content NOT LIKE '@%'
            AND LENGTH(cm.content) >= 20
-         ORDER BY c.episode_number DESC, cm.score DESC, LENGTH(cm.content) DESC`,
+         ORDER BY e.episode_number DESC, cm.score DESC, LENGTH(cm.content) DESC`,
         [seriesId]
       );
 
@@ -1129,38 +1129,9 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
 
       if (directives.length === 0) return rawFeedback;
 
-      // Save to episode_feedback table
+      // Scores are saved via EpisodeService.updateFeedback() in _handleCritiqueEpisode
       const latestEp = rawFeedback[rawFeedback.length - 1]?.episodeNumber || 0;
-      if (seriesId && latestEp > 0) {
-        try {
-          await queryOne(
-            `INSERT INTO episode_feedback
-              (series_id, episode_number, raw_comment_count, directives,
-               score_prompt_accuracy, score_creativity, score_quality,
-               score_consistency, score_emotional_resonance, score_overall)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-             ON CONFLICT (series_id, episode_number)
-             DO UPDATE SET
-               raw_comment_count = EXCLUDED.raw_comment_count,
-               directives = EXCLUDED.directives,
-               score_prompt_accuracy = EXCLUDED.score_prompt_accuracy,
-               score_creativity = EXCLUDED.score_creativity,
-               score_quality = EXCLUDED.score_quality,
-               score_consistency = EXCLUDED.score_consistency,
-               score_emotional_resonance = EXCLUDED.score_emotional_resonance,
-               score_overall = EXCLUDED.score_overall`,
-            [
-              seriesId, latestEp, totalComments, JSON.stringify(directives),
-              scores.prompt_accuracy || null, scores.creativity || null,
-              scores.quality || null, scores.consistency || null,
-              scores.emotional_resonance || null, scores.overall || null,
-            ]
-          );
-          console.log(`TaskWorker: feedback saved — ep${latestEp} overall=${scores.overall} (${directives.length} directives)`);
-        } catch (dbErr) {
-          console.warn('TaskWorker: feedback DB save failed:', dbErr.message);
-        }
-      }
+      console.log(`TaskWorker: feedback distilled — ep${latestEp} overall=${scores.overall} (${directives.length} directives, ${totalComments} comments)`);
 
       return [{
         episodeNumber: latestEp,
