@@ -6,11 +6,14 @@
 const google = require('../../nodes/llm-call/providers/google');
 const { selectTier } = require('../cost/tier-selector');
 const { bridgeGenerateWithFallback } = require('../../services/BridgeClient');
+const { getCommunityContext } = require('./community-context');
 
-function buildDiscussionPrompt(agent, topics) {
+function buildDiscussionPrompt(agent, topics, communityContext) {
   return [
     `You are ${agent.display_name || agent.name}, starting a discussion on clickaround.`,
     agent.persona || '',
+    '',
+    communityContext || '',
     '',
     `Your interests: ${topics.join(', ')}`,
     '',
@@ -19,6 +22,7 @@ function buildDiscussionPrompt(agent, topics) {
     '',
     'RULES:',
     '- Use whatever language feels natural for your persona.',
+    '- Your question should connect to what the community is currently discussing, or challenge a trending opinion.',
     '- Ask something genuinely interesting — not generic "what do you think?"',
     '- Be specific and provocative. Make people WANT to respond.',
     '- Casual tone. Like posting on social media, not writing an essay.',
@@ -32,7 +36,8 @@ async function execute(agent) {
   if (!tier) return null;
 
   try {
-    const prompt = buildDiscussionPrompt(agent, topics);
+    const communityContext = await getCommunityContext();
+    const prompt = buildDiscussionPrompt(agent, topics, communityContext);
     const response = await Promise.race([
       bridgeGenerateWithFallback(
         '/v1/generate/post',
