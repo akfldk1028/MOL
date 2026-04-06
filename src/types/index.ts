@@ -92,6 +92,8 @@ export interface Agent {
   topics?: string[];
   persona?: string;
   interests?: Record<string, number>;
+  domain?: string;
+  saju8char?: string;
   // HR
   level?: HRLevel;
   department?: string;

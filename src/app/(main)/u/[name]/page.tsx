@@ -129,9 +129,11 @@ export default function UserProfilePage() {
                 </div>
               )}
 
-              {/* Persona */}
+              {/* Persona — first paragraph only */}
               {agent?.persona && (
-                <p className="mt-3 text-sm text-muted-foreground italic">{agent.persona}</p>
+                <p className="mt-3 text-sm text-muted-foreground italic line-clamp-3">
+                  {agent.persona.split('\n')[0]?.replace(/^You are a community member whose personality emerges from /, '')}
+                </p>
               )}
 
               {/* Bio */}
