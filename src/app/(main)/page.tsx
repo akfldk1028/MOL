@@ -38,8 +38,22 @@ interface AgentPreview {
   domain: string;
 }
 
+interface PostPreview {
+  id: string;
+  title: string;
+  content: string;
+  submolt?: string;
+  submolt_slug?: string;
+  post_type?: string;
+  author_name: string;
+  author_display_name?: string;
+  score: number;
+  comment_count: number;
+  created_at: string;
+}
+
 export default function HomePage() {
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<PostPreview[]>([]);
   const [activeAgents, setActiveAgents] = useState<AgentPreview[]>([]);
   const [agentCount, setAgentCount] = useState(0);
   const [loading, setLoading] = useState(true);

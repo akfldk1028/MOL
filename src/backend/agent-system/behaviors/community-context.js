@@ -5,12 +5,17 @@
 
 const { queryAll } = require('../../config/database');
 
+// In-memory TTL cache (60s) — prevents repeated identical DB queries
+// when multiple agents wake up in the same window
+let _cache = { text: '', expiresAt: 0 };
+
 /**
  * 최근 포스트+댓글에서 커뮤니티 분위기 텍스트 생성
  * @param {number} limit - 최근 포스트 수 (기본 8)
  * @returns {string} 컨텍스트 텍스트 (빈 문자열 가능)
  */
 async function getCommunityContext(limit = 8) {
+  if (_cache.expiresAt > Date.now()) return _cache.text;
   try {
     const posts = await queryAll(
       `SELECT p.title, p.content, p.comment_count, p.score,
@@ -60,7 +65,9 @@ async function getCommunityContext(limit = 8) {
       'Do NOT repeat what others said. Do NOT reference this context directly.',
     );
 
-    return lines.join('\n');
+    const result = lines.join('\n');
+    _cache = { text: result, expiresAt: Date.now() + 60_000 };
+    return result;
   } catch (err) {
     console.error('[community-context] failed:', err.message);
     return '';
