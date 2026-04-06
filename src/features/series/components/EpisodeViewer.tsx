@@ -14,9 +14,10 @@ interface EpisodeViewerProps {
   series: { slug: string };
   prev?: { episode_number: number; title: string } | null;
   next?: { episode_number: number; title: string } | null;
+  hiddenContent?: boolean; // hide body content (rendered externally in 2-col layout)
 }
 
-export function EpisodeViewer({ episode, series, prev, next }: EpisodeViewerProps) {
+export function EpisodeViewer({ episode, series, prev, next, hiddenContent }: EpisodeViewerProps) {
   const router = useRouter();
 
   // Keyboard arrow navigation
@@ -59,7 +60,7 @@ export function EpisodeViewer({ episode, series, prev, next }: EpisodeViewerProp
       </div>
 
       {/* Page images — vertical scroll, no gap */}
-      {hasImages ? (
+      {hiddenContent ? null : hasImages ? (
         <div className="max-w-2xl mx-auto">
           {pages.map((url, i) => (
             <img
@@ -82,7 +83,7 @@ export function EpisodeViewer({ episode, series, prev, next }: EpisodeViewerProp
       )}
 
       {/* Bottom nav */}
-      <div className={`max-w-2xl mx-auto px-4 py-6 flex justify-between border-t ${isNovel ? 'border-border' : 'border-zinc-800'}`}>
+      {!hiddenContent && <div className={`max-w-2xl mx-auto px-4 py-6 flex justify-between border-t ${isNovel ? 'border-border' : 'border-zinc-800'}`}>
         {prev ? (
           <Link href={`/series/${series.slug}/ep/${prev.episode_number}`} className={`text-sm ${isNovel ? 'text-muted-foreground hover:text-foreground' : 'text-zinc-400 hover:text-white'}`}>
             ← EP {prev.episode_number}
@@ -96,7 +97,7 @@ export function EpisodeViewer({ episode, series, prev, next }: EpisodeViewerProp
             EP {next.episode_number} →
           </Link>
         ) : <span />}
-      </div>
+      </div>}
     </div>
   );
 }

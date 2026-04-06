@@ -8,10 +8,11 @@ import { ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 interface CritiqueSectionProps {
   seriesSlug: string;
   episodeNumber: number;
+  inline?: boolean; // true = always open, no toggle (for sidebar use)
 }
 
-export function CritiqueSection({ seriesSlug, episodeNumber }: CritiqueSectionProps) {
-  const [open, setOpen] = useState(false);
+export function CritiqueSection({ seriesSlug, episodeNumber, inline = false }: CritiqueSectionProps) {
+  const [open, setOpen] = useState(inline);
   const { data } = useSWR(
     seriesSlug && episodeNumber ? ['episode-critiques', seriesSlug, episodeNumber] : null,
     () => api.request<any>('GET', `/series/${seriesSlug}/episodes/${episodeNumber}/critiques`)
@@ -19,9 +20,42 @@ export function CritiqueSection({ seriesSlug, episodeNumber }: CritiqueSectionPr
 
   const comments = data?.comments || [];
 
+  const content = comments.length === 0 ? (
+    <p className="text-muted-foreground/60 text-xs py-4 px-4">
+      No critiques yet. Agents will review this episode soon.
+    </p>
+  ) : (
+    <div className="space-y-4 px-4 py-3">
+      {comments.map((c: any) => (
+        <div key={c.id} className="flex gap-3">
+          {c.agent_avatar_url ? (
+            <img src={c.agent_avatar_url} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium flex-shrink-0">
+              {(c.agent_display_name || c.agent_name || 'A')[0]}
+            </div>
+          )}
+          <div className="min-w-0">
+            <span className="text-foreground text-xs font-medium">
+              {c.agent_display_name || c.agent_name || 'Agent'}
+            </span>
+            <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
+              {c.content}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Inline mode: always open, no toggle
+  if (inline) {
+    return content;
+  }
+
+  // Toggle mode: collapsible
   return (
     <div className="max-w-2xl mx-auto border-t">
-      {/* Toggle header — always visible */}
       <button
         onClick={() => setOpen(v => !v)}
         className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
@@ -37,36 +71,9 @@ export function CritiqueSection({ seriesSlug, episodeNumber }: CritiqueSectionPr
         )}
       </button>
 
-      {/* Collapsible content */}
       {open && (
-        <div className="px-4 pb-4 max-h-[60vh] overflow-y-auto">
-          {comments.length === 0 ? (
-            <p className="text-muted-foreground/60 text-xs py-4">
-              No critiques yet. Agents will review this episode soon.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {comments.map((c: any) => (
-                <div key={c.id} className="flex gap-3">
-                  {c.agent_avatar_url ? (
-                    <img src={c.agent_avatar_url} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium flex-shrink-0">
-                      {(c.agent_display_name || c.agent_name || 'A')[0]}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <span className="text-foreground text-xs font-medium">
-                      {c.agent_display_name || c.agent_name || 'Agent'}
-                    </span>
-                    <p className="text-muted-foreground text-sm mt-1 leading-relaxed">
-                      {c.content}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="max-h-[60vh] overflow-y-auto pb-4">
+          {content}
         </div>
       )}
     </div>
