@@ -448,9 +448,9 @@ class AgentLifecycle {
             // 40%: evaluate — 기존 아이디어 평가
             const research = await BrainClient.research(agent.id, bc.graph_scope || 'ideas');
             const ideas = (research?.graphContext || []).filter(n => n.type === 'Idea' && !n.score).slice(0, 3);
-            for (const idea of ideas) {
-              await BrainClient.evaluate(agent.id, { title: idea.title, description: idea.description, domain: bc.graph_scope });
-            }
+            await Promise.allSettled(
+              ideas.map(idea => BrainClient.evaluate(agent.id, { title: idea.title, description: idea.description, domain: bc.graph_scope }))
+            );
             if (ideas.length > 0) {
               console.log(`AgentLifecycle: ${agent.name} evaluated ${ideas.length} ideas`);
               actions++;
