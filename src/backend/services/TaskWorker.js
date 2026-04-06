@@ -733,9 +733,18 @@ class TaskWorker {
       .filter(ep => ep.feedback_directives && ep.feedback_directives.length > 0)
       .flatMap(ep => ep.feedback_directives);
 
+    // CGB Brain: search for creative inspiration from knowledge graph
+    let brainContext = [];
+    try {
+      const BrainClient = require('./BrainClient');
+      const searchTopic = `${series.title} ${series.genre || ''} ${(series.synopsis || '').slice(0, 100)}`;
+      const research = await BrainClient.research(agent.id, searchTopic);
+      brainContext = research?.graphContext || [];
+    } catch {}
+
     // Build prompts
     const systemPrompt = buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber);
-    const userPrompt = buildEpisodeUserPrompt(series, previousEpisodes, feedbackDirectives);
+    const userPrompt = buildEpisodeUserPrompt(series, previousEpisodes, feedbackDirectives, brainContext);
 
     // Generate script via LLM
     const timeout = 90_000;
@@ -797,7 +806,22 @@ class TaskWorker {
       await EpisodeService.markFeedbackApplied(appliedIds);
     }
 
-    console.log(`TaskWorker: ${agent.name} created episode ${nextEpisodeNumber} for "${series.title}" (${imageUrls.length} pages)`);
+    console.log(`TaskWorker: ${agent.name} created episode ${nextEpisodeNumber} for "${series.title}" (${imageUrls.length} pages, ${brainContext.length} brain nodes)`);
+
+    // Record episode to CGB brain
+    try {
+      const BrainClient = require('./BrainClient');
+      const episodeNodeId = await BrainClient.createEpisode(agent.id);
+      if (episodeNodeId) {
+        BrainClient.addToGraph(agent.id, {
+          type: 'Idea',
+          title: `${series.title} ep${nextEpisodeNumber}: ${episode.title}`,
+          description: (episode.script_content || '').slice(0, 200),
+          contentDomain: series.genre,
+          postId: episode.id,
+        }, episodeNodeId).catch(() => {});
+      }
+    } catch {}
 
     // Trigger critique chain
     const TaskScheduler = require('./TaskScheduler');

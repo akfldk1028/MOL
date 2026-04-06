@@ -5,12 +5,16 @@
 
 const { queryOne, queryAll } = require('../../config/database');
 const { bridgeGenerateWithFallback } = require('../../services/BridgeClient');
+const BrainClient = require('../../services/BrainClient');
 
-const CONTENT_TYPES = ['webtoon', 'novel'];
 const GENRES = ['fantasy', 'romance', 'thriller', 'sci-fi', 'slice-of-life', 'horror', 'comedy', 'drama'];
 
-function buildSeriesPrompt(agent, topics) {
+function buildSeriesPrompt(agent, topics, brainContext) {
   const contentType = Math.random() < 0.4 ? 'webtoon' : 'novel';
+  const contextBlock = brainContext.length > 0
+    ? `\n\nINSPIRATION FROM YOUR KNOWLEDGE GRAPH:\n${brainContext.map(n => `- [${n.type}] ${n.title}: ${(n.description || '').slice(0, 100)}`).join('\n')}\nUse these as creative seeds — combine, twist, or expand on them.\n`
+    : '';
+
   return {
     contentType,
     prompt: [
@@ -18,7 +22,7 @@ function buildSeriesPrompt(agent, topics) {
       agent.persona ? agent.persona.slice(0, 300) : '',
       '',
       `Your interests/expertise: ${topics.join(', ')}`,
-      '',
+      contextBlock,
       `Create a compelling ${contentType} series concept. Respond in this exact JSON:`,
       '{"title": "series title (Korean, under 20 chars)", "synopsis": "engaging synopsis (3-5 sentences, Korean)", "genre": "one of: fantasy, romance, thriller, sci-fi, slice-of-life, horror, comedy, drama", "target_word_count": 800}',
       '',
@@ -26,6 +30,7 @@ function buildSeriesPrompt(agent, topics) {
       '- Title should be catchy and memorable in Korean',
       '- Synopsis should hook readers immediately',
       '- Genre must match your personality and interests',
+      '- Draw inspiration from your knowledge graph — make unexpected connections',
       '- Be creative and original — avoid cliche plots',
     ].filter(Boolean).join('\n'),
   };
@@ -48,7 +53,14 @@ async function execute(agent) {
   const topics = agent.expertise_topics || ['creative writing', 'storytelling'];
   const parsedTopics = Array.isArray(topics) ? topics : (typeof topics === 'string' ? JSON.parse(topics) : ['creative writing']);
 
-  const { contentType, prompt } = buildSeriesPrompt(agent, parsedTopics.slice(0, 5));
+  // CGB Brain: search for creative inspiration from knowledge graph
+  let brainContext = [];
+  try {
+    const research = await BrainClient.research(agent.id, parsedTopics.slice(0, 3).join(' '));
+    brainContext = research?.graphContext || [];
+  } catch {}
+
+  const { contentType, prompt } = buildSeriesPrompt(agent, parsedTopics.slice(0, 5), brainContext);
 
   let response;
   try {
@@ -104,7 +116,16 @@ async function execute(agent) {
     delayMinutes: 1,
   });
 
-  console.log(`StartSeries: ${agent.name} created "${parsed.title}" (${contentType}/${genre})`);
+  // Record to CGB brain: new series as an Idea node
+  BrainClient.addToGraph(agent.id, {
+    id: `series-${series.id}`,
+    type: 'Idea',
+    title: `Series: ${parsed.title}`,
+    description: parsed.synopsis,
+    contentDomain: genre,
+  }).catch(() => {});
+
+  console.log(`StartSeries: ${agent.name} created "${parsed.title}" (${contentType}/${genre}) with ${brainContext.length} brain inspirations`);
 
   return series;
 }

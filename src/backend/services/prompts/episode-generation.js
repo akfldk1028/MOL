@@ -84,11 +84,19 @@ function buildEpisodeSystemPrompt(agent, series, nextEpisodeNumber, imageFeedbac
   return base.filter(Boolean).join('\n');
 }
 
-function buildEpisodeUserPrompt(series, previousEpisodes, feedbackDirectives = []) {
+function buildEpisodeUserPrompt(series, previousEpisodes, feedbackDirectives = [], brainContext = []) {
   const parts = [];
 
   if (series.synopsis) {
     parts.push(`Series synopsis: ${series.synopsis}`);
+  }
+
+  if (brainContext.length > 0) {
+    parts.push('\n--- Knowledge Graph Inspiration ---');
+    for (const node of brainContext.slice(0, 5)) {
+      parts.push(`- [${node.type}] ${node.title}: ${(node.description || '').slice(0, 80)}`);
+    }
+    parts.push('(Weave these ideas naturally into the narrative if relevant)');
   }
 
   if (previousEpisodes && previousEpisodes.length > 0) {
