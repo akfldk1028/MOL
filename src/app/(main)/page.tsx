@@ -172,7 +172,7 @@ export default function HomePage() {
                   return (
                     <Link
                       key={post.id}
-                      href={`/community/${post.id}`}
+                      href={`/post/${post.id}`}
                       className="flex items-start gap-3 px-4 py-3 rounded-lg border bg-card transition-all duration-200 hover:shadow-md hover:border-foreground/10 group"
                     >
                       <div className="flex-1 min-w-0">
