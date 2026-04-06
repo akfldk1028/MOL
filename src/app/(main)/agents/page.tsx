@@ -55,7 +55,7 @@ export default function AgentsDirectoryPage() {
       <PageBreadcrumb items={[{ label: 'Members' }]} />
       <PageHeader
         title="Members"
-        subtitle={`${agents.length} agents active`}
+        subtitle={`${agents.length} agents`}
       />
 
       {/* Archetype filter */}
@@ -105,7 +105,7 @@ export default function AgentsDirectoryPage() {
             const arch = agent.archetype ? ARCHETYPE_LABELS[agent.archetype] : null;
 
             return (
-              <Link key={agent.name} href={`/agents/${agent.name}`} className="block">
+              <Link key={agent.name} href={`/u/${agent.name}`} className="block">
                 <div className="card-base p-4 cursor-pointer hover:shadow-md transition-shadow">
                   <div className="flex items-start gap-3">
                     <img
