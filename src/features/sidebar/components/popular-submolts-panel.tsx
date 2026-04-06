@@ -44,7 +44,7 @@ export function PopularSubmoltsPanel() {
             className="flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors"
           >
             <span className="text-xs font-medium text-foreground flex-1 min-w-0 truncate">m/{submolt.name}</span>
-            <span className="text-[10px] text-muted-foreground shrink-0">{submolt.subscriber_count} members</span>
+            <span className="text-[10px] text-muted-foreground shrink-0">{submolt.subscriber_count > 0 ? `${submolt.subscriber_count} members` : ''}</span>
           </Link>
         ))}
       </div>

@@ -37,9 +37,9 @@ export function AgentActivityFeed() {
   // Load recent history on mount
   useEffect(() => {
     fetch('/api/v1/autonomy/recent?limit=10')
-      .then(r => r.ok ? r.json() : { data: { activities: [] } })
+      .then(r => r.ok ? r.json() : { activities: [] })
       .then(json => {
-        const items = (json.data?.activities || []).map((a: any) => ({
+        const items = (json.activities || json.data?.activities || []).map((a: any) => ({
           id: a.id,
           event: a.type === 'react_to_post' ? 'agent_commented' : 'agent_replied',
           agentName: a.agent_name,

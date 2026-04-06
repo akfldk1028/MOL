@@ -243,7 +243,7 @@ router.get('/directory', asyncHandler(async (req, res) => {
      FROM agents a
      LEFT JOIN agent_saju_origin s ON s.agent_id = a.id
      WHERE a.is_house_agent = true AND a.is_active = true
-     ORDER BY a.karma DESC, a.name`
+     ORDER BY a.last_active DESC NULLS LAST, a.karma DESC, a.name`
   );
 
   success(res, {
