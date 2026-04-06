@@ -103,9 +103,9 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
   const text = `${node.title || ''} ${node.description || ''}`.trim();
   if (text.length < 30) return;
 
-  // 에이전트 특성 기반 확률: researcher weight가 높으면 더 자주 학습
+  // 확률: 기본 50%, researcher 계열은 80%까지
   const researchWeight = bc.weights?.researcher || 0.1;
-  const extractChance = Math.min(researchWeight * 0.5, 0.25); // max 25%
+  const extractChance = Math.min(0.5 + researchWeight, 0.8);
   if (Math.random() > extractChance) return;
 
   // 에이전트 특성에 맞는 추출 방식
@@ -113,8 +113,8 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
     ? 'creative' : 'analytical';
 
   const systemPrompt = style === 'creative'
-    ? 'You find creative connections and novel concepts. Return ONLY a JSON array of 2-3 concepts with unexpected angles. Each: {"name": "short name", "description": "creative insight"}. No markdown.'
-    : 'You extract key factual concepts and domain knowledge. Return ONLY a JSON array of 2-3 concepts. Each: {"name": "short name", "description": "factual explanation"}. No markdown.';
+    ? 'You find creative connections and novel concepts. Return ONLY a JSON array of 2-3 concepts with unexpected angles. Each: {"name": "short name (2-4 words)", "description": "creative insight in 1-2 full sentences (minimum 20 chars)"}. No markdown, no truncation.'
+    : 'You extract key factual concepts and domain knowledge. Return ONLY a JSON array of 2-3 concepts. Each: {"name": "short name (2-4 words)", "description": "factual explanation in 1-2 full sentences (minimum 20 chars)"}. No markdown, no truncation.';
 
   try {
     const google = require('../nodes/llm-call/providers/google');
@@ -122,9 +122,9 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
       google.call('gemini-2.5-flash-lite',
         systemPrompt,
         `Extract key concepts from: "${text.slice(0, 500)}"`,
-        { maxOutputTokens: 200 }
+        { maxOutputTokens: 512 }
       ),
-      new Promise(r => setTimeout(() => r(null), 8000)),
+      new Promise(r => setTimeout(() => r(null), 10000)),
     ]);
 
     if (!raw) return;
@@ -167,6 +167,19 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
         cgbFetch('/api/v1/graph/edges', {
           method: 'POST',
           body: { sourceId: `agent-${agentId}`, targetId: conceptId, type: 'OWNS' },
+          timeout: 10000,
+        }).catch(() => {});
+      }
+    }
+
+    // Cross-link: search for related Concepts in graph
+    if (concepts.length >= 2) {
+      for (let i = 0; i < concepts.length - 1; i++) {
+        const id1 = `concept-${concepts[i].name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50)}`;
+        const id2 = `concept-${concepts[i + 1].name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50)}`;
+        cgbFetch('/api/v1/graph/edges', {
+          method: 'POST',
+          body: { sourceId: id1, targetId: id2, type: 'RELATED_TO' },
           timeout: 10000,
         }).catch(() => {});
       }
@@ -338,26 +351,28 @@ async function addToGraph(agentId, node, episodeId = null) {
       }).catch(() => {});
     }
 
-    // Connect to related nodes (same topic → SIMILAR_TO via embedding search)
+    // Connect to related nodes (same topic → SIMILAR_TO via embedding search, top 3)
     const searchTitle = (node.title || '').replace(/^(Interest|Response):\s*/, '');
     if (searchTitle.length > 10) {
       const related = await cgbFetch(
         `/api/v1/graph/search?q=${encodeURIComponent(searchTitle.slice(0, 80))}&limit=5`
       );
       const relatedNodes = related?.data?.results || [];
+      let linked = 0;
       for (const other of relatedNodes) {
-        if (other.id !== result.data.id) {
+        if (other.id !== result.data.id && linked < 3) {
           cgbFetch('/api/v1/graph/edges', {
             method: 'POST',
             body: { sourceId: result.data.id, targetId: other.id, type: 'SIMILAR_TO' },
             timeout: 10000,
           }).catch(() => {});
-          break; // 가장 유사한 1개만
+          linked++;
         }
       }
     }
 
-    // Concept extraction moved to CGB cron/reflect (batch, 100% coverage)
+    // Extract concepts from this idea (inline, not just cron)
+    extractConcepts(agentId, result.data.id, node, bc);
 
     // Promote to domain layer if score >= 40
     const score = result.data.score || 0;
