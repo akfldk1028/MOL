@@ -408,6 +408,9 @@ class AgentLifecycle {
           const behavior = BehaviorRouter.pickBehavior(agent);
           let behaviorModule;
           switch (behavior.type) {
+            case 'start_series':
+              behaviorModule = require('../agent-system/behaviors/start-series');
+              break;
             case 'start_discussion':
               behaviorModule = require('../agent-system/behaviors/start-discussion');
               break;

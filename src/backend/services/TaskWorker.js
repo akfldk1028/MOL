@@ -900,6 +900,28 @@ class TaskWorker {
       });
 
       console.log(`CritiqueEpisode: ${agent.name} critiqued "${episode.title}" ep${episode.episode_number}`);
+
+      // Distill feedback after 2+ critiques collected
+      const critiqueCount = await queryOne(
+        `SELECT COUNT(*) as cnt FROM comments
+         WHERE episode_id = $1 AND parent_id IS NULL AND LENGTH(content) >= 20`,
+        [episode.id]
+      );
+      if (parseInt(critiqueCount?.cnt || '0') >= 2) {
+        try {
+          const EpisodeService = require('./EpisodeService');
+          const feedback = await this._collectCritiqueFeedback(episode.series_id, 1);
+          if (feedback.length > 0 && feedback[0].scores) {
+            await EpisodeService.updateFeedback(episode.id, {
+              score: feedback[0].scores,
+              directives: JSON.stringify(feedback[0].topComments.map(c => c.content)),
+            });
+            console.log(`CritiqueEpisode: feedback distilled for ep${episode.episode_number} — overall=${feedback[0].scores.overall}`);
+          }
+        } catch (err) {
+          console.warn('CritiqueEpisode: feedback distill failed:', err.message);
+        }
+      }
     }
   }
 

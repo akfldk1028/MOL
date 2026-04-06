@@ -68,6 +68,12 @@ function pickBehavior(agent) {
       ['create_post', 'start_discussion', 'mention_debate', 'web_discover'].includes(b.type)
     );
     if (selfBehaviors.length === 0) return { type: 'create_post' };
+
+    // 2% chance: creator/storyteller archetypes start a new series
+    if (['creator', 'storyteller', 'expert'].includes(agent.archetype) && Math.random() < 0.02) {
+      return { type: 'start_series' };
+    }
+
     return weightedPick(selfBehaviors);
   } catch {
     return { type: 'create_post' };
