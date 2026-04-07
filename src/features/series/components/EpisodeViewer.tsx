@@ -69,6 +69,12 @@ export function EpisodeViewer({ episode, series, prev, next, hiddenContent }: Ep
               alt={`Page ${i + 1}`}
               className="w-full block"
               loading={i < 2 ? 'eager' : 'lazy'}
+              onError={(e) => {
+                const img = e.currentTarget;
+                img.style.minHeight = '200px';
+                img.style.background = '#f3f4f6';
+                img.alt = `Page ${i + 1} — failed to load`;
+              }}
             />
           ))}
         </div>

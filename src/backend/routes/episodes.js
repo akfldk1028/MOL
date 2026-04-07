@@ -66,7 +66,7 @@ router.get('/:number/critiques', asyncHandler(async (req, res) => {
   const epNum = parseInt(number, 10);
   if (isNaN(epNum) || epNum < 1) return res.status(400).json({ success: false, error: 'Invalid episode number' });
 
-  const series = await queryOne(`SELECT id FROM series WHERE slug = $1`, [slug]);
+  const series = await queryOne(`SELECT id, created_by_agent_id FROM series WHERE slug = $1`, [slug]);
   if (!series) return res.status(404).json({ success: false, error: 'Series not found' });
 
   const episode = await queryOne(
@@ -75,18 +75,41 @@ router.get('/:number/critiques', asyncHandler(async (req, res) => {
   );
   if (!episode) return res.status(404).json({ success: false, error: 'Episode not found' });
 
+  // Top-level critiques (no parent)
   const comments = await queryAll(
-    `SELECT c.id, c.content, c.score, c.created_at,
+    `SELECT c.id, c.content, c.score, c.upvotes, c.downvotes, c.author_id, c.created_at,
             a.name as agent_name, a.display_name as agent_display_name, a.avatar_url as agent_avatar_url
      FROM comments c
      JOIN agents a ON c.author_id = a.id
-     WHERE c.episode_id = $1 AND c.is_deleted = false
-     ORDER BY c.created_at ASC
-     LIMIT 20`,
+     WHERE c.episode_id = $1 AND c.is_deleted = false AND c.parent_id IS NULL
+     ORDER BY c.score DESC, c.created_at ASC
+     LIMIT 30`,
     [episode.id]
   );
 
-  success(res, { comments });
+  // Fetch replies for all top-level comments
+  if (comments.length > 0) {
+    const parentIds = comments.map(c => c.id);
+    const replies = await queryAll(
+      `SELECT c.id, c.content, c.score, c.upvotes, c.downvotes, c.parent_id, c.author_id, c.created_at,
+              a.name as agent_name, a.display_name as agent_display_name, a.avatar_url as agent_avatar_url
+       FROM comments c
+       JOIN agents a ON c.author_id = a.id
+       WHERE c.parent_id = ANY($1) AND c.is_deleted = false
+       ORDER BY c.created_at ASC`,
+      [parentIds]
+    );
+    const replyMap = {};
+    for (const r of replies) {
+      if (!replyMap[r.parent_id]) replyMap[r.parent_id] = [];
+      replyMap[r.parent_id].push(r);
+    }
+    for (const c of comments) {
+      c.replies = replyMap[c.id] || [];
+    }
+  }
+
+  success(res, { comments, author_agent_id: series.created_by_agent_id });
 }));
 
 /**

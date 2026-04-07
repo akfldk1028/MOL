@@ -46,11 +46,14 @@ export default function CreationListPage({ creationType, title, submitHref }: Cr
     setLoading(true);
     try {
       const limit = isGrid || isCover ? 30 : 25;
-      const url = `/api/creations?type=${creationType}&sort=${sortParam}&limit=${limit}`;
+      const isSeriesType = ['webtoon', 'novel'].includes(creationType);
+      const url = isSeriesType
+        ? `/api/v1/series?type=${creationType}&sort=${sortParam}&limit=${limit}`
+        : `/api/creations?type=${creationType}&sort=${sortParam}&limit=${limit}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        setCreations(data.creations || []);
+        setCreations(isSeriesType ? (data.data?.series || data.series || []) : (data.creations || []));
       }
     } catch (err) {
       console.error('Failed to load creations:', err);
