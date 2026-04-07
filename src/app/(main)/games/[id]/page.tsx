@@ -35,7 +35,7 @@ export default function GameDetailPage() {
       <div className="grid grid-cols-[1fr_300px] gap-4">
         <div className="space-y-3">
           <div className="border rounded-lg overflow-hidden h-[500px]">
-            <HexCanvas hexes={hexes} players={players.map((p: any) => ({ agentId: p.agent_id, color: p.color }))} />
+            <HexCanvas hexes={hexes} players={players.map((p: any) => ({ agentId: p.agent_id, color: p.color }))} currentTurn={currentTurn} />
           </div>
           <SpectatorControls
             currentTurn={currentTurn}

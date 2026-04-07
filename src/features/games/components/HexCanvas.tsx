@@ -18,6 +18,7 @@ interface PlayerInfo {
 interface HexCanvasProps {
   hexes: HexData[];
   players: PlayerInfo[];
+  currentTurn?: number;
   onHexClick?: (q: number, r: number) => void;
 }
 
@@ -49,15 +50,32 @@ function drawHex(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: nu
   ctx.closePath();
 }
 
-export default function HexCanvas({ hexes, players, onHexClick }: HexCanvasProps) {
+export default function HexCanvas({ hexes, players, currentTurn = 0, onHexClick }: HexCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const dragRef = useRef<{ startX: number; startY: number; offsetX: number; offsetY: number } | null>(null);
+  const prevHexesRef = useRef<Map<string, string | null>>(new Map());
+  const flashRef = useRef<Map<string, { color: string; alpha: number }>>(new Map());
+  const animFrameRef = useRef<number>(0);
+  const sizeRef = useRef({ w: 0, h: 0 });
 
   const playerMap = new Map(players.map(p => [p.agentId, p]));
 
-  const sizeRef = useRef({ w: 0, h: 0 });
+  // Detect changed hexes for flash animation
+  useEffect(() => {
+    const newOwnerMap = new Map<string, string | null>();
+    for (const hex of hexes) {
+      const key = `${hex.q},${hex.r}`;
+      newOwnerMap.set(key, hex.owner);
+      const prevOwner = prevHexesRef.current.get(key);
+      if (prevOwner !== undefined && prevOwner !== hex.owner && hex.owner) {
+        const player = playerMap.get(hex.owner);
+        flashRef.current.set(key, { color: player?.color || '#fff', alpha: 1.0 });
+      }
+    }
+    prevHexesRef.current = newOwnerMap;
+  }, [hexes, currentTurn]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -82,37 +100,80 @@ export default function HexCanvas({ hexes, players, onHexClick }: HexCanvasProps
 
     for (const hex of hexes) {
       const { x, y } = hexToPixel(hex.q, hex.r);
+      const key = `${hex.q},${hex.r}`;
 
+      // Terrain fill
       drawHex(ctx, x, y, HEX_SIZE - 1);
       ctx.fillStyle = TERRAIN_COLORS[hex.terrain] || '#ccc';
       ctx.fill();
 
+      // Owner overlay
       if (hex.owner) {
         const player = playerMap.get(hex.owner);
         if (player) {
           drawHex(ctx, x, y, HEX_SIZE - 1);
-          ctx.fillStyle = player.color + '66';
+          ctx.fillStyle = player.color + '88';
           ctx.fill();
         }
       }
 
+      // Flash effect for recently changed hexes
+      const flash = flashRef.current.get(key);
+      if (flash && flash.alpha > 0) {
+        drawHex(ctx, x, y, HEX_SIZE + 2);
+        ctx.fillStyle = flash.color + Math.round(flash.alpha * 255).toString(16).padStart(2, '0');
+        ctx.fill();
+        // White burst
+        drawHex(ctx, x, y, HEX_SIZE - 1);
+        ctx.fillStyle = `rgba(255,255,255,${flash.alpha * 0.6})`;
+        ctx.fill();
+      }
+
+      // Border
       drawHex(ctx, x, y, HEX_SIZE - 1);
-      ctx.strokeStyle = '#00000020';
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = hex.owner ? '#00000040' : '#00000015';
+      ctx.lineWidth = hex.owner ? 1 : 0.5;
       ctx.stroke();
 
+      // Defense indicator
       if (hex.defenseBonus > 0) {
         ctx.fillStyle = '#3b82f6';
-        ctx.font = '8px sans-serif';
+        ctx.font = `${10}px sans-serif`;
         ctx.textAlign = 'center';
-        ctx.fillText('\u{1F6E1}'.repeat(hex.defenseBonus), x, y + 3);
+        ctx.textBaseline = 'middle';
+        ctx.fillText(hex.defenseBonus.toString(), x, y);
       }
     }
 
     ctx.restore();
-  }, [hexes, players, offset, zoom]);
 
-  useEffect(() => { render(); }, [render]);
+    // Turn indicator
+    ctx.fillStyle = '#666';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Turn ${currentTurn}`, 10, 20);
+
+    // Decay flash alphas
+    let hasFlash = false;
+    for (const [key, flash] of flashRef.current) {
+      flash.alpha -= 0.03;
+      if (flash.alpha <= 0) {
+        flashRef.current.delete(key);
+      } else {
+        hasFlash = true;
+      }
+    }
+
+    if (hasFlash) {
+      animFrameRef.current = requestAnimationFrame(render);
+    }
+  }, [hexes, players, offset, zoom, currentTurn]);
+
+  useEffect(() => {
+    cancelAnimationFrame(animFrameRef.current);
+    animFrameRef.current = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [render]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -148,7 +209,7 @@ export default function HexCanvas({ hexes, players, onHexClick }: HexCanvasProps
   return (
     <canvas
       ref={canvasRef}
-      className="w-full h-full cursor-grab active:cursor-grabbing"
+      className="w-full h-full cursor-grab active:cursor-grabbing bg-slate-50"
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}

@@ -14,7 +14,7 @@ export function useGameLive(id: string, config?: SWRConfiguration) {
   return useSWR(
     id ? ['games', id, 'state'] : null,
     () => api.request<any>('GET', `/games/${id}/state`),
-    { refreshInterval: 3000, ...config }
+    { refreshInterval: 2000, ...config }
   );
 }
 
