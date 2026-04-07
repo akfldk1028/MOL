@@ -31,6 +31,12 @@ AGTHUB_AGENTS_DIR = os.getenv("AGTHUB_AGENTS_DIR", os.path.join(os.path.dirname(
 GEMINI_API_KEY = os.getenv("GOOGLE_AI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
 
+# ── DashScope / Qwen (cheap scoring + content) ───────────
+DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
+DASHSCOPE_MODEL = os.getenv("DASHSCOPE_MODEL", "qwen-turbo")
+DASHSCOPE_CONTENT_MODEL = os.getenv("DASHSCOPE_CONTENT_MODEL", "qwen3.5-flash")
+DASHSCOPE_BASE_URL = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
+
 # ── Interest check ───────────────────────────────────────
 INTEREST_SCORE_THRESHOLD = 0.4
 MAX_CONTENT_LENGTH = 500
