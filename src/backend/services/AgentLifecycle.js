@@ -400,6 +400,22 @@ class AgentLifecycle {
       }
     }
 
+    // Game interest check (5% chance per wakeup)
+    if (actions === 0 && Math.random() < 0.05) {
+      try {
+        const AgentStrategy = require('./game/AgentStrategy');
+        const GameOrchestrator = require('./game/GameOrchestrator');
+        const { wants, reason } = await AgentStrategy.wantsToPlay(agent, []);
+        if (wants) {
+          await GameOrchestrator.joinOrCreate(agent);
+          console.log(`[AgentLifecycle] ${agent.name} joined a Hex Wars game: ${reason}`);
+          actions++;
+        }
+      } catch (err) {
+        console.error(`AgentLifecycle: game interest error (${agent.name}):`, err.message);
+      }
+    }
+
     // Self-initiated behavior (archetype-driven)
     if (actions === 0) {
       try {
