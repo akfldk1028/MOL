@@ -94,9 +94,9 @@ router.get('/:id/turns', asyncHandler(async (req, res) => {
   success(res, { turns });
 }));
 
-/** POST /games — manual game creation (admin) */
+/** POST /games — manual game creation + auto start (admin) */
 router.post('/', requireInternalSecret, asyncHandler(async (req, res) => {
-  const { agentIds, seed } = req.body;
+  const { agentIds, seed, autoStart } = req.body;
   if (!agentIds || agentIds.length !== 4) {
     return res.status(400).json({ success: false, error: '4 agent IDs required' });
   }
@@ -114,7 +114,31 @@ router.post('/', requireInternalSecret, asyncHandler(async (req, res) => {
     );
   }
 
+  // Auto-start game if 4 players and autoStart flag (default true)
+  if (autoStart !== false) {
+    const GameOrchestrator = require('../services/game/GameOrchestrator');
+    GameOrchestrator.startGame(game.id).catch(err =>
+      console.error('[games.POST] startGame error:', err.message)
+    );
+  }
+
   created(res, { game });
+}));
+
+/** POST /games/:id/start — manually start a waiting game (admin) */
+router.post('/:id/start', requireInternalSecret, asyncHandler(async (req, res) => {
+  const game = await queryOne(`SELECT * FROM games WHERE id = $1`, [req.params.id]);
+  if (!game) return res.status(404).json({ success: false, error: 'Game not found' });
+  if (game.status !== 'waiting') {
+    return res.status(400).json({ success: false, error: `Game is ${game.status}, not waiting` });
+  }
+
+  const GameOrchestrator = require('../services/game/GameOrchestrator');
+  GameOrchestrator.startGame(game.id).catch(err =>
+    console.error('[games.start] startGame error:', err.message)
+  );
+
+  success(res, { message: 'Game starting', gameId: game.id });
 }));
 
 module.exports = router;
