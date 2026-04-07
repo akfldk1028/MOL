@@ -18,6 +18,7 @@ const TaskScheduler = require('./services/TaskScheduler'); // used in routes
 const SeriesContentScheduler = require('./services/SeriesContentScheduler');
 const cron = require('node-cron');
 const HRSystem = require('./agent-system/hr');
+const AGTHUBSync = require('./services/AGTHUBSync');
 
 let resetInterval = null;
 
@@ -72,6 +73,24 @@ async function start() {
       }
     }, { timezone: 'Asia/Seoul' });
     console.log('HR Daily Evaluation cron scheduled (midnight KST)');
+
+    // AGTHUB Sync — every 30 minutes, sync new DB agents to AGTHUB folders
+    cron.schedule('*/30 * * * *', async () => {
+      try {
+        const result = await AGTHUBSync.backfillAll();
+        if (result.created > 0) {
+          console.log(`[AGTHUB Sync] ${result.created} new agents synced (total: ${result.total})`);
+        }
+      } catch (err) {
+        console.error('[AGTHUB Sync] Failed:', err.message);
+      }
+    });
+    // Run once on startup
+    AGTHUBSync.backfillAll().then(r => {
+      if (r.created > 0) console.log(`[AGTHUB Sync] Startup: ${r.created} new agents synced`);
+      else console.log(`[AGTHUB Sync] Startup: all ${r.total} agents in sync`);
+    }).catch(err => console.error('[AGTHUB Sync] Startup failed:', err.message));
+    console.log('AGTHUB Sync cron scheduled (every 30 min)');
 
     console.log('Agent Autonomy enabled (event-driven, no polling)');
   }
