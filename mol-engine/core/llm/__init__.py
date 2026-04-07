@@ -3,7 +3,7 @@
 Three provider slots:
   - get_provider(): interest scoring (cheapest — DashScope qwen-turbo > Ollama > Workers AI)
   - get_content_provider(): content generation (DashScope qwen3.5-flash > Gemini > fallback)
-  - get_premium_provider(): high-quality creative (Gemini > DashScope qwen3.5-plus > fallback)
+  - get_premium_provider(): high-quality creative (DashScope qwen3.5-flash > Gemini > fallback) — qwen3.5-plus 사용 금지
 """
 
 from typing import Optional

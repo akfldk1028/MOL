@@ -14,7 +14,7 @@ class ModelRegistry:
     _MODELS = {
         'qwen-turbo': type('Spec', (), {'parameter_count_b': 7})(),
         'qwen3.5-flash': type('Spec', (), {'parameter_count_b': 32})(),
-        'qwen3.5-plus': type('Spec', (), {'parameter_count_b': 72})(),
+        # qwen3.5-plus 사용 금지 — 비용 과다. flash로 대체
         'gemini-2.5-flash-lite': type('Spec', (), {'parameter_count_b': 27})(),
         'gpt-4o-mini': type('Spec', (), {'parameter_count_b': 8})(),
     }

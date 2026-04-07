@@ -3,10 +3,9 @@
 Cheapest option for scoring, comments, and general tasks.
 API: POST https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions
 
-Models:
-  - qwen-turbo: $0.05/1M input, $0.20/1M output (scoring, classification)
-  - qwen3.5-flash: $0.10/1M input, $0.40/1M output (comments, short text)
-  - qwen3.5-plus: $0.40/1M input, $2.40/1M output (creative writing)
+Models (qwen3.5-plus 사용 금지 — 비용 과다):
+  - qwen-turbo: $0.05/1M input, $0.20/1M output (scoring, classification, 대부분)
+  - qwen3.5-flash: $0.10/1M input, $0.40/1M output (에피소드, 웹툰 스크립트, 프리미엄)
 """
 
 import json
