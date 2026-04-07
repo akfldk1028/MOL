@@ -437,4 +437,44 @@ async function getStatus(agentId) {
   };
 }
 
-module.exports = { research, brainstorm, evaluate, addToGraph, searchGraph, trackActivity, getBrainConfig, getStatus, createEpisode };
+/**
+ * Record an evolution event in CGB graph.
+ * Creates an Evolution node linked to the agent.
+ * @origin: Phase 4 — CGB integration for mol-engine evolution
+ */
+async function recordEvolution(agentId, evolution) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return null;
+
+  ensureAgentNode(agentId, bc);
+
+  const evoId = `evo-${agentId}-${Date.now()}`;
+  const result = await cgbFetch('/api/v1/graph/nodes', {
+    method: 'POST',
+    body: {
+      id: evoId,
+      type: 'Idea',
+      title: `Evolution: ${evolution.type} ${evolution.target}`,
+      description: `${evolution.reason} (${evolution.type})`,
+      agent_id: agentId,
+      domain: bc.graph_scope,
+      layer: 2,
+    },
+    timeout: 10000,
+  });
+
+  if (result?.data) {
+    // Agent → OWNS → Evolution node
+    cgbFetch('/api/v1/graph/edges', {
+      method: 'POST',
+      body: { sourceId: `agent-${agentId}`, targetId: evoId, type: 'OWNS' },
+      timeout: 10000,
+    }).catch(() => {});
+
+    await trackActivity(agentId, 'evolution');
+  }
+
+  return result?.data || null;
+}
+
+module.exports = { research, brainstorm, evaluate, addToGraph, searchGraph, trackActivity, getBrainConfig, getStatus, createEpisode, recordEvolution };
