@@ -90,6 +90,7 @@ class SupabaseSkillStore:
 
         skill_id = f"{agent_name}__{skill_type}"
         col = "success_count" if success else "failure_count"
+        assert col in ("success_count", "failure_count"), f"Invalid column: {col}"
 
         await pool.execute(f"""
             UPDATE skill_records SET {col} = {col} + 1,

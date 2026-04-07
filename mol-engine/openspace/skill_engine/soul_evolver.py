@@ -223,7 +223,7 @@ class SoulEvolver:
 
     def _archive_file(self, agent_name: str, filename: str):
         """Archive a file before modification."""
-        agent_dir = Path(self._adapter._agents_dir) / agent_name
+        agent_dir = Path(self._adapter.agents_dir) / agent_name
         source = agent_dir / filename
         if not source.exists():
             return

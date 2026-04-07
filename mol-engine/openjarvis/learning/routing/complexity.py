@@ -15,8 +15,7 @@ from typing import Optional
 # Optional imports — ComplexityQueryAnalyzer class needs these,
 # but score_complexity() is fully independent
 try:
-    from openjarvis.core.types import RoutingContext
-    from openjarvis.learning._stubs import QueryAnalyzer
+    from .._stubs import RoutingContext, QueryAnalyzer
 except ImportError:
     RoutingContext = None
     QueryAnalyzer = object

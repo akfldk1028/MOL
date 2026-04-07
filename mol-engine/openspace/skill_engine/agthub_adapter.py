@@ -43,6 +43,10 @@ class AGTHUBSkillAdapter:
         self._cache: Dict[str, AgentSkillMeta] = {}
         self._scan()
 
+    @property
+    def agents_dir(self) -> Path:
+        return self._agents_dir
+
     def _scan(self) -> int:
         """Scan AGTHUB agents directory."""
         self._cache.clear()

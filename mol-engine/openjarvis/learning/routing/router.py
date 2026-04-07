@@ -23,6 +23,10 @@ class ModelRegistry:
     def get(cls, key):
         return cls._MODELS.get(key, type('Spec', (), {'parameter_count_b': 0})())
 
+    @classmethod
+    def keys(cls):
+        return cls._MODELS.keys()
+
 logger = logging.getLogger(__name__)
 
 

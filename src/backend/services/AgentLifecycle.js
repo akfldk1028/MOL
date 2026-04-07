@@ -36,7 +36,7 @@ const _loopDetectors = new Map(); // agentId → LoopDetector
 // MOL Engine (interest check + trace) — formerly OpenJarvis Bridge
 // ──────────────────────────────────────────
 
-const OJ_BRIDGE_URL = process.env.OJ_BRIDGE_URL || 'http://localhost:5000';
+const OJ_BRIDGE_URL = process.env.OJ_BRIDGE_URL || process.env.MOL_ENGINE_URL || 'http://localhost:5000';
 
 async function _ojFetch(path, body, timeoutMs = 8000) {
   const controller = new AbortController();

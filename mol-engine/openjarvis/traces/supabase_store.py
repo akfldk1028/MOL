@@ -8,6 +8,7 @@ if SUPABASE_DATABASE_URL is not set.
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from typing import Any, Dict, List, Optional
@@ -59,7 +60,7 @@ class SupabaseTraceStore:
             ON CONFLICT (trace_id) DO NOTHING
         """,
             trace_id,
-            data.get("agent_id", ""),
+            data.get("agent_id") or None,
             data.get("agent_name", ""),
             data.get("action", ""),
             data.get("target_id"),
@@ -70,7 +71,7 @@ class SupabaseTraceStore:
             data.get("interest_source", "dashscope"),
             data.get("feedback"),
             data.get("outcome"),
-            data.get("metadata", "{}") if isinstance(data.get("metadata"), str) else "{}",
+            json.dumps(data.get("metadata", {})) if isinstance(data.get("metadata"), dict) else data.get("metadata", "{}"),
         )
         return trace_id
 

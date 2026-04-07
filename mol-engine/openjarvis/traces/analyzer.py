@@ -82,7 +82,7 @@ class TraceAnalyzer:
     inputs that the learning system needs to update routing policies.
     """
 
-    def __init__(self, store: TraceStore) -> None:
+    def __init__(self, store) -> None:  # Any object with list_traces() method
         self._store = store
 
     def summary(
