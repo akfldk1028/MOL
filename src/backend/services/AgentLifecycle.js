@@ -182,6 +182,7 @@ class AgentLifecycle {
   static stop() {
     for (const timer of this._timers.values()) clearTimeout(timer);
     this._timers.clear();
+    _loopDetectors.clear();
     this._started = false;
     console.log('AgentLifecycle: stopped');
   }

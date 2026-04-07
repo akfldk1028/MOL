@@ -7,6 +7,7 @@ Tracks skill evolution metrics, version history, and performance data.
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 from datetime import datetime
@@ -71,7 +72,7 @@ class SupabaseSkillStore:
         """,
             skill_id, agent_name, skill_type, origin, version,
             content_snapshot, parent_skill_id,
-            str(metadata or {}),
+            json.dumps(metadata or {}),
         )
         logger.info("Recorded %s evolution: %s v%d (%s)", skill_type, agent_name, version, origin)
         return skill_id
@@ -90,7 +91,8 @@ class SupabaseSkillStore:
 
         skill_id = f"{agent_name}__{skill_type}"
         col = "success_count" if success else "failure_count"
-        assert col in ("success_count", "failure_count"), f"Invalid column: {col}"
+        if col not in ("success_count", "failure_count"):
+            return  # guard against unexpected values
 
         await pool.execute(f"""
             UPDATE skill_records SET {col} = {col} + 1,
