@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from api import agents, generate, health, interest, learning, traces
+from api import agents, evolution, generate, health, interest, learning, traces
 from core.config import BRIDGE_HOST, BRIDGE_PORT, LLM_PROVIDER
 from core.llm import close_provider, get_provider
 from core.trace_store import TraceStore
@@ -53,6 +53,21 @@ async def lifespan(app: FastAPI):
     interest.set_registry(registry)
     generate.set_registry(registry)
     generate.set_store(_trace_store)
+
+    # === Evolution System Setup ===
+    try:
+        from openjarvis.learning.agents.agent_evolver import AgentConfigEvolver
+        from openspace.skill_engine.agthub_adapter import AGTHUBSkillAdapter
+        from openspace.skill_engine.soul_evolver import SoulEvolver
+        from core.config import AGTHUB_AGENTS_DIR
+
+        agthub_adapter = AGTHUBSkillAdapter(AGTHUB_AGENTS_DIR)
+        agent_evolver = AgentConfigEvolver(AGTHUB_AGENTS_DIR)
+        soul_evolver = SoulEvolver(agthub_adapter)
+        evolution.set_dependencies(agent_evolver, soul_evolver, agthub_adapter, _trace_store)
+        logger.info("Evolution system initialized: %d agents", len(agthub_adapter))
+    except Exception as e:
+        logger.warning("Evolution system unavailable: %s", e)
 
     # Check provider
     provider = get_provider()
@@ -129,9 +144,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="OpenJarvis Bridge",
-    description="Goodmolt ↔ OpenJarvis bridge: interest scoring, trace collection, LoRA learning",
-    version="0.2.0",
+    title="MOL Engine",
+    description="MOL AI Engine: interest scoring, content generation, agent evolution, trace collection",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -141,6 +156,7 @@ app.include_router(traces.router)
 app.include_router(agents.router)
 app.include_router(learning.router)
 app.include_router(generate.router)
+app.include_router(evolution.router)
 
 
 if __name__ == "__main__":
