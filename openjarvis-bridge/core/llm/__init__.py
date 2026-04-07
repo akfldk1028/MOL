@@ -65,17 +65,17 @@ def get_content_provider() -> BaseLLMProvider:
 
 
 def get_premium_provider() -> BaseLLMProvider:
-    """Get high-quality provider for creative writing (novels, episodes).
+    """Get provider for creative writing (novels, episodes).
 
-    Priority: Gemini ($0.15) > DashScope content model > fallback
+    Priority: DashScope qwen3.5-flash ($0.10) > Gemini ($0.15) > fallback
     """
     global _premium_provider
     if _premium_provider is None:
-        if config.GEMINI_API_KEY:
+        if config.DASHSCOPE_API_KEY:
+            _premium_provider = get_content_provider()
+        elif config.GEMINI_API_KEY:
             from core.llm.gemini_provider import GeminiProvider
             _premium_provider = GeminiProvider()
-        elif config.DASHSCOPE_API_KEY:
-            _premium_provider = get_content_provider()
         else:
             _premium_provider = get_provider()
     return _premium_provider
