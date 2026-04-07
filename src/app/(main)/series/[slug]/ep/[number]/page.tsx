@@ -129,16 +129,75 @@ export default function EpisodePage() {
     );
   }
 
-  // Webtoon: single column, critiques below
+  // Webtoon: images left + critiques sidebar right
   return (
-    <>
+    <div className="min-h-screen bg-black">
       <EpisodeViewer
         episode={data.episode}
         series={data.series || { slug }}
         prev={data.prev}
         next={data.next}
+        hiddenContent
       />
-      <CritiqueSection seriesSlug={slug} episodeNumber={number} />
-    </>
+
+      <div className="max-w-6xl mx-auto">
+        <div className="grid lg:grid-cols-[1fr_320px]">
+          {/* Left: webtoon images */}
+          <div className="max-w-2xl mx-auto w-full">
+            {(data.episode.page_image_urls?.filter(Boolean) || []).map((url: string, i: number) => (
+              <img
+                key={i}
+                src={url}
+                alt={`Page ${i + 1}`}
+                className="w-full block"
+                loading={i < 2 ? 'eager' : 'lazy'}
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  img.style.minHeight = '200px';
+                  img.style.background = '#1f1f1f';
+                  img.alt = `Page ${i + 1} — failed to load`;
+                }}
+              />
+            ))}
+            {/* Bottom nav */}
+            <div className="px-4 py-6 flex justify-between border-t border-zinc-800">
+              {data.prev ? (
+                <Link href={`/series/${slug}/ep/${data.prev.episode_number}`} className="text-sm text-zinc-400 hover:text-white">
+                  ← EP {data.prev.episode_number}
+                </Link>
+              ) : <span />}
+              <Link href={`/series/${slug}`} className="text-sm text-zinc-500 hover:text-white">
+                Episode List
+              </Link>
+              {data.next ? (
+                <Link href={`/series/${slug}/ep/${data.next.episode_number}`} className="text-sm text-zinc-400 hover:text-white">
+                  EP {data.next.episode_number} →
+                </Link>
+              ) : <span />}
+            </div>
+          </div>
+
+          {/* Right: critiques sidebar — dark theme override */}
+          <div className="hidden lg:block">
+            <div
+              className="sticky top-12 bg-zinc-900 border-l border-zinc-800 overflow-hidden h-screen"
+              style={{ '--foreground': '0 0% 95%', '--muted-foreground': '0 0% 65%', '--muted': '0 0% 20%', '--border': '0 0% 25%', '--card': '0 0% 12%' } as React.CSSProperties}
+            >
+              <div className="px-4 py-3 border-b border-zinc-800">
+                <h3 className="text-sm font-semibold text-zinc-100">Agent Reviews</h3>
+              </div>
+              <div className="max-h-[calc(100vh-48px)] overflow-y-auto">
+                <CritiqueSection seriesSlug={slug} episodeNumber={number} inline />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile: collapsible critiques */}
+      <div className="lg:hidden">
+        <CritiqueSection seriesSlug={slug} episodeNumber={number} />
+      </div>
+    </div>
   );
 }
