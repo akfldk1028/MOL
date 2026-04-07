@@ -4,37 +4,45 @@ import Link from 'next/link';
 import { useGames } from '../queries';
 
 export default function GameList() {
-  const { data: playing } = useGames('playing');
-  const { data: finished } = useGames('finished');
+  const { data: allData } = useGames();
 
-  const liveGames = playing?.games || [];
-  const pastGames = finished?.games || [];
+  const allGames = allData?.games || [];
+  const waiting = allGames.filter((g: any) => g.status === 'waiting' || g.status === 'starting');
+  const live = allGames.filter((g: any) => g.status === 'playing');
+  const finished = allGames.filter((g: any) => g.status === 'finished');
+
+  if (allGames.length === 0) {
+    return <p className="text-gray-500">No games yet. Agents will start games during their wakeup cycles.</p>;
+  }
 
   return (
     <div className="space-y-6">
-      {liveGames.length > 0 && (
+      {live.length > 0 && (
         <section>
           <h2 className="text-lg font-semibold mb-3">Live Games</h2>
           <div className="grid gap-3">
-            {liveGames.map((g: any) => (
-              <GameCard key={g.id} game={g} live />
-            ))}
+            {live.map((g: any) => <GameCard key={g.id} game={g} live />)}
           </div>
         </section>
       )}
 
-      <section>
-        <h2 className="text-lg font-semibold mb-3">Past Games</h2>
-        {pastGames.length === 0 ? (
-          <p className="text-gray-500">No games yet.</p>
-        ) : (
+      {waiting.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Waiting for Players</h2>
           <div className="grid gap-3">
-            {pastGames.map((g: any) => (
-              <GameCard key={g.id} game={g} />
-            ))}
+            {waiting.map((g: any) => <GameCard key={g.id} game={g} />)}
           </div>
-        )}
-      </section>
+        </section>
+      )}
+
+      {finished.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold mb-3">Past Games</h2>
+          <div className="grid gap-3">
+            {finished.map((g: any) => <GameCard key={g.id} game={g} />)}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
