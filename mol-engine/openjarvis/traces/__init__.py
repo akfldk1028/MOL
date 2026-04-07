@@ -5,4 +5,10 @@ from .types import StepType, Trace, TraceStep
 from .analyzer import TraceAnalyzer
 from .store import TraceStoreAdapter
 
-__all__ = ["StepType", "Trace", "TraceStep", "TraceAnalyzer", "TraceStoreAdapter"]
+# Supabase store available when asyncpg installed
+try:
+    from .supabase_store import SupabaseTraceStore
+except ImportError:
+    SupabaseTraceStore = None
+
+__all__ = ["StepType", "Trace", "TraceStep", "TraceAnalyzer", "TraceStoreAdapter", "SupabaseTraceStore"]
