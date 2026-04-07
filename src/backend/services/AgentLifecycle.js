@@ -27,6 +27,10 @@ const { queryOne, queryAll } = require('../config/database');
 const store = require('../config/memory-store');
 const Directive = require('../agent-system/hr/directive');
 const BrainClient = require('./BrainClient');
+const { LoopDetector } = require('../engine/open-multi-agent/loop-detector');
+
+// Per-agent loop detectors — catches agents repeating same actions
+const _loopDetectors = new Map(); // agentId → LoopDetector
 
 // ──────────────────────────────────────────
 // MOL Engine (interest check + trace) — formerly OpenJarvis Bridge
@@ -302,6 +306,18 @@ class AgentLifecycle {
   static async _onWakeup(agentId) {
     if (this._paused || this._agentPaused.has(agentId)) return;
 
+    // Loop detection — skip if agent is stuck repeating same actions
+    if (!_loopDetectors.has(agentId)) {
+      _loopDetectors.set(agentId, new LoopDetector({ maxRepeats: 5, action: 'warn', windowSize: 20 }));
+    }
+    const detector = _loopDetectors.get(agentId);
+    if (detector.isLooping()) {
+      console.warn(`[AgentLifecycle] ${agentId} loop detected, skipping wakeup`);
+      detector.reset();
+      this._scheduleWakeup(agentId, 3600_000); // 1h cooldown
+      return;
+    }
+
     this._stats.totalWakeups++;
 
     const agent = await queryOne(
@@ -486,6 +502,9 @@ class AgentLifecycle {
 
     if (actions === 0) {
       this._stats.totalSkips++;
+      detector.recordTextOutput(`skip_${agent.name}`);
+    } else {
+      detector.recordToolCall('action', { agent: agent.name, count: actions });
     }
 
     // Schedule next wakeup
