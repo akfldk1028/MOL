@@ -8,14 +8,19 @@ const { buildSystemPrompt, buildUserPrompt } = require('../nodes/llm-call/prompt
 const anthropic = require('../nodes/llm-call/providers/anthropic');
 const openai = require('../nodes/llm-call/providers/openai');
 const google = require('../nodes/llm-call/providers/google');
+const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
 
-// 에이전트별 LLM 설정 (kept for backward compat)
-const AGENT_LLM_CONFIG = {
-  analyst: { provider: 'google', model: 'gemini-2.5-flash-lite' },
-  creative: { provider: 'google', model: 'gemini-2.5-flash-lite' },
-  critic: { provider: 'google', model: 'gemini-2.5-flash-lite' },
-  synthesizer: { provider: 'google', model: 'gemini-2.5-flash-lite' },
-  researcher: { provider: 'google', model: 'gemini-2.5-flash-lite' },
+// 기본 LLM — DashScope 최저가 (brain_config에서 오버라이드 가능)
+const DEFAULT_LLM_CONFIG = {
+  provider: 'openai-compat',
+  model: process.env.DASHSCOPE_MODEL || 'qwen-turbo',
+  openaiCompatProvider: 'dashscope',
+};
+
+// fallback: DashScope 키 없으면 Gemini
+const FALLBACK_LLM_CONFIG = {
+  provider: 'google',
+  model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite',
 };
 
 // 에이전트 페르소나 프롬프트
@@ -27,11 +32,34 @@ const AGENT_PERSONAS = {
   researcher: `You are "Researcher", a thorough investigator focused on accuracy and sources. You dig deep into topics, provide context and background, fact-check claims, and reference relevant information to ground the discussion in reality.`,
 };
 
-const providers = { anthropic, openai, google };
+const providers = { anthropic, openai, google, 'openai-compat': openaiCompat };
 
 class LLMService {
-  static getAgentConfig(agentName) {
-    return AGENT_LLM_CONFIG[agentName] || AGENT_LLM_CONFIG.analyst;
+  /**
+   * Get LLM config — from brain_config if available, else default DashScope/Gemini
+   * @param {string} agentName
+   * @param {Object} [brainConfig] - agent.brain_config from DB
+   */
+  static getAgentConfig(agentName, brainConfig) {
+    // brain_config에 llm_provider 있으면 우선
+    if (brainConfig?.llm_provider && brainConfig.llm_provider !== 'dashscope') {
+      // GPT, Claude 등 외부 provider
+      return {
+        provider: 'openai-compat',
+        model: brainConfig.llm_model || 'gpt-4o-mini',
+        openaiCompatProvider: brainConfig.llm_provider,
+        apiKey: brainConfig.llm_api_key, // 유저가 자기 키 넣은 경우
+      };
+    }
+    // DashScope 기본
+    if (process.env.DASHSCOPE_API_KEY) {
+      return {
+        ...DEFAULT_LLM_CONFIG,
+        model: brainConfig?.llm_content_model || brainConfig?.llm_model || DEFAULT_LLM_CONFIG.model,
+      };
+    }
+    // fallback: Gemini
+    return FALLBACK_LLM_CONFIG;
   }
 
   static getPersona(agentName) {
@@ -42,8 +70,8 @@ class LLMService {
    * Generate a response from an LLM provider
    * Delegates to modular provider modules.
    */
-  static async generateResponse({ agentName, question, previousResponses = [], round, role }) {
-    const llmConfig = this.getAgentConfig(agentName);
+  static async generateResponse({ agentName, question, previousResponses = [], round, role, brainConfig }) {
+    const llmConfig = this.getAgentConfig(agentName, brainConfig);
     const persona = this.getPersona(agentName);
 
     const systemPrompt = buildSystemPrompt(persona, role, round);
@@ -52,15 +80,19 @@ class LLMService {
     const provider = providers[llmConfig.provider];
     if (!provider) throw new Error(`Unknown LLM provider: ${llmConfig.provider}`);
 
-    return provider.call(llmConfig.model, systemPrompt, userPrompt);
+    const options = {};
+    if (llmConfig.openaiCompatProvider) options.provider = llmConfig.openaiCompatProvider;
+    if (llmConfig.apiKey) options.apiKey = llmConfig.apiKey;
+
+    return provider.call(llmConfig.model, systemPrompt, userPrompt, options);
   }
 
   /**
    * Generate a synthesis/summary response
    */
-  static async generateSynthesis({ question, allResponses }) {
+  static async generateSynthesis({ question, allResponses, brainConfig }) {
     const persona = this.getPersona('synthesizer');
-    const llmConfig = this.getAgentConfig('synthesizer');
+    const llmConfig = this.getAgentConfig('synthesizer', brainConfig);
 
     const systemPrompt = `${persona}\n\nYour task is to create a comprehensive synthesis of the debate. Identify key agreements, disagreements, and the strongest arguments. Provide a clear, actionable conclusion that addresses the original question. Write in a structured format with clear sections.`;
 
@@ -70,7 +102,12 @@ class LLMService {
 
     const userPrompt = `Original Question: ${question}\n\nDebate Responses:\n${responseSummary}\n\nPlease synthesize these perspectives into a comprehensive answer.`;
 
-    return anthropic.call(llmConfig.model, systemPrompt, userPrompt);
+    const provider = providers[llmConfig.provider];
+    const options = {};
+    if (llmConfig.openaiCompatProvider) options.provider = llmConfig.openaiCompatProvider;
+    if (llmConfig.apiKey) options.apiKey = llmConfig.apiKey;
+
+    return provider.call(llmConfig.model, systemPrompt, userPrompt, options);
   }
 }
 

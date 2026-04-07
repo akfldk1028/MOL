@@ -47,11 +47,17 @@ async function bridgeGenerateWithFallback(endpoint, body, fallbackArgs, timeoutM
   const content = await bridgeGenerate(endpoint, body, timeoutMs);
   if (content) return content;
 
-  // Fallback: direct Gemini call
+  // Fallback: DashScope (cheapest) → Gemini
   if (fallbackArgs) {
-    const google = require('../nodes/llm-call/providers/google');
     const { model, systemPrompt, userPrompt, options } = fallbackArgs;
-    console.log(`BridgeClient: fallback to direct Gemini for ${endpoint}`);
+    if (process.env.DASHSCOPE_API_KEY) {
+      const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
+      const dsModel = process.env.DASHSCOPE_MODEL || 'qwen-turbo';
+      console.log(`BridgeClient: fallback to DashScope ${dsModel} for ${endpoint}`);
+      return openaiCompat.call(dsModel, systemPrompt, userPrompt, { provider: 'dashscope' });
+    }
+    const google = require('../nodes/llm-call/providers/google');
+    console.log(`BridgeClient: fallback to Gemini for ${endpoint}`);
     return google.call(model || 'gemini-2.5-flash-lite', systemPrompt, userPrompt, options || {});
   }
 

@@ -117,15 +117,21 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
     : 'You extract key factual concepts and domain knowledge. Return ONLY a JSON array of 2-3 concepts. Each: {"name": "short name (2-4 words)", "description": "factual explanation in 1-2 full sentences (minimum 20 chars)"}. No markdown, no truncation.';
 
   try {
-    const google = require('../nodes/llm-call/providers/google');
-    const raw = await Promise.race([
-      google.call('gemini-2.5-flash-lite',
-        systemPrompt,
-        `Extract key concepts from: "${text.slice(0, 500)}"`,
-        { maxOutputTokens: 512 }
-      ),
-      new Promise(r => setTimeout(() => r(null), 10000)),
-    ]);
+    const userPrompt = `Extract key concepts from: "${text.slice(0, 500)}"`;
+    let raw;
+    if (process.env.DASHSCOPE_API_KEY) {
+      const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
+      raw = await Promise.race([
+        openaiCompat.call(process.env.DASHSCOPE_MODEL || 'qwen-turbo', systemPrompt, userPrompt, { provider: 'dashscope', maxOutputTokens: 512 }),
+        new Promise(r => setTimeout(() => r(null), 10000)),
+      ]);
+    } else {
+      const google = require('../nodes/llm-call/providers/google');
+      raw = await Promise.race([
+        google.call('gemini-2.5-flash-lite', systemPrompt, userPrompt, { maxOutputTokens: 512 }),
+        new Promise(r => setTimeout(() => r(null), 10000)),
+      ]);
+    }
 
     if (!raw) return;
 

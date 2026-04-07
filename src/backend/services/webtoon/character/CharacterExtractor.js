@@ -73,9 +73,13 @@ Return ONLY the JSON array, no other text. Example:
 [{"name": "Kai", "description": "shoulder-length dark brown messy hair, ice-blue eyes, lean build, torn leather armor"}]`;
 
     try {
-      const response = await google.call(EXTRACT_MODEL, 'You are a character analyst. Return only valid JSON.', prompt, {
-        maxOutputTokens: 1024,
-      });
+      let response;
+      if (process.env.DASHSCOPE_API_KEY) {
+        const openaiCompat = require('../../nodes/llm-call/providers/openai-compat');
+        response = await openaiCompat.call(process.env.DASHSCOPE_MODEL || 'qwen-turbo', 'You are a character analyst. Return only valid JSON.', prompt, { provider: 'dashscope', maxOutputTokens: 1024 });
+      } else {
+        response = await google.call(EXTRACT_MODEL, 'You are a character analyst. Return only valid JSON.', prompt, { maxOutputTokens: 1024 });
+      }
 
       // Parse JSON from response
       const jsonMatch = response.match(/\[[\s\S]*\]/);
