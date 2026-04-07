@@ -1,10 +1,10 @@
 # Dependencies
 node_modules/
 
-# OpenJarvis Bridge data
-openjarvis-bridge/data/
-openjarvis-bridge/__pycache__/
-openjarvis-bridge/**/__pycache__/
+# MOL Engine (formerly OpenJarvis Bridge)
+mol-engine/data/
+__pycache__/
+*.pyc
 .pnp/
 .pnp.js
 
