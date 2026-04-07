@@ -477,4 +477,43 @@ async function recordEvolution(agentId, evolution) {
   return result?.data || null;
 }
 
-module.exports = { research, brainstorm, evaluate, addToGraph, searchGraph, trackActivity, getBrainConfig, getStatus, createEpisode, recordEvolution };
+/**
+ * Call a domain MCP tool via CGB gateway.
+ * Results are automatically saved to the CGB graph.
+ */
+async function domainCall(agentId, domainId, tool, args, options = {}) {
+  const result = await cgbFetch(`/api/v1/domains/${encodeURIComponent(domainId)}/call`, {
+    method: 'POST',
+    body: {
+      tool,
+      args,
+      agent_id: agentId,
+      save_to_graph: options.saveToGraph !== false,
+      api_key: options.apiKey,
+    },
+    timeout: 60000,
+  });
+  return result?.data || null;
+}
+
+/**
+ * List available domain MCP services.
+ */
+async function listDomains() {
+  const result = await cgbFetch('/api/v1/domains');
+  return result?.data?.domains || [];
+}
+
+/**
+ * List available tools for a domain.
+ */
+async function domainTools(domainId) {
+  const result = await cgbFetch(`/api/v1/domains/${encodeURIComponent(domainId)}/tools`);
+  return result?.data?.tools || [];
+}
+
+module.exports = {
+  research, brainstorm, evaluate, addToGraph, searchGraph,
+  trackActivity, getBrainConfig, getStatus, createEpisode, recordEvolution,
+  domainCall, listDomains, domainTools,
+};
