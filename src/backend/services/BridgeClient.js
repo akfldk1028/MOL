@@ -5,7 +5,7 @@
  * Provides generate-specific helper with longer timeouts + fallback to direct Gemini.
  */
 
-const OJ_BRIDGE_URL = process.env.OJ_BRIDGE_URL || 'http://localhost:5000';
+const OJ_BRIDGE_URL = process.env.OJ_BRIDGE_URL || process.env.MOL_ENGINE_URL || 'http://localhost:5000';
 
 /**
  * Generic Bridge fetch (POST). Returns parsed JSON or null on failure.

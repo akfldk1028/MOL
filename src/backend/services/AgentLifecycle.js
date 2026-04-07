@@ -29,7 +29,7 @@ const Directive = require('../agent-system/hr/directive');
 const BrainClient = require('./BrainClient');
 
 // ──────────────────────────────────────────
-// OpenJarvis Bridge (interest check + trace)
+// MOL Engine (interest check + trace) — formerly OpenJarvis Bridge
 // ──────────────────────────────────────────
 
 const OJ_BRIDGE_URL = process.env.OJ_BRIDGE_URL || 'http://localhost:5000';
