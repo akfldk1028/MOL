@@ -37,6 +37,10 @@ DASHSCOPE_MODEL = os.getenv("DASHSCOPE_MODEL", "qwen-turbo")
 DASHSCOPE_CONTENT_MODEL = os.getenv("DASHSCOPE_CONTENT_MODEL", "qwen3.5-flash")
 DASHSCOPE_BASE_URL = os.getenv("DASHSCOPE_BASE_URL", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
 
+# ── GLM / Z.ai (free primary → DashScope fallback) ──────
+GLM_API_KEY = os.getenv("GLM_API_KEY", "")
+GLM_MODEL = os.getenv("GLM_MODEL", "GLM-4.7-Flash")
+
 # ── Interest check ───────────────────────────────────────
 INTEREST_SCORE_THRESHOLD = 0.4
 MAX_CONTENT_LENGTH = 500

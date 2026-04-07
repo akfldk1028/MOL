@@ -1,29 +1,53 @@
-"""LLM provider factory — returns the best provider per task.
+"""LLM provider factory — GLM free primary → DashScope fallback.
 
-Three provider slots:
-  - get_provider(): interest scoring (cheapest — DashScope qwen-turbo > Ollama > Workers AI)
-  - get_content_provider(): content generation (DashScope qwen3.5-flash > Gemini > fallback)
-  - get_premium_provider(): high-quality creative (DashScope qwen3.5-flash > Gemini > fallback) — qwen3.5-plus 사용 금지
+Three provider slots (all with GLM→DashScope fallback when GLM_API_KEY set):
+  - get_provider(): scoring (GLM-4.7-Flash free → qwen-turbo fallback)
+  - get_content_provider(): content (GLM-4.7-Flash free → qwen3.5-flash fallback)
+  - get_premium_provider(): creative = content provider (qwen3.5-plus 사용 금지)
 """
 
+import logging
 from typing import Optional
 
 from core import config
 from core.llm.base import BaseLLMProvider
+
+logger = logging.getLogger(__name__)
 
 _provider: Optional[BaseLLMProvider] = None
 _content_provider: Optional[BaseLLMProvider] = None
 _premium_provider: Optional[BaseLLMProvider] = None
 
 
-def get_provider() -> BaseLLMProvider:
-    """Get the cheapest LLM provider for scoring/classification (singleton).
+def _make_glm_fallback(dashscope_model: str) -> BaseLLMProvider:
+    """Create GLM primary → DashScope fallback provider."""
+    from core.llm.glm_provider import GLMProvider
+    from core.llm.dashscope_provider import DashScopeProvider
+    from core.llm.fallback_provider import FallbackProvider
 
-    Priority: DashScope qwen-turbo ($0.05) > Workers AI (free) > Ollama (local)
+    glm = GLMProvider(
+        api_key=config.GLM_API_KEY,
+        model=config.GLM_MODEL,
+    )
+    dashscope = DashScopeProvider(
+        api_key=config.DASHSCOPE_API_KEY,
+        model=dashscope_model,
+        base_url=config.DASHSCOPE_BASE_URL,
+    )
+    return FallbackProvider(glm, dashscope)
+
+
+def get_provider() -> BaseLLMProvider:
+    """Get scoring provider (cheapest).
+
+    Priority: GLM-4.7-Flash (free) → DashScope qwen-turbo ($0.05) → Ollama
     """
     global _provider
     if _provider is None:
-        if config.DASHSCOPE_API_KEY:
+        if config.GLM_API_KEY and config.DASHSCOPE_API_KEY:
+            _provider = _make_glm_fallback(config.DASHSCOPE_MODEL)
+            logger.info("LLM scoring: GLM %s (free) → DashScope %s (fallback)", config.GLM_MODEL, config.DASHSCOPE_MODEL)
+        elif config.DASHSCOPE_API_KEY:
             from core.llm.dashscope_provider import DashScopeProvider
             _provider = DashScopeProvider(
                 api_key=config.DASHSCOPE_API_KEY,
@@ -43,13 +67,16 @@ def get_provider() -> BaseLLMProvider:
 
 
 def get_content_provider() -> BaseLLMProvider:
-    """Get LLM provider for comments, short content (mid-tier).
+    """Get content provider (comments, posts).
 
-    Priority: DashScope qwen3.5-flash ($0.10) > Gemini ($0.15) > fallback
+    Priority: GLM-4.7-Flash (free) → DashScope qwen3.5-flash ($0.065) → Gemini
     """
     global _content_provider
     if _content_provider is None:
-        if config.DASHSCOPE_API_KEY:
+        if config.GLM_API_KEY and config.DASHSCOPE_API_KEY:
+            _content_provider = _make_glm_fallback(config.DASHSCOPE_CONTENT_MODEL)
+            logger.info("LLM content: GLM %s (free) → DashScope %s (fallback)", config.GLM_MODEL, config.DASHSCOPE_CONTENT_MODEL)
+        elif config.DASHSCOPE_API_KEY:
             from core.llm.dashscope_provider import DashScopeProvider
             _content_provider = DashScopeProvider(
                 api_key=config.DASHSCOPE_API_KEY,
@@ -65,19 +92,10 @@ def get_content_provider() -> BaseLLMProvider:
 
 
 def get_premium_provider() -> BaseLLMProvider:
-    """Get provider for creative writing (novels, episodes).
-
-    Priority: DashScope qwen3.5-flash ($0.10) > Gemini ($0.15) > fallback
-    """
+    """Get premium provider = content provider (qwen3.5-plus 사용 금지)."""
     global _premium_provider
     if _premium_provider is None:
-        if config.DASHSCOPE_API_KEY:
-            _premium_provider = get_content_provider()
-        elif config.GEMINI_API_KEY:
-            from core.llm.gemini_provider import GeminiProvider
-            _premium_provider = GeminiProvider()
-        else:
-            _premium_provider = get_provider()
+        _premium_provider = get_content_provider()
     return _premium_provider
 
 
