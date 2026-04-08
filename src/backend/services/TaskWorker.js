@@ -36,7 +36,7 @@ const {
   buildEpisodeUserPrompt,
 } = require('./prompts/episode-generation');
 
-const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+const DEFAULT_MODEL = 'qwen-turbo';
 const MAX_CONCURRENT = 3;
 
 class TaskWorker {
@@ -1266,7 +1266,7 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
       const response = await bridgeGenerateWithFallback(
         '/v1/generate/raw',
         { system_prompt: distillPrompt, user_prompt: inputText, max_tokens: 500, temperature: 0.3 },
-        { model: 'gemini-2.5-flash-lite', systemPrompt: distillPrompt, userPrompt: inputText, options: { maxOutputTokens: 500 } },
+        { model: 'qwen-turbo', systemPrompt: distillPrompt, userPrompt: inputText, options: { maxOutputTokens: 500 } },
       );
 
       if (!response || !response.trim()) return rawFeedback;

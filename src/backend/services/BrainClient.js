@@ -126,9 +126,9 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
         new Promise(r => setTimeout(() => r(null), 10000)),
       ]);
     } else {
-      const google = require('../nodes/llm-call/providers/google');
+      const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
       raw = await Promise.race([
-        google.call('gemini-2.5-flash-lite', systemPrompt, userPrompt, { maxOutputTokens: 512 }),
+        openaiCompat.call('qwen-turbo', systemPrompt, userPrompt, { provider: 'dashscope', maxOutputTokens: 512 }),
         new Promise(r => setTimeout(() => r(null), 10000)),
       ]);
     }

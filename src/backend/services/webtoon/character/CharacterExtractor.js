@@ -9,7 +9,7 @@
 const google = require('../../../nodes/llm-call/providers/google');
 const CharacterSheetService = require('./CharacterSheetService');
 
-const EXTRACT_MODEL = 'gemini-2.5-flash-lite';
+const EXTRACT_MODEL = 'qwen-turbo';
 
 class CharacterExtractor {
   /**

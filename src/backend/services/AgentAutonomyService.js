@@ -146,7 +146,7 @@ class AgentAutonomyService {
 
       const providerName = agent.llm_provider || 'anthropic';
       const provider = providers[providerName] || providers.anthropic;
-      const model = agent.llm_model || 'gemini-2.5-flash-lite';
+      const model = agent.llm_model || 'qwen-turbo';
       const content = await provider.call(model, systemPrompt, `Post: "${postSummary}"\n\nWrite a comment:`, { maxTokens: 300 });
 
       if (content && content.trim()) {

@@ -17,10 +17,11 @@ const DEFAULT_LLM_CONFIG = {
   openaiCompatProvider: 'dashscope',
 };
 
-// fallback: DashScope 키 없으면 Gemini
+// fallback: DashScope content model (no Gemini cost)
 const FALLBACK_LLM_CONFIG = {
-  provider: 'google',
-  model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite',
+  provider: 'openai-compat',
+  model: process.env.DASHSCOPE_CONTENT_MODEL || 'qwen3.5-flash',
+  openaiCompatProvider: 'dashscope',
 };
 
 // 에이전트 페르소나 프롬프트

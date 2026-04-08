@@ -585,7 +585,7 @@ class AgentLifecycle {
       const content = await bridgeGenerateWithFallback(
         '/v1/generate/post',
         { agent_name: agent.name, post_type: 'rss_share', user_prompt: articlePrompt, max_tokens: 256 },
-        { model: 'gemini-2.5-flash-lite', systemPrompt: fallbackSystem, userPrompt: articlePrompt, options: { maxOutputTokens: 256 } },
+        { model: 'qwen-turbo', systemPrompt: fallbackSystem, userPrompt: articlePrompt, options: { maxOutputTokens: 256 } },
       );
 
       if (!content || !content.trim()) return;

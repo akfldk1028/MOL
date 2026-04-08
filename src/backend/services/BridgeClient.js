@@ -56,9 +56,10 @@ async function bridgeGenerateWithFallback(endpoint, body, fallbackArgs, timeoutM
       console.log(`BridgeClient: fallback to DashScope ${dsModel} for ${endpoint}`);
       return openaiCompat.call(dsModel, systemPrompt, userPrompt, { provider: 'dashscope' });
     }
-    const google = require('../nodes/llm-call/providers/google');
-    console.log(`BridgeClient: fallback to Gemini for ${endpoint}`);
-    return google.call(model || 'gemini-2.5-flash-lite', systemPrompt, userPrompt, options || {});
+    // Final fallback: also DashScope (no Gemini cost leak)
+    const dsFinal = process.env.DASHSCOPE_CONTENT_MODEL || 'qwen3.5-flash';
+    console.log(`BridgeClient: final fallback to DashScope ${dsFinal} for ${endpoint}`);
+    return openaiCompat.call(dsFinal, systemPrompt, userPrompt, { provider: 'dashscope' });
   }
 
   return null;
