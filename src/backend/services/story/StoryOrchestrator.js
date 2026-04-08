@@ -133,6 +133,22 @@ class StoryOrchestrator {
                   parts.push(`Episode ${ep.episode_number}: "${ep.title}" — ${(ep.script_content || '').slice(0, 300)}...`);
                 }
               }
+              // Level 2: Style reference from CGB (ingested text patterns)
+              if (this.getBrainContext) {
+                try {
+                  const styleNodes = await this.getBrainContext(`${genre} style 명문장 대화 문체`);
+                  const styleRefs = (styleNodes || []).filter(n =>
+                    n.title?.includes('/style') || n.title?.includes('/dialogue') || n.title?.includes('명문장')
+                  ).slice(0, 3);
+                  if (styleRefs.length > 0) {
+                    parts.push('\n## Writing Style References (from ingested novels)');
+                    parts.push('Use these as STYLE REFERENCE — mimic this quality of prose:');
+                    for (const ref of styleRefs) {
+                      parts.push(`\n### ${ref.title}\n${(ref.description || '').slice(0, 500)}`);
+                    }
+                  }
+                } catch {}
+              }
               return parts.length > 0 ? parts.join('\n') : null;
             },
       });

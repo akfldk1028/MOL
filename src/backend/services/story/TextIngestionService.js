@@ -57,24 +57,50 @@ class TextIngestionService {
       } catch {}
     }
 
-    // 3. Process each chapter → Episode + Concept nodes
+    // 3. Process each chapter → multiple node types for deep learning
     for (let i = 0; i < chapters.length; i++) {
       const chapter = chapters[i];
       if (chapter.content.length < 50) continue;
 
-      // Episode node for the chapter
       if (agentId) {
+        // 3a. Chapter summary node (구조 학습)
         try {
           await BrainClient.addToGraph(agentId, {
             type: 'Idea',
-            title: chapter.title || `${title} Ch.${i + 1}`,
+            title: `[${genre}] ${chapter.title || `${title} Ch.${i + 1}`}`,
             description: chapter.content.slice(0, 500),
           });
           nodesCreated++;
         } catch {}
+
+        // 3b. Best paragraphs node — Level 2: 원문 문단 저장 (스타일 학습)
+        const bestParagraphs = this._extractBestParagraphs(chapter.content, 3);
+        if (bestParagraphs.length > 0) {
+          try {
+            await BrainClient.addToGraph(agentId, {
+              type: 'Idea',
+              title: `[${genre}/style] ${title} Ch.${i + 1} 명문장`,
+              description: bestParagraphs.join('\n---\n'),
+            });
+            nodesCreated++;
+          } catch {}
+        }
+
+        // 3c. Dialogue samples node (대화체 학습)
+        const dialogues = this._extractDialogues(chapter.content, 5);
+        if (dialogues.length >= 2) {
+          try {
+            await BrainClient.addToGraph(agentId, {
+              type: 'Idea',
+              title: `[${genre}/dialogue] ${title} Ch.${i + 1} 대화`,
+              description: dialogues.join('\n'),
+            });
+            nodesCreated++;
+          } catch {}
+        }
       }
 
-      // Extract concepts via LLM (if available)
+      // 3d. Extract narrative concepts via LLM (구조 학습)
       if (this.llmCall && chapter.content.length > 200) {
         try {
           const concepts = await this._extractConcepts(chapter.content, genre);
@@ -91,6 +117,21 @@ class TextIngestionService {
         } catch (err) {
           console.warn(`[TextIngestion] Concept extraction failed ch${i + 1}:`, err.message);
         }
+      }
+
+      // 3e. Style analysis via LLM (문체 학습) — Level 2 핵심
+      if (this.llmCall && chapter.content.length > 300) {
+        try {
+          const style = await this._analyzeStyle(chapter.content, genre);
+          if (style && agentId) {
+            await BrainClient.addToGraph(agentId, {
+              type: 'Idea',
+              title: `[${genre}/style-analysis] ${title} Ch.${i + 1} 문체`,
+              description: style,
+            });
+            nodesCreated++;
+          }
+        } catch {}
       }
     }
 
@@ -137,6 +178,59 @@ class TextIngestionService {
       });
     }
     return chapters;
+  }
+
+  // ─── Level 2: Style Learning ───
+
+  /**
+   * Extract best paragraphs (longest, most descriptive) for style reference.
+   */
+  _extractBestParagraphs(text, count = 3) {
+    const paragraphs = text.split(/\n{2,}/)
+      .map(p => p.trim())
+      .filter(p => p.length > 80 && !p.startsWith('#') && !p.startsWith('제'));
+
+    // Score: length + sensory words + dialogue presence
+    const sensoryWords = /빛|소리|냄새|바람|차가|따뜻|부드|거친|향|맛|눈물|심장|숨|떨|색|그림자|silence|warm|cold|light|dark|whisper/;
+    const scored = paragraphs.map(p => ({
+      text: p,
+      score: Math.min(p.length, 500) + (sensoryWords.test(p) ? 100 : 0) + (p.includes('"') || p.includes('\"') ? 50 : 0),
+    }));
+
+    return scored
+      .sort((a, b) => b.score - a.score)
+      .slice(0, count)
+      .map(s => s.text.slice(0, 400));
+  }
+
+  /**
+   * Extract dialogue lines for dialogue style learning.
+   */
+  _extractDialogues(text, count = 5) {
+    const patterns = [
+      /["\u201C]([^"\u201D]{5,100})["\u201D]/g,      // "대화"
+      /「([^」]{5,100})」/g,                             // 「대화」
+    ];
+    const dialogues = [];
+    for (const p of patterns) {
+      let m;
+      while ((m = p.exec(text)) !== null) {
+        dialogues.push(m[0]);
+      }
+    }
+    return dialogues.slice(0, count);
+  }
+
+  /**
+   * Analyze writing style via LLM — Level 2 core.
+   */
+  async _analyzeStyle(text, genre) {
+    if (!this.llmCall) return null;
+    const system = 'You are a literary style analyst. Analyze the writing style in 3-4 bullet points. Focus on: sentence rhythm, description technique, dialogue style, emotional expression method. Korean response. Be specific with examples from the text.';
+    const user = `Analyze the writing style of this ${genre} text:\n\n${text.slice(0, 2000)}`;
+    try {
+      return await this.llmCall(system, user, { maxOutputTokens: 512 });
+    } catch { return null; }
   }
 
   /**
