@@ -78,7 +78,7 @@ function createEvaluationHarness(options = {}) {
 
     tools: {
       llmProvider: 'dashscope',
-      llmModel: options.model || process.env.GLM_MODEL || 'qwen-turbo', // GLM free → DashScope fallback
+      llmModel: options.model || 'qwen-turbo',
       useCGB: true,
       cgbAPIs: ['/api/v1/creative/evaluate'],
     },

@@ -100,7 +100,7 @@ function createWritingHarness(options = {}) {
 
     tools: {
       llmProvider: 'dashscope',
-      llmModel: options.model || process.env.GLM_MODEL || 'qwen3.5-flash', // GLM free → DashScope fallback
+      llmModel: options.model || 'qwen3.5-flash',
       useCGB: true,
       cgbAPIs: ['/api/v1/graph/search', '/api/v1/creative/evaluate'],
     },

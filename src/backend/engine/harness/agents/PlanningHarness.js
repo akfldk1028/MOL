@@ -70,7 +70,7 @@ function createPlanningHarness(options = {}) {
 
     tools: {
       llmProvider: 'dashscope',
-      llmModel: options.model || process.env.GLM_MODEL || 'qwen3.5-flash',
+      llmModel: options.model || 'qwen3.5-flash',
       useCGB: kgIntensity === 'high',
       cgbAPIs: kgIntensity === 'high'
         ? ['/api/v1/creative/brainstorm', '/api/v1/graph/search']
