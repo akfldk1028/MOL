@@ -622,10 +622,202 @@ async function getGenrePatterns(agentId, genre) {
   };
 }
 
+// ─────────────────────────────────────────────
+// Novel Domain Graph Builder
+// Papers: Hierarchical KG for Story (ICIDS 2025) — 3-tier narrative graph
+// Uses CGB existing types: Domain→Topic→Idea + Concept + edges
+// ─────────────────────────────────────────────
+
+/**
+ * Create a Topic node for a series (Level 1 in hierarchy).
+ * Topic = series. Links to Domain via BELONGS_TO.
+ */
+async function createSeriesTopic(agentId, series) {
+  const bc = await getBrainConfig(agentId);
+  const topicId = `topic-series-${series.id}`;
+
+  const result = await cgbFetch('/api/v1/graph/nodes', {
+    method: 'POST',
+    body: {
+      id: topicId,
+      type: 'Topic',
+      title: series.title,
+      description: series.synopsis || series.description || '',
+      agent_id: agentId,
+      domain: bc?.graph_scope || 'creative',
+      layer: 1,
+    },
+    timeout: 15000,
+  });
+
+  // Topic → BELONGS_TO → "Novel Writing" Domain (find actual node ID)
+  if (result?.data) {
+    // Domain node was created as Idea type earlier — search for it
+    const domainSearch = await cgbFetch('/api/v1/graph/search?q=Novel+Writing&limit=1');
+    const domainNodeId = domainSearch?.data?.results?.[0]?.id || domainSearch?.data?.nodes?.[0]?.id;
+    if (domainNodeId) {
+      cgbFetch('/api/v1/graph/edges', {
+        method: 'POST',
+        body: { sourceId: topicId, targetId: domainNodeId, type: 'BELONGS_TO' },
+      }).catch(() => {});
+    }
+  }
+
+  return result?.data || null;
+}
+
+/**
+ * Create a Concept node for a character.
+ * Concept requires { name, description, domainIds } (not title).
+ */
+async function createCharacterNode(agentId, character, seriesId) {
+  const bc = await getBrainConfig(agentId);
+  const charSlug = Buffer.from(character.name).toString('base64url').slice(0, 12);
+  const charId = `char-${seriesId.slice(0, 8)}-${charSlug}`;
+
+  // Use custom type 'Character' — bypasses Idea's auto-ID and goes direct to store
+  // CGB route: non-Idea/Concept/Session types → store.addNode with body.id preserved
+  const desc = `[CHARACTER] ${character.name} (${character.age || '?'}세, ${character.role}). 성격: ${character.personality || ''}. 외모: ${character.appearance || ''}`;
+  const result = await cgbFetch('/api/v1/graph/nodes', {
+    method: 'POST',
+    body: {
+      id: charId,
+      type: 'Character',
+      title: `${character.name}`,
+      description: desc,
+      agent_id: agentId,
+      domain: bc?.graph_scope || 'creative',
+      layer: 1,
+    },
+    timeout: 15000,
+  });
+
+  // Character → BELONGS_TO → Series Topic
+  if (result?.data) {
+    const topicId = `topic-series-${seriesId}`;
+    cgbFetch('/api/v1/graph/edges', {
+      method: 'POST',
+      body: { sourceId: charId, targetId: topicId, type: 'BELONGS_TO' },
+    }).catch(() => {});
+  }
+
+  return result?.data || null;
+}
+
+/**
+ * Create an episode node with proper hierarchy.
+ * Episode = Idea node linked to Series Topic via PART_OF.
+ * Previous episode linked via CAUSES (sequential).
+ */
+async function addEpisodeToGraph(agentId, episode, series, prevEpisodeNodeId = null) {
+  const bc = await getBrainConfig(agentId);
+  const nodeId = `episode-${series.id}-ep${episode.episodeNumber}`;
+
+  const result = await cgbFetch('/api/v1/graph/nodes', {
+    method: 'POST',
+    body: {
+      type: 'Idea',
+      id: nodeId,
+      title: `[${series.genre}] ${series.title} ep${episode.episodeNumber}: ${episode.title}`,
+      description: (episode.content || '').slice(0, 500),
+      agent_id: agentId,
+      domain: bc?.graph_scope || 'creative',
+      layer: 1,
+      metadata: {
+        seriesId: series.id,
+        episodeNumber: episode.episodeNumber,
+        genre: series.genre,
+        wordCount: episode.wordCount,
+        qualityScore: episode.qualityScore,
+        sentiment: episode.sentiment,
+        pipelineType: episode.pipelineType || 'storywriter',
+      },
+    },
+    timeout: 15000,
+  });
+
+  if (result?.data) {
+    // Episode → PART_OF → Series Topic
+    const topicId = `topic-series-${series.id}`;
+    cgbFetch('/api/v1/graph/edges', {
+      method: 'POST',
+      body: { sourceId: nodeId, targetId: topicId, type: 'PART_OF' },
+    }).catch(() => {});
+
+    // Episode → CAUSES → Previous Episode (sequential chain)
+    if (prevEpisodeNodeId) {
+      cgbFetch('/api/v1/graph/edges', {
+        method: 'POST',
+        body: { sourceId: prevEpisodeNodeId, targetId: nodeId, type: 'CAUSES' },
+      }).catch(() => {});
+    }
+
+    // Episode → USES_CONCEPT → Characters
+    if (series.character_sheet) {
+      const chars = typeof series.character_sheet === 'string'
+        ? JSON.parse(series.character_sheet) : series.character_sheet;
+      for (const c of chars) {
+        const cSlug = Buffer.from(c.name).toString('base64url').slice(0, 12);
+        const charId = `char-${series.id.slice(0, 8)}-${cSlug}`;
+        cgbFetch('/api/v1/graph/edges', {
+          method: 'POST',
+          body: { sourceId: nodeId, targetId: charId, type: 'USES_CONCEPT' },
+        }).catch(() => {});
+      }
+    }
+
+    // Agent → GENERATED_BY → Episode
+    cgbFetch('/api/v1/graph/edges', {
+      method: 'POST',
+      body: { sourceId: `agent-${agentId}`, targetId: nodeId, type: 'GENERATED_BY' },
+    }).catch(() => {});
+  }
+
+  return result?.data ? nodeId : null;
+}
+
+/**
+ * Initialize full novel graph structure for a new series.
+ * Creates: Domain check → Topic → Character Concepts → edges
+ */
+async function initSeriesGraph(agentId, series) {
+  console.log(`[BrainClient] Initializing novel graph for "${series.title}"...`);
+
+  // 1. Create Topic for series
+  await createSeriesTopic(agentId, series);
+
+  // 2. Create Character Concept nodes
+  if (series.character_sheet) {
+    const chars = typeof series.character_sheet === 'string'
+      ? JSON.parse(series.character_sheet) : series.character_sheet;
+    for (const c of chars) {
+      await createCharacterNode(agentId, c, series.id);
+    }
+
+    // 3. Character relationship edges
+    for (let i = 0; i < chars.length; i++) {
+      for (let j = i + 1; j < chars.length; j++) {
+        const slug1 = Buffer.from(chars[i].name).toString('base64url').slice(0, 12);
+        const slug2 = Buffer.from(chars[j].name).toString('base64url').slice(0, 12);
+        const id1 = `char-${series.id.slice(0, 8)}-${slug1}`;
+        const id2 = `char-${series.id.slice(0, 8)}-${slug2}`;
+        cgbFetch('/api/v1/graph/edges', {
+          method: 'POST',
+          body: { sourceId: id1, targetId: id2, type: 'SIMILAR_TO', metadata: { relationship: 'same_series' } },
+        }).catch(() => {});
+      }
+    }
+  }
+
+  console.log(`[BrainClient] ✅ Novel graph initialized for "${series.title}"`);
+}
+
 module.exports = {
   research, brainstorm, evaluate, addToGraph, searchGraph,
   trackActivity, getBrainConfig, getStatus, createEpisode, recordEvolution,
   domainCall, listDomains, domainTools,
   // Story-specific APIs
   getStoryKG, suggestTwist, checkCoherence, getGenrePatterns,
+  // Novel Domain Graph Builder
+  createSeriesTopic, createCharacterNode, addEpisodeToGraph, initSeriesGraph,
 };

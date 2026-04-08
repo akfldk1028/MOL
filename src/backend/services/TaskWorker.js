@@ -955,19 +955,26 @@ class TaskWorker {
 
     await this._incrementDailyCount(agent.id);
 
-    // Record to CGB
+    // Record to CGB — proper hierarchical graph (ICIDS 2025 paper)
     try {
-      const episodeNodeId = await BrainClient.createEpisode(agent.id);
-      if (episodeNodeId) {
-        BrainClient.addToGraph(agent.id, {
-          type: 'Idea',
-          title: `${series.title} ep${nextEpisodeNumber}: ${result.episode.title}`,
-          description: (result.episode.content || '').slice(0, 200),
-          contentDomain: series.genre,
-          postId: episode.id,
-        }, episodeNodeId).catch(() => {});
+      // Init series graph if first episode (Topic + Characters)
+      if (nextEpisodeNumber === 1) {
+        await BrainClient.initSeriesGraph(agent.id, series);
       }
-    } catch {}
+      // Add episode with proper edges (PART_OF→Topic, CAUSES→prev, USES_CONCEPT→chars)
+      const prevNodeId = nextEpisodeNumber > 1
+        ? `episode-${series.id}-ep${nextEpisodeNumber - 1}` : null;
+      await BrainClient.addEpisodeToGraph(agent.id, {
+        title: result.episode.title,
+        content: result.episode.content,
+        episodeNumber: nextEpisodeNumber,
+        wordCount: result.episode.wordCount,
+        qualityScore: result.evaluation?.overallScore,
+        pipelineType: 'storywriter',
+      }, series, prevNodeId);
+    } catch (err) {
+      console.warn('[StoryWriter] CGB graph update failed:', err.message);
+    }
 
     // Trigger critique chain
     const TaskScheduler = require('./TaskScheduler');
