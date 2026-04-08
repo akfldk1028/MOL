@@ -9,6 +9,16 @@ const { queryOne } = require('../config/database');
 const CGB_URL = config.cgb?.apiUrl || 'http://localhost:3001';
 const CGB_KEY = config.cgb?.apiKey || '';
 
+/** Edge creation with 1 retry (FK may fail if node not yet committed) */
+async function cgbEdge(sourceId, targetId, type) {
+  const body = { sourceId, targetId, type };
+  const result = await cgbFetch('/api/v1/graph/edges', { method: 'POST', body, timeout: 10000 });
+  if (result) return result;
+  // Retry once after 300ms (Supabase commit lag)
+  await new Promise(r => setTimeout(r, 300));
+  return cgbFetch('/api/v1/graph/edges', { method: 'POST', body, timeout: 10000 });
+}
+
 async function cgbFetch(path, options = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (CGB_KEY) headers['Authorization'] = `Bearer ${CGB_KEY}`;
@@ -737,29 +747,17 @@ async function addEpisodeToGraph(agentId, episode, series, prevEpisodeNodeId = n
   });
 
   if (result?.data) {
-    // Wait a tick for node to be committed before creating edges
-    await new Promise(r => setTimeout(r, 500));
-
     // Episode → PART_OF → Series Topic
     const topicId = `topic-series-${series.id}`;
-    cgbFetch('/api/v1/graph/edges', {
-      method: 'POST',
-      body: { sourceId: nodeId, targetId: topicId, type: 'PART_OF' },
-    }).catch(() => {});
+    cgbEdge(nodeId, topicId, 'PART_OF').catch(() => {});
 
     // Episode → CAUSES → Previous Episode (sequential chain)
     if (prevEpisodeNodeId) {
-      cgbFetch('/api/v1/graph/edges', {
-        method: 'POST',
-        body: { sourceId: prevEpisodeNodeId, targetId: nodeId, type: 'CAUSES' },
-      }).catch(() => {});
+      cgbEdge(prevEpisodeNodeId, nodeId, 'CAUSES').catch(() => {});
     }
 
     // Agent → GENERATED_BY → Episode
-    cgbFetch('/api/v1/graph/edges', {
-      method: 'POST',
-      body: { sourceId: `agent-${agentId}`, targetId: nodeId, type: 'GENERATED_BY' },
-    }).catch(() => {});
+    cgbEdge(`agent-${agentId}`, nodeId, 'GENERATED_BY').catch(() => {});
   }
 
   return result?.data ? nodeId : null;
@@ -856,23 +854,14 @@ async function recordEvaluation(agentId, evaluation, episodeNodeId, series) {
   let promoted = false;
 
   if (result?.data) {
-    // Wait for node commit before edges
-    await new Promise(r => setTimeout(r, 500));
-
     // Evaluation → EVALUATES → Episode
     if (episodeNodeId) {
-      cgbFetch('/api/v1/graph/edges', {
-        method: 'POST',
-        body: { sourceId: evalId, targetId: episodeNodeId, type: 'EVALUATES' },
-      }).catch(() => {});
+      cgbEdge(evalId, episodeNodeId, 'EVALUATES').catch(() => {});
     }
 
     // Eval → BELONGS_TO → Series Topic
     const topicId = `topic-series-${series.id}`;
-    cgbFetch('/api/v1/graph/edges', {
-      method: 'POST',
-      body: { sourceId: evalId, targetId: topicId, type: 'BELONGS_TO' },
-    }).catch(() => {});
+    cgbEdge(evalId, topicId, 'BELONGS_TO').catch(() => {});
 
     // RL Logic: High score → promote good patterns; Low score → store anti-patterns
     if (evaluation.overallScore >= 4.0 && evaluation.strengths?.length) {

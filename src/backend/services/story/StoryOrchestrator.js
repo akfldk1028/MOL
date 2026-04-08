@@ -22,7 +22,7 @@ const { SharedMemory } = require('../../engine/open-multi-agent/shared-memory');
 const { AgentHarness } = require('../../engine/harness/AgentHarness');
 const { createOutlineHarness, buildOutlinePrompt } = require('../../engine/harness/agents/OutlineHarness');
 const { createPlanningHarness, buildPlanningPrompt } = require('../../engine/harness/agents/PlanningHarness');
-const { createWritingHarness, buildWritingPrompt } = require('../../engine/harness/agents/WritingHarness');
+const { createWritingHarness, buildWritingPrompt, countWords } = require('../../engine/harness/agents/WritingHarness');
 const { createEvaluationHarness, buildEvaluationPrompt } = require('../../engine/harness/agents/EvaluationHarness');
 const { StoryStateTracker } = require('./StoryStateTracker');
 const BrainClient = require('../BrainClient');
@@ -252,7 +252,7 @@ class StoryOrchestrator {
     const episode = {
       title: writeResult.artifact?.data?.title || `Episode ${episodeNumber}`,
       content: writeResult.output,
-      wordCount: writeResult.output?.split(/\s+/).length || 0,
+      wordCount: countWords(writeResult.output),
       episodeNumber,
     };
 
@@ -262,18 +262,22 @@ class StoryOrchestrator {
     // ─── RL: Record to CGB graph (async, non-blocking) ───
     if (agentId) {
       const evalData = evalResult?.artifact?.data || {};
-      // Save episode node
       const prevEpNodeId = episodeNumber > 1 ? `episode-${series.id}-ep${episodeNumber - 1}` : null;
       BrainClient.addEpisodeToGraph(agentId, {
         ...episode, qualityScore: evalData.overallScore, pipelineType: 'storywriter',
       }, series, prevEpNodeId).then(epNodeId => {
-        // Save evaluation feedback
         if (epNodeId && evalData.overallScore) {
           BrainClient.recordEvaluation(agentId, evalData, epNodeId, series).then(r => {
             if (r?.promoted) this._emit('rl_promoted', { score: evalData.overallScore });
-          }).catch(() => {});
+          }).catch(err => {
+            console.warn(`[StoryOrchestrator] RL recordEvaluation failed:`, err.message);
+            this._emit('rl_error', { stage: 'recordEvaluation', error: err.message });
+          });
         }
-      }).catch(() => {});
+      }).catch(err => {
+        console.warn(`[StoryOrchestrator] RL addEpisodeToGraph failed:`, err.message);
+        this._emit('rl_error', { stage: 'addEpisodeToGraph', error: err.message });
+      });
     }
 
     return {

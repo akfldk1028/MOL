@@ -120,8 +120,13 @@ function createWritingHarness(options = {}) {
       artifactKey: `writer/chapter_${chapterNumber}`,
       artifactFormat: 'text',
       transform: (output) => {
-        // Post-process: strip stray Chinese/Japanese characters
-        const cleaned = output.replace(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g, '');
+        // Post-process: strip stray Chinese/Japanese only if >5 chars detected
+        const cjkChars = output.match(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g);
+        let cleaned = output;
+        if (cjkChars && cjkChars.length > 5) {
+          console.warn(`[WritingHarness] Stripping ${cjkChars.length} CJK chars from output`);
+          cleaned = output.replace(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g, '');
+        }
         return {
           chapterNumber,
           title: extractTitle(cleaned),
@@ -133,9 +138,20 @@ function createWritingHarness(options = {}) {
   });
 }
 
+/** Korean-aware word count: Korean chars/2.5 or space-split, whichever is higher */
+function countWords(text) {
+  if (!text) return 0;
+  const wordCount = text.split(/\s+/).length;
+  const charCount = text.replace(/\s/g, '').length;
+  const isKorean = /[\uAC00-\uD7AF]/.test(text);
+  return isKorean ? Math.max(wordCount, Math.floor(charCount / 2.5)) : wordCount;
+}
+
 function extractTitle(text) {
-  // Try TITLE: pattern
-  const titleMatch = text.match(/^TITLE:\s*(.+)/mi) || text.match(/^#\s*(.+)/m);
+  // Try various title patterns (English + Korean)
+  const titleMatch = text.match(/^TITLE:\s*(.+)/mi)
+    || text.match(/^제목:\s*(.+)/mi)
+    || text.match(/^##?\s*(.+)/m);
   if (titleMatch) return titleMatch[1].trim();
   // First line as fallback
   const firstLine = text.split('\n')[0]?.trim();
@@ -260,4 +276,4 @@ function compressChapter(content, maxLength = 800) {
   return `${head}\n\n[... compressed ...]\n\n${tail}`;
 }
 
-module.exports = { createWritingHarness, buildWritingPrompt, compressChapter, extractTitle };
+module.exports = { createWritingHarness, buildWritingPrompt, compressChapter, extractTitle, countWords };
