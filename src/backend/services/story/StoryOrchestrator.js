@@ -138,8 +138,15 @@ class StoryOrchestrator {
       });
       const writeHarness = new AgentHarness(writeConfig, this.llmCall, this.sharedMemory);
       const chapterPlan = planResult.artifact?.data || planResult.output;
+      // C1+I2 fix: inject character sheet + world setting from series context
+      const extraPremise = [
+        series.synopsis || '',
+        this._seriesContext?.worldSetting ? `\n## World Setting\n${this._seriesContext.worldSetting}` : '',
+        this._seriesContext?.characterSheet ? `\n## Character Sheet (MUST USE)\n${this._seriesContext.characterSheet}` : '',
+      ].filter(Boolean).join('\n');
+
       const writePrompt = buildWritingPrompt(chapterPlan, previousEpisodes, {
-        premise: series.synopsis,
+        premise: extraPremise,
         outline: outlineResult.output, // CRITICAL: pass full outline for character consistency
         targetWordCount: this.targetWordCount,
         language: this.language,

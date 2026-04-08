@@ -62,14 +62,19 @@ class AgentHarness {
           provider: config.tools.llmProvider,
         };
 
-        // C1 fix: actually enforce timeout via Promise.race
+        // C1 fix: enforce timeout via Promise.race + S1 fix: cleanup timer
         let output;
         const timeoutMs = config.authority.timeoutMs;
+        let timer;
         const llmPromise = this.llmCall(systemPrompt, fullPrompt, llmOptions);
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error(`LLM timeout (${timeoutMs / 1000}s)`)), timeoutMs);
+          timer = setTimeout(() => reject(new Error(`LLM timeout (${timeoutMs / 1000}s)`)), timeoutMs);
         });
-        output = await Promise.race([llmPromise, timeoutPromise]);
+        try {
+          output = await Promise.race([llmPromise, timeoutPromise]);
+        } finally {
+          clearTimeout(timer);
+        }
 
         if (!output || !output.trim()) {
           throw new Error('LLM returned empty output');

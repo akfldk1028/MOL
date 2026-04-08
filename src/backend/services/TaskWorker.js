@@ -889,17 +889,28 @@ class TaskWorker {
       getBrainContext,
     });
 
-    // Inject character sheet into state tracker
+    // C1 fix: Inject character sheet into state tracker AND store for prompt injection
+    let characterSheetText = '';
     if (series.character_sheet) {
       const chars = typeof series.character_sheet === 'string'
         ? JSON.parse(series.character_sheet) : series.character_sheet;
       for (const c of chars) {
         story.stateTracker.trackEntity(c.name, 'character', 'active', c);
       }
+      // Build explicit character sheet text for writing prompt
+      characterSheetText = chars.map(c =>
+        `- ${c.name} (${c.age || '?'}세, ${c.role}): ${c.personality || ''}. 외모: ${c.appearance || ''}`
+      ).join('\n');
     }
-    if (series.world_setting) {
-      story.stateTracker.setThemeAnchors({ topic: `${series.genre} ${series.title}`, mainGoal: series.synopsis?.slice(0, 100) });
+    // I2 fix: Pass world_setting to theme anchors AND store for prompt injection
+    if (series.world_setting || series.synopsis) {
+      story.stateTracker.setThemeAnchors({
+        topic: `${series.genre} ${series.title}`,
+        mainGoal: series.synopsis?.slice(0, 100),
+      });
     }
+    // Store character sheet + world setting for StoryOrchestrator to pass to WritingAgent
+    story._seriesContext = { characterSheet: characterSheetText, worldSetting: series.world_setting || '' };
 
     console.log(`[StoryWriter] Starting 4-Agent pipeline for "${series.title}" ep${nextEpisodeNumber}...`);
 
@@ -976,6 +987,8 @@ class TaskWorker {
     });
 
     console.log(`[StoryWriter] ✅ ${agent.name} created "${result.episode.title}" ep${nextEpisodeNumber} for "${series.title}" (${result.episode.wordCount}w, eval:${result.evaluation?.overallScore}, ${result.writeAttempts} attempts, ${(result.durationMs/1000).toFixed(0)}s)`);
+
+    return episode; // I1 fix: return created episode
   }
 
   // ──────────────────────────────────────────

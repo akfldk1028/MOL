@@ -41,7 +41,6 @@ CREATE INDEX IF NOT EXISTS idx_series_sub_genre ON series(sub_genre);
 CREATE INDEX IF NOT EXISTS idx_episodes_pipeline_type ON episodes(pipeline_type);
 CREATE INDEX IF NOT EXISTS idx_episodes_quality ON episodes((quality_scores->>'overall'));
 
--- 4. 기존 시리즈 content_type → creative_category 마이그레이션
-UPDATE series SET creative_category = content_type WHERE creative_category = 'general';
-UPDATE series SET creative_category = 'novel' WHERE content_type = 'novel';
-UPDATE series SET creative_category = 'webtoon' WHERE content_type = 'webtoon';
+-- 4. 기존 시리즈 content_type → creative_category 마이그레이션 (I4 fix: NULL-safe)
+UPDATE series SET creative_category = content_type
+  WHERE creative_category = 'general' AND content_type IS NOT NULL;
