@@ -111,7 +111,7 @@ router.post('/generate', requireInternalAuth, async (req, res) => {
  */
 router.post('/ingest', requireInternalAuth, async (req, res) => {
   try {
-    const { text, title, author, genre, agentId } = req.body;
+    const { text, title, author, genre, category, agentId } = req.body;
     if (!text) return res.status(400).json({ error: 'text required' });
     if (text.length > MAX_TEXT_LENGTH) return res.status(400).json({ error: `Text too large (max ${MAX_TEXT_LENGTH} chars)` });
 
@@ -126,7 +126,7 @@ router.post('/ingest', requireInternalAuth, async (req, res) => {
     };
 
     const service = new TextIngestionService({ llmCall, agentId });
-    const result = await service.ingest(text, { title, author, genre, source: 'upload' });
+    const result = await service.ingest(text, { title, author, genre, category, source: 'upload' });
 
     res.json(result);
   } catch (err) {

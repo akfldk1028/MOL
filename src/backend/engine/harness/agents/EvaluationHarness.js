@@ -150,7 +150,10 @@ function parseEvaluationOutput(raw, passThreshold = 3.5) {
     passed: overallScore >= passThreshold,
     feedback,
     rewriteRequired: overallScore < passThreshold,
-    raw: scoreValues.length < 3 ? raw : undefined,
+    // Keep partial scores + raw for RL (even 2/6 dimensions are useful signal)
+    raw: scoreValues.length < 6 ? raw : undefined,
+    strengths: [],
+    weaknesses: feedback ? [feedback] : [],
   };
 }
 
@@ -196,6 +199,19 @@ function buildEvaluationPrompt(episodeText, outlinePlan, options = {}) {
     '}',
     '```',
   ];
+
+  if (options.language === 'ko') {
+    parts.push(
+      '',
+      '## 한국어 품질 추가 기준',
+      '- 자연스러운 한국어 문체인가? (번역체 X, 설명문 X)',
+      '- 대화가 한국어 구어체로 자연스러운가?',
+      '- 중국어(汉字)/일본어가 섞여 있지 않은가?',
+      '- 한국 문화/배경에 맞는 설정인가?',
+      '',
+      '한국어로 평가를 작성하세요.',
+    );
+  }
 
   return parts.join('\n');
 }

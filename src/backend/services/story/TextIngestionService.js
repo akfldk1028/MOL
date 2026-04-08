@@ -36,8 +36,17 @@ class TextIngestionService {
     if (!text || text.length < 100) return { success: false, error: 'Text too short' };
 
     const title = metadata.title || 'Unknown';
+    const author = metadata.author || 'Unknown';
     const genre = metadata.genre || 'general';
+    const category = metadata.category || genre; // 상위 카테고리 (fantasy, martial-arts, romance 등)
+    const source = metadata.source || 'upload';
     const agentId = this.agentId;
+
+    // Deterministic ID for dedup — same book won't create duplicate nodes
+    const domainId = `source-${this._hash(title + '|' + author)}`;
+
+    // Common metadata for all nodes from this ingestion
+    const nodeMeta = { genre, category, source, sourceTitle: title, sourceAuthor: author };
 
     // 1. Split into chapters
     const chapters = this._splitChapters(text);
@@ -45,97 +54,141 @@ class TextIngestionService {
 
     let nodesCreated = 0;
 
-    // 2. Create Domain node for the source text
+    // 2. Create Domain node for the source text (deterministic ID = dedup)
     if (agentId) {
       try {
         await BrainClient.addToGraph(agentId, {
+          id: domainId,
           type: 'Domain',
           title: `Reference: ${title}`,
-          description: `${metadata.author || 'Unknown'} | ${genre} | ${chapters.length} chapters | Source: ${metadata.source || 'upload'}`,
-        });
+          description: `${author} | ${genre} | ${chapters.length} chapters | Source: ${source}`,
+          metadata: nodeMeta,
+        }, null, { skipSimilarSearch: true });
         nodesCreated++;
       } catch {}
     }
 
-    // 3. Process each chapter → multiple node types for deep learning
-    for (let i = 0; i < chapters.length; i++) {
-      const chapter = chapters[i];
-      if (chapter.content.length < 50) continue;
+    // 3. Process chapters — parallel with concurrency limit
+    const CONCURRENCY = 3;
+    const chapterResults = [];
 
-      if (agentId) {
-        // 3a. Chapter summary node (구조 학습)
-        try {
-          await BrainClient.addToGraph(agentId, {
-            type: 'Idea',
-            title: `[${genre}] ${chapter.title || `${title} Ch.${i + 1}`}`,
-            description: chapter.content.slice(0, 500),
-          });
-          nodesCreated++;
-        } catch {}
-
-        // 3b. Best paragraphs node — Level 2: 원문 문단 저장 (스타일 학습)
-        const bestParagraphs = this._extractBestParagraphs(chapter.content, 3);
-        if (bestParagraphs.length > 0) {
-          try {
-            await BrainClient.addToGraph(agentId, {
-              type: 'Idea',
-              title: `[${genre}/style] ${title} Ch.${i + 1} 명문장`,
-              description: bestParagraphs.join('\n---\n'),
-            });
-            nodesCreated++;
-          } catch {}
-        }
-
-        // 3c. Dialogue samples node (대화체 학습)
-        const dialogues = this._extractDialogues(chapter.content, 5);
-        if (dialogues.length >= 2) {
-          try {
-            await BrainClient.addToGraph(agentId, {
-              type: 'Idea',
-              title: `[${genre}/dialogue] ${title} Ch.${i + 1} 대화`,
-              description: dialogues.join('\n'),
-            });
-            nodesCreated++;
-          } catch {}
-        }
-      }
-
-      // 3d. Extract narrative concepts via LLM (구조 학습)
-      if (this.llmCall && chapter.content.length > 200) {
-        try {
-          const concepts = await this._extractConcepts(chapter.content, genre);
-          for (const concept of concepts) {
-            if (agentId) {
-              await BrainClient.addToGraph(agentId, {
-                type: 'Idea',
-                title: `[${genre}] ${concept.name}`,
-                description: concept.description,
-              });
-              nodesCreated++;
-            }
-          }
-        } catch (err) {
-          console.warn(`[TextIngestion] Concept extraction failed ch${i + 1}:`, err.message);
-        }
-      }
-
-      // 3e. Style analysis via LLM (문체 학습) — Level 2 핵심
-      if (this.llmCall && chapter.content.length > 300) {
-        try {
-          const style = await this._analyzeStyle(chapter.content, genre);
-          if (style && agentId) {
-            await BrainClient.addToGraph(agentId, {
-              type: 'Idea',
-              title: `[${genre}/style-analysis] ${title} Ch.${i + 1} 문체`,
-              description: style,
-            });
-            nodesCreated++;
-          }
-        } catch {}
+    for (let start = 0; start < chapters.length; start += CONCURRENCY) {
+      const batch = chapters.slice(start, start + CONCURRENCY);
+      const promises = batch.map((chapter, batchIdx) => {
+        const i = start + batchIdx;
+        return this._processChapter(chapter, i, { agentId, title, genre, domainId, nodeMeta });
+      });
+      const results = await Promise.allSettled(promises);
+      for (const r of results) {
+        if (r.status === 'fulfilled') nodesCreated += r.value;
       }
     }
 
     return { success: true, nodesCreated, chaptersFound: chapters.length, title };
+  }
+
+  /**
+   * Process a single chapter — create all node types.
+   * @returns {number} nodesCreated
+   */
+  async _processChapter(chapter, index, ctx) {
+    const { agentId, title, genre, domainId, nodeMeta } = ctx;
+    if (chapter.content.length < 50) return 0;
+    let created = 0;
+    const opts = { skipSimilarSearch: true };
+
+    if (agentId) {
+      // 3a. Chapter summary node (구조 학습)
+      try {
+        await BrainClient.addToGraph(agentId, {
+          type: 'Idea',
+          title: `[${genre}] ${chapter.title || `${title} Ch.${index + 1}`}`,
+          description: chapter.content.slice(0, 500),
+          metadata: { ...nodeMeta, chapterIndex: index, nodeRole: 'summary' },
+          parentId: domainId,
+        }, null, opts);
+        created++;
+      } catch {}
+
+      // 3b. Best paragraphs node — Level 2: 원문 문단 저장 (스타일 학습)
+      const bestParagraphs = this._extractBestParagraphs(chapter.content, 3);
+      if (bestParagraphs.length > 0) {
+        try {
+          await BrainClient.addToGraph(agentId, {
+            type: 'Idea',
+            title: `[${genre}/style] ${title} Ch.${index + 1} 명문장`,
+            description: bestParagraphs.join('\n---\n'),
+            metadata: { ...nodeMeta, chapterIndex: index, nodeRole: 'style' },
+            parentId: domainId,
+          }, null, opts);
+          created++;
+        } catch {}
+      }
+
+      // 3c. Dialogue samples node (대화체 학습)
+      const dialogues = this._extractDialogues(chapter.content, 5);
+      if (dialogues.length >= 2) {
+        try {
+          await BrainClient.addToGraph(agentId, {
+            type: 'Idea',
+            title: `[${genre}/dialogue] ${title} Ch.${index + 1} 대화`,
+            description: dialogues.join('\n'),
+            metadata: { ...nodeMeta, chapterIndex: index, nodeRole: 'dialogue' },
+            parentId: domainId,
+          }, null, opts);
+          created++;
+        } catch {}
+      }
+    }
+
+    // 3d. Extract narrative concepts via LLM (구조 학습)
+    if (this.llmCall && chapter.content.length > 200) {
+      try {
+        const concepts = await this._extractConcepts(chapter.content, genre);
+        for (const concept of concepts) {
+          if (agentId) {
+            await BrainClient.addToGraph(agentId, {
+              type: 'Idea',
+              title: `[${genre}] ${concept.name}`,
+              description: concept.description,
+              metadata: { ...nodeMeta, chapterIndex: index, nodeRole: 'concept' },
+              parentId: domainId,
+            }, null, opts);
+            created++;
+          }
+        }
+      } catch (err) {
+        console.warn(`[TextIngestion] Concept extraction failed ch${index + 1}:`, err.message);
+      }
+    }
+
+    // 3e. Style analysis via LLM (문체 학습) — Level 2 핵심
+    if (this.llmCall && chapter.content.length > 300) {
+      try {
+        const style = await this._analyzeStyle(chapter.content, genre);
+        if (style && agentId) {
+          await BrainClient.addToGraph(agentId, {
+            type: 'Idea',
+            title: `[${genre}/style-analysis] ${title} Ch.${index + 1} 문체`,
+            description: style,
+            metadata: { ...nodeMeta, chapterIndex: index, nodeRole: 'style-analysis' },
+            parentId: domainId,
+          }, null, opts);
+          created++;
+        }
+      } catch {}
+    }
+
+    return created;
+  }
+
+  /** Simple hash for deterministic IDs */
+  _hash(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+      h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h).toString(36);
   }
 
   /**

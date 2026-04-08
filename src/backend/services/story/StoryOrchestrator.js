@@ -113,7 +113,7 @@ class StoryOrchestrator {
     let evalHistory = { goodPatterns: [], antiPatterns: [], avgScore: 0 };
     if (agentId) {
       try {
-        evalHistory = await BrainClient.getEvalHistory(agentId, series.title);
+        evalHistory = await BrainClient.getEvalHistory(agentId, series.id);
         if (evalHistory.goodPatterns.length || evalHistory.antiPatterns.length) {
           this._emit('rl_context', {
             goodPatterns: evalHistory.goodPatterns.length,
@@ -149,15 +149,21 @@ class StoryOrchestrator {
                   parts.push(`Episode ${ep.episode_number}: "${ep.title}" — ${(ep.script_content || '').slice(0, 300)}...`);
                 }
               }
-              // Level 2: Style reference from CGB (ingested text patterns)
+              // Level 2: Style reference from CGB (genre-filtered metadata query)
               if (this.getBrainContext) {
                 try {
                   const styleNodes = await this.getBrainContext(`${genre} style 명문장 대화 문체`);
-                  const styleRefs = (styleNodes || []).filter(n =>
-                    n.title?.includes('/style') || n.title?.includes('/dialogue') || n.title?.includes('명문장')
-                  ).slice(0, 3);
+                  const styleRefs = (styleNodes || []).filter(n => {
+                    // Filter by genre metadata (not just title string)
+                    const meta = n.metadata || {};
+                    const nodeGenre = meta.genre || meta.category || '';
+                    const genreMatch = !nodeGenre || nodeGenre === genre || nodeGenre === 'general';
+                    const roleMatch = meta.nodeRole === 'style' || meta.nodeRole === 'dialogue' || meta.nodeRole === 'style-analysis'
+                      || n.title?.includes('/style') || n.title?.includes('/dialogue') || n.title?.includes('명문장');
+                    return genreMatch && roleMatch;
+                  }).slice(0, 3);
                   if (styleRefs.length > 0) {
-                    parts.push('\n## Writing Style References (from ingested novels)');
+                    parts.push(`\n## Writing Style References (${genre} genre, from ingested novels)`);
                     parts.push('Use these as STYLE REFERENCE — mimic this quality of prose:');
                     for (const ref of styleRefs) {
                       parts.push(`\n### ${ref.title}\n${(ref.description || '').slice(0, 500)}`);

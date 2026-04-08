@@ -315,7 +315,7 @@ async function createEpisode(agentId) {
   return episodeId;
 }
 
-async function addToGraph(agentId, node, episodeId = null) {
+async function addToGraph(agentId, node, episodeId = null, options = {}) {
   const bc = await getBrainConfig(agentId);
   if (!bc) return null;
 
@@ -368,28 +368,32 @@ async function addToGraph(agentId, node, episodeId = null) {
       }).catch(() => {});
     }
 
-    // Connect to related nodes (same topic → SIMILAR_TO via embedding search, top 3)
-    const searchTitle = (node.title || '').replace(/^(Interest|Response):\s*/, '');
-    if (searchTitle.length > 10) {
-      const related = await cgbFetch(
-        `/api/v1/graph/search?q=${encodeURIComponent(searchTitle.slice(0, 80))}&limit=5`
-      );
-      const relatedNodes = related?.data?.results || [];
-      let linked = 0;
-      for (const other of relatedNodes) {
-        if (other.id !== result.data.id && linked < 3) {
-          cgbFetch('/api/v1/graph/edges', {
-            method: 'POST',
-            body: { sourceId: result.data.id, targetId: other.id, type: 'SIMILAR_TO' },
-            timeout: 10000,
-          }).catch(() => {});
-          linked++;
+    // Connect to related nodes (skip in bulk ingestion mode — saves ~3 API calls per node)
+    if (!options.skipSimilarSearch) {
+      const searchTitle = (node.title || '').replace(/^(Interest|Response):\s*/, '');
+      if (searchTitle.length > 10) {
+        const related = await cgbFetch(
+          `/api/v1/graph/search?q=${encodeURIComponent(searchTitle.slice(0, 80))}&limit=5`
+        );
+        const relatedNodes = related?.data?.results || [];
+        let linked = 0;
+        for (const other of relatedNodes) {
+          if (other.id !== result.data.id && linked < 3) {
+            cgbFetch('/api/v1/graph/edges', {
+              method: 'POST',
+              body: { sourceId: result.data.id, targetId: other.id, type: 'SIMILAR_TO' },
+              timeout: 10000,
+            }).catch(() => {});
+            linked++;
+          }
         }
       }
     }
 
-    // Extract concepts from this idea (inline, not just cron)
-    extractConcepts(agentId, result.data.id, node, bc);
+    // Extract concepts from this idea (skip in ingestion mode — TextIngestion does its own)
+    if (!options.skipSimilarSearch) {
+      extractConcepts(agentId, result.data.id, node, bc);
+    }
 
     // Promote to domain layer if score >= 40
     const score = result.data.score || 0;
@@ -865,7 +869,6 @@ async function recordEvaluation(agentId, evaluation, episodeNodeId, series) {
 
     // RL Logic: High score → promote good patterns; Low score → store anti-patterns
     if (evaluation.overallScore >= 4.0 && evaluation.strengths?.length) {
-      // Promote: store strengths as reusable style reference
       promoted = true;
       await cgbFetch('/api/v1/graph/nodes', {
         method: 'POST',
@@ -876,13 +879,13 @@ async function recordEvaluation(agentId, evaluation, episodeNodeId, series) {
           agent_id: agentId,
           domain: bc.graph_scope || 'creative',
           layer: 1,
+          metadata: { patternType: 'good', seriesId: series.id, score: evaluation.overallScore },
         },
         timeout: 10000,
       }).catch(() => {});
     }
 
     if (evaluation.overallScore < 3.0 && evaluation.weaknesses?.length) {
-      // Anti-pattern: store what to avoid
       await cgbFetch('/api/v1/graph/nodes', {
         method: 'POST',
         body: {
@@ -892,6 +895,7 @@ async function recordEvaluation(agentId, evaluation, episodeNodeId, series) {
           agent_id: agentId,
           domain: bc.graph_scope || 'creative',
           layer: 1,
+          metadata: { patternType: 'anti', seriesId: series.id, score: evaluation.overallScore },
         },
         timeout: 10000,
       }).catch(() => {});
@@ -905,33 +909,46 @@ async function recordEvaluation(agentId, evaluation, episodeNodeId, series) {
 
 /**
  * Get past evaluation feedback for a series from CGB graph.
- * Used by WritingHarness to inject "lessons learned" from previous episodes.
+ * Uses metadata queries (not title string matching) for reliable filtering.
  * @param {string} agentId
- * @param {string} seriesTitle
+ * @param {string} seriesId - Series UUID
  * @returns {{ goodPatterns: string[], antiPatterns: string[], avgScore: number }}
  */
-async function getEvalHistory(agentId, seriesTitle) {
+async function getEvalHistory(agentId, seriesId) {
   const bc = await getBrainConfig(agentId);
   if (!bc) return { goodPatterns: [], antiPatterns: [], avgScore: 0 };
 
-  const result = await cgbFetch(
-    `/api/v1/graph/search?q=${encodeURIComponent(seriesTitle + ' evaluation pattern')}&domain=${encodeURIComponent(bc.graph_scope || 'creative')}&limit=10`
+  // Query CGB with metadata filter: meta.type=evaluation, meta.seriesId=xxx
+  const evalNodes = await cgbFetch(
+    `/api/v1/graph/nodes?meta.type=evaluation&meta.seriesId=${encodeURIComponent(seriesId)}&domain=${encodeURIComponent(bc.graph_scope || 'creative')}&limit=10`
   );
 
-  const nodes = result?.data?.results || result?.data?.nodes || [];
+  const nodes = evalNodes?.data?.nodes || [];
   const goodPatterns = [];
   const antiPatterns = [];
   const scores = [];
 
   for (const n of nodes) {
-    if (n.title?.includes('/good-pattern')) {
-      goodPatterns.push(n.description?.slice(0, 300) || '');
-    } else if (n.title?.includes('/anti-pattern')) {
-      antiPatterns.push(n.description?.slice(0, 300) || '');
-    } else if (n.title?.includes('[eval]')) {
-      const scoreMatch = n.title.match(/(\d+\.?\d*)\/5/);
-      if (scoreMatch) scores.push(parseFloat(scoreMatch[1]));
-    }
+    const meta = n.metadata || {};
+    const score = meta.overallScore || 0;
+    if (score) scores.push(typeof score === 'number' ? score : parseFloat(score));
+
+    // Also fetch pattern nodes linked to this series
+  }
+
+  // Fetch good/anti patterns via metadata
+  const patternNodes = await cgbFetch(
+    `/api/v1/graph/nodes?meta.seriesId=${encodeURIComponent(seriesId)}&meta.patternType=good&domain=${encodeURIComponent(bc.graph_scope || 'creative')}&limit=5`
+  );
+  for (const n of (patternNodes?.data?.nodes || [])) {
+    goodPatterns.push(n.description?.slice(0, 300) || '');
+  }
+
+  const antiNodes = await cgbFetch(
+    `/api/v1/graph/nodes?meta.seriesId=${encodeURIComponent(seriesId)}&meta.patternType=anti&domain=${encodeURIComponent(bc.graph_scope || 'creative')}&limit=5`
+  );
+  for (const n of (antiNodes?.data?.nodes || [])) {
+    antiPatterns.push(n.description?.slice(0, 300) || '');
   }
 
   const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
