@@ -82,7 +82,7 @@ function createOutlineHarness(options = {}) {
 
     tools: {
       llmProvider: 'dashscope',
-      llmModel: options.model || 'qwen3.5-flash',
+      llmModel: options.model || process.env.GLM_MODEL || 'qwen3.5-flash',
       useCGB: true,
       cgbAPIs: ['/api/v1/graph/search', '/api/v1/creative/brainstorm'],
     },
