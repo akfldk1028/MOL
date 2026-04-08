@@ -512,8 +512,120 @@ async function domainTools(domainId) {
   return result?.data?.tools || [];
 }
 
+// ─────────────────────────────────────────────
+// Story-specific APIs (StoryWriter pipeline support)
+// Papers: Long Story KG (2025), KG-Guided Storytelling, SCORE
+// ─────────────────────────────────────────────
+
+/**
+ * Get story knowledge graph subgraph for a series.
+ * Returns related Episode, Concept, Idea nodes for continuity.
+ * @param {string} agentId
+ * @param {string} seriesTitle
+ * @param {object} [options] - { limit, nodeTypes }
+ */
+async function getStoryKG(agentId, seriesTitle, options = {}) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return { nodes: [], edges: [] };
+
+  const limit = options.limit || 20;
+  const result = await cgbFetch(
+    `/api/v1/graph/search?q=${encodeURIComponent(seriesTitle)}&domain=${encodeURIComponent(bc.graph_scope)}&limit=${limit}`
+  );
+  return {
+    nodes: result?.data?.results || result?.data?.nodes || [],
+    edges: [],
+  };
+}
+
+/**
+ * Suggest a plot twist by finding related but unexpected concepts in the graph.
+ * Paper: Long Story KG — introduce obstacle nodes related to main goal.
+ * @param {string} agentId
+ * @param {string} currentPlot - Current story state description
+ * @returns {{ suggestions: Array<{ concept, connection, twistType }> }}
+ */
+async function suggestTwist(agentId, currentPlot) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return { suggestions: [] };
+
+  // Use CGB brainstorm to find unexpected angles
+  const result = await cgbFetch('/api/v1/creative/brainstorm', {
+    method: 'POST',
+    body: {
+      topic: `Plot twist for: ${currentPlot}`,
+      count: 5,
+      temperature: 0.9, // Higher for more creative twists
+      domain: bc.graph_scope,
+    },
+    timeout: 60000,
+  });
+
+  const ideas = result?.data?.ideas || result?.data || [];
+  return {
+    suggestions: Array.isArray(ideas) ? ideas.slice(0, 3).map(idea => ({
+      concept: idea.title || idea.name || idea,
+      connection: idea.description || '',
+      twistType: 'obstacle', // Long Story KG paper: obstacle nodes
+    })) : [],
+  };
+}
+
+/**
+ * Check story coherence using CGB evaluate endpoint.
+ * Paper: SCORE — validation of contextual consistency.
+ * @param {string} agentId
+ * @param {string} episodeText
+ * @param {string} outlineSummary
+ * @returns {{ coherent, score, issues }}
+ */
+async function checkCoherence(agentId, episodeText, outlineSummary) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return { coherent: true, score: 0, issues: [] };
+
+  const result = await cgbFetch('/api/v1/creative/evaluate', {
+    method: 'POST',
+    body: {
+      idea: `Episode text (${episodeText.length} chars): ${episodeText.slice(0, 2000)}`,
+      domain: bc.graph_scope,
+    },
+    timeout: 30000,
+  });
+
+  const evalData = result?.data || {};
+  return {
+    coherent: (evalData.score || 0) >= 0.6,
+    score: evalData.score || 0,
+    issues: evalData.weaknesses || [],
+  };
+}
+
+/**
+ * Get genre-specific patterns from ingested reference material in CGB.
+ * @param {string} agentId
+ * @param {string} genre
+ * @returns {{ patterns, structures, archetypes }}
+ */
+async function getGenrePatterns(agentId, genre) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return { patterns: [], structures: [], archetypes: [] };
+
+  const result = await cgbFetch(
+    `/api/v1/graph/search?q=${encodeURIComponent(genre + ' story pattern structure')}&domain=${encodeURIComponent(bc.graph_scope)}&limit=10`
+  );
+
+  const nodes = result?.data?.results || result?.data?.nodes || [];
+  return {
+    patterns: nodes.filter(n => n.type === 'Concept'),
+    structures: nodes.filter(n => n.type === 'Idea'),
+    archetypes: nodes.filter(n => n.type === 'Agent' || n.type === 'Domain'),
+  };
+}
+
 module.exports = {
   research, brainstorm, evaluate, addToGraph, searchGraph,
   trackActivity, getBrainConfig, getStatus, createEpisode, recordEvolution,
   domainCall, listDomains, domainTools,
+  // Story-specific APIs
+  getStoryKG, suggestTwist, checkCoherence, getGenrePatterns,
 };

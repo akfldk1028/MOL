@@ -7,5 +7,17 @@
 const { extractJSON, validate, validateAndRetry } = require('./structured-output');
 const { LoopDetector } = require('./loop-detector');
 const { Semaphore } = require('./semaphore');
+const { TaskQueue, createTask, isTaskReady, getTaskDependencyOrder, validateTaskDependencies } = require('./task-queue');
+const { Orchestrator, Team, parseTaskSpecs, executeWithRetry } = require('./orchestrator');
+const { Scheduler } = require('./scheduler');
+const { AgentPool } = require('./agent-pool');
+const { SharedMemory } = require('./shared-memory');
 
-module.exports = { extractJSON, validate, validateAndRetry, LoopDetector, Semaphore };
+module.exports = {
+  // Existing
+  extractJSON, validate, validateAndRetry, LoopDetector, Semaphore,
+  // Task Queue
+  TaskQueue, createTask, isTaskReady, getTaskDependencyOrder, validateTaskDependencies,
+  // Orchestrator + Scheduler + Pool + SharedMemory
+  Orchestrator, Team, parseTaskSpecs, executeWithRetry, Scheduler, AgentPool, SharedMemory,
+};

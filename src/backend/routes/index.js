@@ -27,6 +27,7 @@ const hrRoutes = require('./hr');
 const cacheRoutes = require('./cache');
 const brainRoutes = require('./brain');
 const gameRoutes = require('./games');
+const storyRoutes = require('./story');
 
 const router = Router();
 
@@ -55,6 +56,7 @@ router.use('/hr', hrRoutes);
 router.use('/cache', cacheRoutes);
 router.use('/brain', brainRoutes);
 router.use('/games', gameRoutes);
+router.use('/story', storyRoutes);
 
 // Health check (no auth required)
 router.get('/health', (req, res) => {
