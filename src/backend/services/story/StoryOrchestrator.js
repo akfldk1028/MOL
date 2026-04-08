@@ -25,6 +25,7 @@ const { createPlanningHarness, buildPlanningPrompt } = require('../../engine/har
 const { createWritingHarness, buildWritingPrompt } = require('../../engine/harness/agents/WritingHarness');
 const { createEvaluationHarness, buildEvaluationPrompt } = require('../../engine/harness/agents/EvaluationHarness');
 const { StoryStateTracker } = require('./StoryStateTracker');
+const BrainClient = require('../BrainClient');
 
 class StoryOrchestrator {
   /**
@@ -108,6 +109,21 @@ class StoryOrchestrator {
     }
     this._emit('stage_complete', { stage: 'planning', chapters: planResult.artifact?.data?.chapters?.length || 0 });
 
+    // ─── RL: Fetch past evaluation feedback from CGB ───
+    let evalHistory = { goodPatterns: [], antiPatterns: [], avgScore: 0 };
+    if (agentId) {
+      try {
+        evalHistory = await BrainClient.getEvalHistory(agentId, series.title);
+        if (evalHistory.goodPatterns.length || evalHistory.antiPatterns.length) {
+          this._emit('rl_context', {
+            goodPatterns: evalHistory.goodPatterns.length,
+            antiPatterns: evalHistory.antiPatterns.length,
+            avgScore: evalHistory.avgScore,
+          });
+        }
+      } catch {}
+    }
+
     // ─── Stage 3: Writing (with evaluation loop) ───
     let writeResult = null;
     let evalResult = null;
@@ -175,6 +191,24 @@ class StoryOrchestrator {
         fullWritePrompt += `\n\n## Reviewer Feedback (MUST address)\n${fb}`;
       }
 
+      // RL: Inject past evaluation learnings from CGB
+      if (evalHistory.goodPatterns.length > 0 || evalHistory.antiPatterns.length > 0) {
+        const rlParts = ['\n\n## 이전 에피소드 평가에서 배운 교훈 (RL Feedback)'];
+        if (evalHistory.goodPatterns.length > 0) {
+          rlParts.push('### ✅ 잘한 점 (이것을 유지하세요)');
+          for (const p of evalHistory.goodPatterns.slice(0, 3)) {
+            rlParts.push(`- ${p.slice(0, 200)}`);
+          }
+        }
+        if (evalHistory.antiPatterns.length > 0) {
+          rlParts.push('### ⛔ 피해야 할 점 (이것은 반복하지 마세요)');
+          for (const p of evalHistory.antiPatterns.slice(0, 3)) {
+            rlParts.push(`- ${p.slice(0, 200)}`);
+          }
+        }
+        fullWritePrompt += rlParts.join('\n');
+      }
+
       writeResult = await writeHarness.run(fullWritePrompt);
 
       if (!writeResult.success) {
@@ -224,6 +258,23 @@ class StoryOrchestrator {
 
     const durationMs = Date.now() - startTime;
     this._emit('pipeline_complete', { episode: episode.title, wordCount: episode.wordCount, durationMs, attempts: writeAttempt });
+
+    // ─── RL: Record to CGB graph (async, non-blocking) ───
+    if (agentId) {
+      const evalData = evalResult?.artifact?.data || {};
+      // Save episode node
+      const prevEpNodeId = episodeNumber > 1 ? `episode-${series.id}-ep${episodeNumber - 1}` : null;
+      BrainClient.addEpisodeToGraph(agentId, {
+        ...episode, qualityScore: evalData.overallScore, pipelineType: 'storywriter',
+      }, series, prevEpNodeId).then(epNodeId => {
+        // Save evaluation feedback
+        if (epNodeId && evalData.overallScore) {
+          BrainClient.recordEvaluation(agentId, evalData, epNodeId, series).then(r => {
+            if (r?.promoted) this._emit('rl_promoted', { score: evalData.overallScore });
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
 
     return {
       success: true,

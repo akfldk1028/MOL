@@ -27,13 +27,14 @@ function createWritingHarness(options = {}) {
     role: `Creative fiction writer specializing in ${genre}. You write immersive, emotionally engaging prose with vivid descriptions and authentic dialogue.`,
 
     intent: {
-      goal: `Write chapter ${chapterNumber} (~${targetWordCount} words) following the chapter plan. Maintain consistency with previous chapters.`,
+      goal: `Write chapter ${chapterNumber} (MINIMUM ${targetWordCount} words, aim for ${Math.floor(targetWordCount * 1.2)}) following the chapter plan. Maintain consistency with previous chapters.`,
       successCriteria: [
-        `Write approximately ${targetWordCount} words (±20%)`,
+        `Write AT LEAST ${targetWordCount} words — longer is better, shorter is FAILURE`,
         'Follow the chapter plan sub-events in order',
         'End with a cliffhanger or emotional hook',
-        'Maintain character voice consistency',
-        'Show, don\'t tell — use sensory details',
+        'Maintain character voice consistency — use EXACT names from outline',
+        'Show, don\'t tell — use sensory details (sight, sound, smell, touch, taste)',
+        '반드시 100% 한국어로 작성 — 중국어/일본어/영어 단어 절대 금지',
         genre === 'romance' ? 'Build emotional tension between leads' :
         genre === 'fantasy' ? 'Vivid world-building through action' :
         genre === 'thriller' ? 'Escalating suspense and pacing' :
@@ -43,8 +44,12 @@ function createWritingHarness(options = {}) {
         'Deviating from the chapter plan outline',
         'INVENTING NEW CHARACTERS not in the outline — use ONLY provided character names',
         'Changing character names, ages, or occupations from the outline',
+        'Using ANY Chinese characters (汉字) in the text — this is Korean fiction',
+        'Using Japanese (ひらがな/カタカナ) in the text',
+        'Mixing languages — the ENTIRE text must be pure Korean (한글)',
         'Breaking character consistency',
         'Telling emotions instead of showing them',
+        'Writing less than the minimum word count',
         'Abrupt ending without hook',
         'Repetitive sentence patterns',
       ],
@@ -74,14 +79,20 @@ function createWritingHarness(options = {}) {
         const wordCount = output.split(/\s+/).length;
         const charCount = output.replace(/\s/g, '').length;
         const isKorean = /[\uAC00-\uD7AF]/.test(output);
-        const minWords = Math.floor(targetWordCount * 0.5);
-        const effectiveCount = isKorean ? Math.max(wordCount, Math.floor(charCount / 3)) : wordCount;
+        const minWords = Math.floor(targetWordCount * 0.6);
+        // Korean: each 한글 char ≈ 1 syllable, avg word = 2-3 syllables → char/2.5
+        const effectiveCount = isKorean ? Math.max(wordCount, Math.floor(charCount / 2.5)) : wordCount;
         if (effectiveCount < minWords) {
           return { valid: false, reason: `Only ${effectiveCount} words (${charCount} chars), need at least ${minWords}` };
         }
         // Check for common LLM failure modes
         if (output.includes('[continue]') || output.includes('[to be continued by]')) {
           return { valid: false, reason: 'LLM broke character — meta-text detected' };
+        }
+        // Check for Chinese character contamination (>10 = likely Chinese text, not just Hanja)
+        const chineseChars = output.match(/[\u4E00-\u9FFF]/g);
+        if (chineseChars && chineseChars.length > 10) {
+          return { valid: false, reason: `Chinese characters detected (${chineseChars.length} chars) — must be pure Korean` };
         }
         return { valid: true };
       },
@@ -108,12 +119,16 @@ function createWritingHarness(options = {}) {
     handoff: {
       artifactKey: `writer/chapter_${chapterNumber}`,
       artifactFormat: 'text',
-      transform: (output) => ({
-        chapterNumber,
-        title: extractTitle(output),
-        content: output,
-        wordCount: output.split(/\s+/).length,
-      }),
+      transform: (output) => {
+        // Post-process: strip stray Chinese/Japanese characters
+        const cleaned = output.replace(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g, '');
+        return {
+          chapterNumber,
+          title: extractTitle(cleaned),
+          content: cleaned,
+          wordCount: cleaned.split(/\s+/).length,
+        };
+      },
     },
   });
 }
@@ -198,8 +213,37 @@ function buildWritingPrompt(chapterPlan, previousChapters = [], options = {}) {
   }
 
   if (options.language === 'ko') {
-    parts.push('반드시 한국어로 작성하세요. 자연스러운 한국어 문체를 사용하세요.');
-    parts.push('소설처럼 자연스러운 문장을 쓰세요. 설명문이 아닌 이야기체로.');
+    parts.push(
+      '## 언어 규칙 (절대 준수)',
+      '⛔ 절대 중국어(汉字) 사용 금지. 한자 한 글자도 포함하면 실패.',
+      '⛔ 절대 일본어(ひらがな/カタカナ) 사용 금지.',
+      '⛔ 영어 단어 삽입 금지 (고유명사 제외).',
+      '✅ 반드시 100% 한국어(한글)로만 작성하세요.',
+      '✅ 자연스러운 한국어 소설 문체. 설명문이 아닌 이야기체.',
+      '✅ 대화는 "쌍따옴표" 사용.',
+      '',
+    );
+  }
+
+  // Word count enforcement (repeat for emphasis — LLMs respond to repetition)
+  parts.push(
+    '## 분량 규칙 (절대 준수)',
+    `⛔ ${wc}단어 미만이면 무조건 실패입니다. 절대 짧게 쓰지 마세요.`,
+    `✅ 최소 ${wc}단어, 목표 ${Math.floor(wc * 1.2)}단어 이상.`,
+    '✅ 각 서브이벤트를 충분히 전개하세요 — 요약하지 말고 장면을 풀어 쓰세요.',
+    '✅ 대화, 내면 독백, 감각 묘사를 풍부하게 넣으세요.',
+    '',
+  );
+
+  // Character name lock
+  if (options.outline) {
+    parts.push(
+      '## 캐릭터명 규칙 (절대 준수)',
+      '⛔ 아웃라인에 없는 캐릭터를 새로 만들지 마세요.',
+      '⛔ 캐릭터 이름을 변경하거나 다른 이름으로 부르지 마세요.',
+      '✅ 위 아웃라인의 캐릭터 이름을 정확히 그대로 사용하세요.',
+      '',
+    );
   }
 
   return parts.join('\n');

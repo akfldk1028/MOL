@@ -737,6 +737,9 @@ async function addEpisodeToGraph(agentId, episode, series, prevEpisodeNodeId = n
   });
 
   if (result?.data) {
+    // Wait a tick for node to be committed before creating edges
+    await new Promise(r => setTimeout(r, 500));
+
     // Episode → PART_OF → Series Topic
     const topicId = `topic-series-${series.id}`;
     cgbFetch('/api/v1/graph/edges', {
@@ -750,20 +753,6 @@ async function addEpisodeToGraph(agentId, episode, series, prevEpisodeNodeId = n
         method: 'POST',
         body: { sourceId: prevEpisodeNodeId, targetId: nodeId, type: 'CAUSES' },
       }).catch(() => {});
-    }
-
-    // Episode → USES_CONCEPT → Characters
-    if (series.character_sheet) {
-      const chars = typeof series.character_sheet === 'string'
-        ? JSON.parse(series.character_sheet) : series.character_sheet;
-      for (const c of chars) {
-        const cSlug = Buffer.from(c.name).toString('base64url').slice(0, 12);
-        const charId = `char-${series.id.slice(0, 8)}-${cSlug}`;
-        cgbFetch('/api/v1/graph/edges', {
-          method: 'POST',
-          body: { sourceId: nodeId, targetId: charId, type: 'USES_CONCEPT' },
-        }).catch(() => {});
-      }
     }
 
     // Agent → GENERATED_BY → Episode
@@ -812,6 +801,155 @@ async function initSeriesGraph(agentId, series) {
   console.log(`[BrainClient] ✅ Novel graph initialized for "${series.title}"`);
 }
 
+// ─────────────────────────────────────────────
+// RL Feedback Loop — Evaluation → CGB Graph
+// Papers: SCORE (2025) — evaluation-driven improvement
+//         Anthropic Harness — "separating the agent doing work from the agent judging it"
+// ─────────────────────────────────────────────
+
+/**
+ * Record evaluation result in CGB graph as feedback node.
+ * Creates: Evaluation node → EVALUATES → Episode node
+ * High scores: promote episode content to style reference (Level 2 learning)
+ * Low scores: store weaknesses as anti-patterns for next generation
+ *
+ * @param {string} agentId
+ * @param {object} evaluation - { scores, overallScore, feedback, strengths, weaknesses }
+ * @param {string} episodeNodeId - CGB node ID of the evaluated episode
+ * @param {object} series - { id, title, genre }
+ * @returns {{ nodeId, promoted }}
+ */
+async function recordEvaluation(agentId, evaluation, episodeNodeId, series) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return null;
+
+  const evalId = `eval-${series.id.slice(0, 8)}-${Date.now()}`;
+  const scores = evaluation.scores || {};
+  const scoreStr = Object.entries(scores).map(([k, v]) => `${k}:${v}/5`).join(', ');
+
+  const result = await cgbFetch('/api/v1/graph/nodes', {
+    method: 'POST',
+    body: {
+      id: evalId,
+      type: 'Idea',
+      title: `[eval] ${series.title} — ${evaluation.overallScore}/5 (${scoreStr})`,
+      description: [
+        `Overall: ${evaluation.overallScore}/5`,
+        evaluation.strengths?.length ? `Strengths: ${evaluation.strengths.join('; ')}` : '',
+        evaluation.weaknesses?.length ? `Weaknesses: ${evaluation.weaknesses.join('; ')}` : '',
+        evaluation.feedback || '',
+      ].filter(Boolean).join('\n'),
+      agent_id: agentId,
+      domain: bc.graph_scope || 'creative',
+      layer: 1,
+      metadata: {
+        type: 'evaluation',
+        seriesId: series.id,
+        overallScore: evaluation.overallScore,
+        scores,
+        passed: evaluation.passed,
+      },
+    },
+    timeout: 15000,
+  });
+
+  let promoted = false;
+
+  if (result?.data) {
+    // Wait for node commit before edges
+    await new Promise(r => setTimeout(r, 500));
+
+    // Evaluation → EVALUATES → Episode
+    if (episodeNodeId) {
+      cgbFetch('/api/v1/graph/edges', {
+        method: 'POST',
+        body: { sourceId: evalId, targetId: episodeNodeId, type: 'EVALUATES' },
+      }).catch(() => {});
+    }
+
+    // Eval → BELONGS_TO → Series Topic
+    const topicId = `topic-series-${series.id}`;
+    cgbFetch('/api/v1/graph/edges', {
+      method: 'POST',
+      body: { sourceId: evalId, targetId: topicId, type: 'BELONGS_TO' },
+    }).catch(() => {});
+
+    // RL Logic: High score → promote good patterns; Low score → store anti-patterns
+    if (evaluation.overallScore >= 4.0 && evaluation.strengths?.length) {
+      // Promote: store strengths as reusable style reference
+      promoted = true;
+      await cgbFetch('/api/v1/graph/nodes', {
+        method: 'POST',
+        body: {
+          type: 'Idea',
+          title: `[${series.genre}/good-pattern] ${series.title} — verified quality`,
+          description: `Strengths from ${evaluation.overallScore}/5 evaluation:\n${evaluation.strengths.join('\n')}`,
+          agent_id: agentId,
+          domain: bc.graph_scope || 'creative',
+          layer: 1,
+        },
+        timeout: 10000,
+      }).catch(() => {});
+    }
+
+    if (evaluation.overallScore < 3.0 && evaluation.weaknesses?.length) {
+      // Anti-pattern: store what to avoid
+      await cgbFetch('/api/v1/graph/nodes', {
+        method: 'POST',
+        body: {
+          type: 'Idea',
+          title: `[${series.genre}/anti-pattern] ${series.title} — avoid these`,
+          description: `Weaknesses from ${evaluation.overallScore}/5 evaluation:\n${evaluation.weaknesses.join('\n')}\n\nFeedback: ${evaluation.feedback || ''}`,
+          agent_id: agentId,
+          domain: bc.graph_scope || 'creative',
+          layer: 1,
+        },
+        timeout: 10000,
+      }).catch(() => {});
+    }
+
+    await trackActivity(agentId, 'story_eval');
+  }
+
+  return { nodeId: evalId, promoted };
+}
+
+/**
+ * Get past evaluation feedback for a series from CGB graph.
+ * Used by WritingHarness to inject "lessons learned" from previous episodes.
+ * @param {string} agentId
+ * @param {string} seriesTitle
+ * @returns {{ goodPatterns: string[], antiPatterns: string[], avgScore: number }}
+ */
+async function getEvalHistory(agentId, seriesTitle) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return { goodPatterns: [], antiPatterns: [], avgScore: 0 };
+
+  const result = await cgbFetch(
+    `/api/v1/graph/search?q=${encodeURIComponent(seriesTitle + ' evaluation pattern')}&domain=${encodeURIComponent(bc.graph_scope || 'creative')}&limit=10`
+  );
+
+  const nodes = result?.data?.results || result?.data?.nodes || [];
+  const goodPatterns = [];
+  const antiPatterns = [];
+  const scores = [];
+
+  for (const n of nodes) {
+    if (n.title?.includes('/good-pattern')) {
+      goodPatterns.push(n.description?.slice(0, 300) || '');
+    } else if (n.title?.includes('/anti-pattern')) {
+      antiPatterns.push(n.description?.slice(0, 300) || '');
+    } else if (n.title?.includes('[eval]')) {
+      const scoreMatch = n.title.match(/(\d+\.?\d*)\/5/);
+      if (scoreMatch) scores.push(parseFloat(scoreMatch[1]));
+    }
+  }
+
+  const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
+  return { goodPatterns, antiPatterns, avgScore };
+}
+
 module.exports = {
   research, brainstorm, evaluate, addToGraph, searchGraph,
   trackActivity, getBrainConfig, getStatus, createEpisode, recordEvolution,
@@ -820,4 +958,6 @@ module.exports = {
   getStoryKG, suggestTwist, checkCoherence, getGenrePatterns,
   // Novel Domain Graph Builder
   createSeriesTopic, createCharacterNode, addEpisodeToGraph, initSeriesGraph,
+  // RL Feedback Loop
+  recordEvaluation, getEvalHistory,
 };

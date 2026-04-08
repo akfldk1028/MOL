@@ -70,7 +70,12 @@ function createOutlineHarness(options = {}) {
           return { valid: false, reason: `Only ${eventCount} events found, need at least 3 (output too short: ${output.length} chars)` };
         }
         // Long enough output (>1000 chars) likely has enough structure even without exact pattern
-        if (output.length > 1000) return { valid: true };
+        if (output.length < 1000) return { valid: true };
+        // Check for Chinese character contamination
+        const chineseChars = output.match(/[\u4E00-\u9FFF]/g);
+        if (chineseChars && chineseChars.length > 5) {
+          return { valid: false, reason: `Chinese characters detected (${chineseChars.length}) — must be pure Korean` };
+        }
         return { valid: true };
       },
     },
@@ -184,8 +189,25 @@ function buildOutlinePrompt(series, options = {}) {
   );
 
   if (options.language === 'ko') {
-    parts.push('', '한국어로 작성하세요. 이벤트 제목과 내용 모두 한국어로.');
-    parts.push('캐릭터 이름은 한국 이름으로. 설정도 한국 현실에 맞게.');
+    parts.push(
+      '',
+      '## 언어 규칙 (절대 준수)',
+      '⛔ 중국어(汉字) 절대 금지 — 한자 한 글자도 사용하지 마세요.',
+      '⛔ 일본어(ひらがな/カタカナ) 절대 금지.',
+      '✅ 반드시 100% 한국어(한글)로만 작성.',
+      '✅ 캐릭터 이름은 자연스러운 한국 이름 (예: 서연, 민준, 지현).',
+      '✅ 장소/배경도 한국 현실에 맞게 (서울, 부산, 강남, 홍대 등).',
+      '',
+      '## 캐릭터 시트 포맷 (반드시 포함)',
+      '각 주인공은 아래 정보를 반드시 포함:',
+      '- 이름 (한국 이름)',
+      '- 나이',
+      '- 직업',
+      '- 성격 결함 (flaws)',
+      '- 숨겨진 욕망 (hidden desire)',
+      '- 외형 특징 2-3가지',
+      '',
+    );
   }
 
   return parts.filter(Boolean).join('\n');

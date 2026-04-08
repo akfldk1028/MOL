@@ -177,11 +177,18 @@ class AgentHarness {
       }
     }
 
-    // If retrying with previous output
+    // If retrying with previous output — tell LLM what went wrong
     if (previousOutput && this._iteration > 1) {
-      lines.push('## Previous Attempt (needs improvement)');
-      lines.push(previousOutput.slice(0, 2000));
+      lines.push('## Previous Attempt (FAILED — needs improvement)');
+      lines.push('Your previous attempt was rejected. Here is a preview:');
+      lines.push(previousOutput.slice(0, 1500));
       lines.push('');
+      // If writer, emphasize length
+      if (this.config.name === 'writer') {
+        lines.push('⚠️ 이전 시도는 분량이 부족했습니다. 이번에는 반드시 더 길게 작성하세요.');
+        lines.push('각 장면을 최대한 상세하게, 대화와 묘사를 풍부하게 넣으세요.');
+        lines.push('');
+      }
     }
 
     lines.push(userPrompt);

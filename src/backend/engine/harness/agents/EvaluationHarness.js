@@ -100,23 +100,33 @@ function parseEvaluationOutput(raw, passThreshold = 3.5) {
   const scores = {};
   let feedback = '';
 
-  // Try JSON first
+  // Try JSON first (fenced or unfenced)
   try {
-    const fenceMatch = raw.match(/```json\s*([\s\S]*?)```/);
-    if (fenceMatch) {
-      const parsed = JSON.parse(fenceMatch[1]);
+    const fenceMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonStr = fenceMatch ? fenceMatch[1] : raw;
+    // Find the outermost { ... }
+    const start = jsonStr.indexOf('{');
+    const end = jsonStr.lastIndexOf('}');
+    if (start !== -1 && end > start) {
+      const parsed = JSON.parse(jsonStr.slice(start, end + 1));
       if (parsed.scores) {
-        const passed = (parsed.overallScore || 0) >= passThreshold;
-        return { ...parsed, passed, rewriteRequired: !passed };
+        const scoreVals = Object.values(parsed.scores).filter(v => typeof v === 'number');
+        const overall = parsed.overallScore || (scoreVals.length > 0
+          ? scoreVals.reduce((a, b) => a + b, 0) / scoreVals.length : 0);
+        const passed = overall >= passThreshold;
+        return { ...parsed, overallScore: Math.round(overall * 10) / 10, passed, rewriteRequired: !passed };
       }
     }
   } catch {}
 
-  // Parse dimension:score patterns
+  // Parse dimension:score patterns (multiple formats)
   for (const dim of dimensions) {
     const patterns = [
-      new RegExp(`${dim}[:\\s]*([\\d.]+)\\s*(?:\\/\\s*5)?`, 'i'),
-      new RegExp(`${dim}[:\\s]*.*?(\\d)\\s*\\/\\s*5`, 'i'),
+      new RegExp(`"${dim}"\\s*:\\s*(\\d+\\.?\\d*)`, 'i'),                   // "relevance": 4
+      new RegExp(`${dim}[:\\s]+(\\d+\\.?\\d*)\\s*(?:\\/\\s*5)?`, 'i'),      // relevance: 4/5
+      new RegExp(`${dim}[:\\s]*.*?(\\d)\\s*\\/\\s*5`, 'i'),                  // relevance ... 4/5
+      new RegExp(`\\*\\*${dim}\\*\\*[:\\s]*(\\d+\\.?\\d*)`, 'i'),            // **relevance**: 4
+      new RegExp(`\\d+\\.\\s*\\*\\*${dim}\\*\\*.*?(\\d+\\.?\\d*)`, 'i'),     // 1. **Relevance** ... 4
     ];
     for (const p of patterns) {
       const m = raw.match(p);
