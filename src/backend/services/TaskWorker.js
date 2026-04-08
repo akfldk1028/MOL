@@ -722,6 +722,11 @@ class TaskWorker {
       }
     }
 
+    // ── StoryWriter Pipeline (4-Agent) ──
+    if (series.pipeline_type === 'storywriter') {
+      return this._handleCreateEpisodeStoryWriter(task, agent, series);
+    }
+
     const nextEpisodeNumber = await EpisodeService.getNextNumber(series.id);
 
     // Load previous episodes with feedback for context
@@ -837,6 +842,140 @@ class TaskWorker {
       pages: imageUrls.length,
       ts: Date.now(),
     });
+  }
+
+  // ──────────────────────────────────────────
+  // Handler: StoryWriter Pipeline (4-Agent)
+  // Papers: StoryWriter CIKM'25, Anthropic 3-agent, SCORE, IMPACT
+  // ──────────────────────────────────────────
+
+  static async _handleCreateEpisodeStoryWriter(task, agent, series) {
+    const { StoryOrchestrator } = require('./story');
+    const EpisodeService = require('./EpisodeService');
+    const BrainClient = require('./BrainClient');
+
+    const nextEpisodeNumber = await EpisodeService.getNextNumber(series.id);
+    const previousEpisodes = await EpisodeService.getRecentWithFeedback(series.id, 3);
+    previousEpisodes.reverse();
+
+    const pipelineConfig = typeof series.pipeline_config === 'string'
+      ? JSON.parse(series.pipeline_config) : (series.pipeline_config || {});
+
+    // LLM call via BridgeClient (GLM→DashScope fallback)
+    const llmCall = async (system, user, opts = {}) => {
+      const response = await bridgeGenerateWithFallback(
+        '/v1/generate/episode',
+        { agent_name: agent.name, prompt: user, max_tokens: opts.maxOutputTokens || 8192 },
+        { model: DEFAULT_MODEL, systemPrompt: system, userPrompt: user, options: { maxOutputTokens: opts.maxOutputTokens || 8192 } },
+        120000,
+      );
+      return response || '';
+    };
+
+    // CGB brain context
+    const getBrainContext = async (topic) => {
+      try {
+        const result = await BrainClient.research(agent.id, topic);
+        return result?.graphContext || [];
+      } catch { return []; }
+    };
+
+    const story = new StoryOrchestrator({
+      genre: series.genre || 'general',
+      language: 'ko',
+      targetWordCount: series.target_word_count || pipelineConfig.targetWordCount || 3000,
+      maxEvalRetries: pipelineConfig.maxEvalRetries || 2,
+      llmCall,
+      getBrainContext,
+    });
+
+    // Inject character sheet into state tracker
+    if (series.character_sheet) {
+      const chars = typeof series.character_sheet === 'string'
+        ? JSON.parse(series.character_sheet) : series.character_sheet;
+      for (const c of chars) {
+        story.stateTracker.trackEntity(c.name, 'character', 'active', c);
+      }
+    }
+    if (series.world_setting) {
+      story.stateTracker.setThemeAnchors({ topic: `${series.genre} ${series.title}`, mainGoal: series.synopsis?.slice(0, 100) });
+    }
+
+    console.log(`[StoryWriter] Starting 4-Agent pipeline for "${series.title}" ep${nextEpisodeNumber}...`);
+
+    const result = await story.generateEpisode({
+      series,
+      agentId: agent.id,
+      episodeNumber: nextEpisodeNumber,
+      previousEpisodes,
+    });
+
+    if (!result.success) {
+      throw new Error(`StoryWriter pipeline failed: ${result.error?.slice(0, 300)}`);
+    }
+
+    // Save episode with pipeline metadata
+    const episode = await queryOne(
+      `INSERT INTO episodes (id, series_id, created_by_agent_id, episode_number, title, script_content,
+        word_count, status, pipeline_type, pipeline_metadata, quality_scores,
+        created_at, published_at, page_image_urls)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'published', 'storywriter', $7, $8, NOW(), NOW(), '{}')
+       RETURNING *`,
+      [
+        series.id, agent.id, nextEpisodeNumber,
+        result.episode.title, result.episode.content, result.episode.wordCount,
+        JSON.stringify({
+          outline: result.outline,
+          chapterPlan: result.chapterPlan,
+          writeAttempts: result.writeAttempts,
+          durationMs: result.durationMs,
+        }),
+        result.evaluation ? JSON.stringify(result.evaluation.scores || result.evaluation) : null,
+      ]
+    );
+
+    // Update series episode count + quality score
+    await queryOne(
+      `UPDATE series SET episode_count = episode_count + 1, last_episode_at = NOW(),
+        quality_score = COALESCE($2, quality_score)
+       WHERE id = $1`,
+      [series.id, result.evaluation?.overallScore || null]
+    );
+
+    await this._incrementDailyCount(agent.id);
+
+    // Record to CGB
+    try {
+      const episodeNodeId = await BrainClient.createEpisode(agent.id);
+      if (episodeNodeId) {
+        BrainClient.addToGraph(agent.id, {
+          type: 'Idea',
+          title: `${series.title} ep${nextEpisodeNumber}: ${result.episode.title}`,
+          description: (result.episode.content || '').slice(0, 200),
+          contentDomain: series.genre,
+          postId: episode.id,
+        }, episodeNodeId).catch(() => {});
+      }
+    } catch {}
+
+    // Trigger critique chain
+    const TaskScheduler = require('./TaskScheduler');
+    await TaskScheduler.onEpisodeCreated(episode, agent.id);
+
+    emitActivity('agent_episode_created', {
+      agentName: agent.name,
+      seriesId: series.id,
+      seriesTitle: series.title,
+      episodeNumber: nextEpisodeNumber,
+      episodeTitle: result.episode.title,
+      wordCount: result.episode.wordCount,
+      qualityScore: result.evaluation?.overallScore,
+      pipelineType: 'storywriter',
+      writeAttempts: result.writeAttempts,
+      ts: Date.now(),
+    });
+
+    console.log(`[StoryWriter] ✅ ${agent.name} created "${result.episode.title}" ep${nextEpisodeNumber} for "${series.title}" (${result.episode.wordCount}w, eval:${result.evaluation?.overallScore}, ${result.writeAttempts} attempts, ${(result.durationMs/1000).toFixed(0)}s)`);
   }
 
   // ──────────────────────────────────────────
