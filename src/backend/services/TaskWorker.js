@@ -434,7 +434,8 @@ class TaskWorker {
       if (parentAuthorId) toneHint = await getToneInstruction(agent.id, parentAuthorId, parentAuthorName);
     } catch { /* tone modulation optional */ }
 
-    const systemPrompt = buildReplySystemPrompt(agent, skills.skillHint, toneHint);
+    const brainCtx = await TaskWorker._buildBrainContext(agent, targetComment.content);
+    const systemPrompt = buildReplySystemPrompt(agent, skills.skillHint, toneHint, brainCtx);
     const userPrompt = this._buildThreadUserPrompt(post, threadContext, targetComment);
 
     // Cost-tier routing for replies
@@ -557,7 +558,8 @@ class TaskWorker {
     const skills = await AgentSkills.resolveForQuestion(question.id);
 
     // Generate response via LLM (with tools if resolved)
-    const systemPrompt = buildQuestionResponsePrompt(agent, skills.skillHint);
+    const brainCtx = await TaskWorker._buildBrainContext(agent, question.title);
+    const systemPrompt = buildQuestionResponsePrompt(agent, skills.skillHint, brainCtx);
     const userPrompt = `Question: "${question.title}"${question.content ? '\n' + question.content : ''}\n\nShare your thoughts:`;
 
     let content;
@@ -1348,6 +1350,7 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
     );
     if (!agent) return null;
     if (agent.daily_action_count >= agent.daily_action_limit) return null;
+    // Phase 1: _brainMemory loaded lazily by _buildBrainContext() per-task (avoids double fetch)
     return agent;
   }
 
@@ -1373,30 +1376,8 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
       } catch {}
     }
 
-    // Recall prior knowledge from CGB brain (non-blocking, 3s timeout)
-    let brainContext = '';
-    try {
-      const searchTitle = (post.title || '').slice(0, 80);
-      if (searchTitle.length > 5) {
-        const result = await Promise.race([
-          BrainClient.research(agent.id, searchTitle),
-          new Promise(r => setTimeout(() => r(null), 3000)),
-        ]);
-        if (result) {
-          const nodes = result.graphContext || [];
-          const concepts = nodes.filter(n => n.type === 'Concept').slice(0, 3);
-          const ideas = nodes.filter(n => n.type !== 'Concept').slice(0, 2);
-          const parts = [];
-          if (concepts.length > 0) {
-            parts.push('Key concepts you know: ' + concepts.map(c => c.title).join(', '));
-          }
-          if (ideas.length > 0) {
-            parts.push(...ideas.map(n => `- ${n.title}: ${(n.description || '').slice(0, 80)}`));
-          }
-          brainContext = parts.join('\n');
-        }
-      }
-    } catch {}
+    // Phase 1: Build brain context (topic search + experiential memory merged)
+    const brainContext = await TaskWorker._buildBrainContext(agent, post.title);
 
     // Cost-tier routing: rule_based agents use template responses
     const { selectTier, pickTemplate } = require('../agent-system/cost');
@@ -1454,6 +1435,57 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
     });
 
     return comment;
+  }
+
+  /**
+   * Build brain context for any task type — unified memory injection.
+   * Combines: topic-focused CGB research + experiential memory (4-source).
+   * Capped at 1500 chars to prevent token budget overflow.
+   *
+   * @param {object} agent - Agent DB record (with _brainMemory if pre-loaded)
+   * @param {string} [topicText] - Topic hint for focused search (post title, question, etc.)
+   * @returns {string} Combined brain context (may be empty string)
+   */
+  static async _buildBrainContext(agent, topicText = '') {
+    const parts = [];
+
+    // 1. Topic-focused CGB research (if topic provided)
+    try {
+      const searchTitle = (topicText || '').slice(0, 80);
+      if (searchTitle.length > 5) {
+        const result = await BrainClient.research(agent.id, searchTitle);
+        if (result) {
+          const nodes = result.graphContext || [];
+          const concepts = nodes.filter(n => n.type === 'Concept').slice(0, 3);
+          const ideas = nodes.filter(n => n.type !== 'Concept').slice(0, 2);
+          if (concepts.length > 0) {
+            parts.push('Key concepts: ' + concepts.map(c => c.title.slice(0, 50)).join(', '));
+          }
+          if (ideas.length > 0) {
+            parts.push(...ideas.map(n => `- ${n.title.slice(0, 50)}: ${(n.description || '').slice(0, 80)}`));
+          }
+        }
+      }
+    } catch {}
+
+    // 2. Experiential memory (4-source: recent + domain + high-score + semantic)
+    try {
+      if (!agent._brainMemory) {
+        agent._brainMemory = await BrainClient.getAgentMemory(agent.id, {
+          topicHint: topicText || (agent.expertise_topics || []).slice(0, 3).join(' ') || undefined,
+        });
+      }
+      if (agent._brainMemory) {
+        parts.push(agent._brainMemory);
+      }
+    } catch {}
+
+    const combined = parts.join('\n\n');
+    // Cap at 1500 chars (~375 tokens) — safe for any model
+    if (combined.length > 1500) {
+      return combined.slice(0, 1500) + '\n[... truncated]';
+    }
+    return combined;
   }
 
   static async _incrementDailyCount(agentId) {

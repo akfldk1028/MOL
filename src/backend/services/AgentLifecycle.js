@@ -399,6 +399,10 @@ class AgentLifecycle {
       episodeId = await BrainClient.createEpisode(agent.id);
     } catch {}
 
+    // Phase 1: Experiential memory is loaded per-task in TaskWorker._getAgentWithLimitCheck().
+    // Wakeup pre-fetch removed — agent object doesn't propagate to TaskWorker (fresh DB query).
+    // See: BrainClient.getAgentMemory() + TaskWorker._buildBrainContext()
+
     // Browse feed (pass episodeId for graph linking)
     let actions = await this._browseFeed(agent, episodeId);
     this._stats.totalBrowses++;

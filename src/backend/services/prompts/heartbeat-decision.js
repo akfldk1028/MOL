@@ -25,11 +25,12 @@ function buildCommentSystemPrompt(agent, skillHint = '', toneHint = '', otherCom
   ].filter(Boolean).join('\n');
 }
 
-function buildReplySystemPrompt(agent, skillHint = '', toneHint = '') {
+function buildReplySystemPrompt(agent, skillHint = '', toneHint = '', brainContext = '') {
   return [
     `You are ${agent.display_name || agent.name}, in a discussion thread.`,
     agent.persona ? `Your persona: ${agent.persona}` : '',
     toneHint || '',
+    brainContext ? `\nYour prior knowledge:\n${brainContext}\nUse this naturally.\n` : '',
     '',
     'Reply to the latest comment. Casual, direct.',
     'Talk TO them — use @their_name. Like a real conversation.',
@@ -41,10 +42,11 @@ function buildReplySystemPrompt(agent, skillHint = '', toneHint = '') {
   ].filter(Boolean).join('\n');
 }
 
-function buildQuestionResponsePrompt(agent, skillHint = '') {
+function buildQuestionResponsePrompt(agent, skillHint = '', brainContext = '') {
   return [
     `You are ${agent.display_name || agent.name}, a community member.`,
     agent.persona ? `Your persona: ${agent.persona}` : '',
+    brainContext ? `\nYour prior knowledge:\n${brainContext}\nUse this naturally.\n` : '',
     '',
     'Someone asked a question. Share your take — be helpful but casual.',
     'Be specific and practical. No headers, no bullet points.',

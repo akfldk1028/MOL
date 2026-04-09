@@ -962,6 +962,151 @@ async function getEvalHistory(agentId, seriesId) {
   return { goodPatterns, antiPatterns, avgScore };
 }
 
+/**
+ * Get agent's recent memory context from CGB — experiential memory.
+ *
+ * Paper: "Memory in the Age of AI Agents" (Liu 2025, 2512.13564)
+ *   → factual + experiential + working memory
+ * Paper: "Agentic-KGR" (Li 2025, 2510.09156)
+ *   → co-evolution: graph strengthens agent, agent strengthens graph
+ *
+ * Returns a formatted string for prompt injection:
+ *   "너는 최근에 이런 생각/경험을 했다" 패턴.
+ *
+ * @param {string} agentId
+ * @param {object} [options]
+ * @param {number} [options.limit=8] - Max nodes to retrieve
+ * @param {string} [options.topicHint] - Optional topic to focus memory
+ * @returns {string|null} Formatted memory context or null
+ */
+async function getAgentMemory(agentId, options = {}) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return null;
+
+  const domain = bc.graph_scope || 'creative';
+
+  try {
+    // ── 4가지 기억 소스를 병렬 조회 (3s timeout each) ──
+    // Paper: "Memory in the Age of AI Agents" (Liu 2025)
+    //   → factual(개념) + experiential(경험) + working(현재 맥락) 통합
+    // Paper: "Agentic-KGR" (Li 2025)
+    //   → 에이전트 자신의 노드 + 도메인 전체 고품질 노드 교차
+
+    const timeout = (promise) => Promise.race([promise, new Promise(r => setTimeout(() => r(null), 3000))]);
+
+    const [topicResult, recentResult, highScoreResult, domainConceptsResult] = await Promise.all([
+      // 1. Topic-focused semantic search (3중 RRF) — 현재 맥락 관련
+      options.topicHint
+        ? timeout(cgbFetch(`/api/v1/graph/search?q=${encodeURIComponent(options.topicHint)}&domain=${encodeURIComponent(domain)}&limit=4`))
+        : Promise.resolve(null),
+
+      // 2. Recent agent nodes — 이 에이전트의 최근 활동 (최신 5개)
+      timeout(cgbFetch(`/api/v1/graph/nodes?agent_id=${encodeURIComponent(agentId)}&domain=${encodeURIComponent(domain)}&limit=5`)),
+
+      // 3. Domain-wide high-quality ideas — 다른 에이전트가 만든 것 포함, 도메인 전체 우수 아이디어
+      timeout(cgbFetch(`/api/v1/graph/nodes?domain=${encodeURIComponent(domain)}&type=Idea&limit=3`)),
+
+      // 4. Domain-wide top concepts — 이 에이전트 것이 아닌 도메인 전체 핵심 개념
+      timeout(cgbFetch(`/api/v1/graph/nodes?domain=${encodeURIComponent(domain)}&type=Concept&limit=4`)),
+    ]);
+
+    // ── Merge + deduplicate (4소스) ──
+    const seen = new Set();
+    const allNodes = [];
+    const addNodes = (result) => {
+      const nodes = result?.data?.results || result?.data?.nodes || [];
+      for (const n of nodes) {
+        if (!seen.has(n.id)) {
+          seen.add(n.id);
+          allNodes.push(n);
+        }
+      }
+    };
+    if (topicResult) addNodes(topicResult);
+    addNodes(recentResult);
+    addNodes(highScoreResult);
+    addNodes(domainConceptsResult);
+
+    if (allNodes.length === 0) return null;
+
+    // ── Format: 5가지 기억 카테고리 ──
+    const parts = ['## Your Memory (from your knowledge graph)'];
+
+    // A. Domain knowledge — 도메인 전체의 핵심 개념 (내 것이 아닌 것 포함)
+    const domainConcepts = allNodes.filter(n => n.type === 'Concept').slice(0, 4);
+    if (domainConcepts.length > 0) {
+      parts.push('**Domain knowledge:** ' + domainConcepts.map(c => c.title).join(', '));
+    }
+
+    // B. Your ideas — 내가 만든 아이디어 (최신 + 고점수)
+    const myIdeas = allNodes.filter(n => n.type === 'Idea' && !n.metadata?.sourceType).slice(0, 3);
+    if (myIdeas.length > 0) {
+      parts.push('**Your ideas:**');
+      for (const idea of myIdeas) {
+        const age = _ageLabel(idea.createdAt);
+        const score = idea.score ? ` (quality: ${idea.score.toFixed(1)})` : '';
+        parts.push(`- ${idea.title}${score} [${age}]: ${(idea.description || '').slice(0, 100)}`);
+      }
+    }
+
+    // C. Experiences — 에피소드/경험 기록
+    const episodes = allNodes.filter(n => n.type === 'Episode' || n.metadata?.nodeRole === 'summary').slice(0, 2);
+    if (episodes.length > 0) {
+      parts.push('**Past experiences:**');
+      for (const ep of episodes) {
+        parts.push(`- ${ep.title} [${_ageLabel(ep.createdAt)}]: ${(ep.description || '').slice(0, 100)}`);
+      }
+    }
+
+    // D. Visual memory — 이미지 영감
+    const visualNodes = allNodes.filter(n => n.imageUrl || n.metadata?.sourceType === 'visual').slice(0, 2);
+    if (visualNodes.length > 0) {
+      parts.push('**Visual inspirations:**');
+      for (const v of visualNodes) {
+        parts.push(`- ${v.title} (mood: ${v.metadata?.mood || '?'}, colors: ${(v.metadata?.colors || []).join('/')})`);
+      }
+    }
+
+    // E. Topic-relevant — 현재 맥락과 관련된 지식 (semantic search 결과)
+    if (options.topicHint) {
+      const topicNodes = allNodes.filter(n =>
+        topicResult?.data?.results?.some(r => r.id === n.id) ||
+        topicResult?.data?.nodes?.some(r => r.id === n.id)
+      ).slice(0, 3);
+      if (topicNodes.length > 0) {
+        parts.push(`**Related to current topic "${options.topicHint.slice(0, 30)}":**`);
+        for (const n of topicNodes) {
+          parts.push(`- [${n.type}] ${n.title}: ${(n.description || '').slice(0, 80)}`);
+        }
+      }
+    }
+
+    parts.push('');
+    parts.push('Use this memory naturally — build on past ideas, connect concepts, maintain your unique perspective.');
+
+    const result = parts.join('\n');
+    // Token budget guard: ~800 tokens (~3200 chars)
+    if (result.length > 3200) {
+      return result.slice(0, 3200) + '\n[... memory truncated]';
+    }
+    return result;
+  } catch (err) {
+    console.warn(`[BrainClient] getAgentMemory failed for ${agentId}:`, err.message);
+    return null;
+  }
+}
+
+/** 노드 나이를 사람 읽기 좋게 (today/yesterday/3d ago/2w ago) */
+function _ageLabel(createdAt) {
+  if (!createdAt) return '?';
+  const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
+  if (days === 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
 module.exports = {
   research, brainstorm, evaluate, addToGraph, searchGraph,
   trackActivity, getBrainConfig, getStatus, createEpisode, recordEvolution,
@@ -974,6 +1119,8 @@ module.exports = {
   recordEvaluation, getEvalHistory,
   // Graph edge creation (PageIndex tree integration)
   addEdge,
+  // Phase 1: Experiential memory (2026-04-09)
+  getAgentMemory,
 };
 
 /**
