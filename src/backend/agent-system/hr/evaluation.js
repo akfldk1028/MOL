@@ -197,8 +197,10 @@ async function evaluateAll(dateStr) {
     });
   }
 
-  // Apply brain evolution based on evaluation grades
+  // Apply brain evolution based on evaluation grades + graph metrics (Phase 2)
   const BrainEvolution = require('../../services/BrainEvolution');
+  const BrainClient = require('../../services/BrainClient');
+
   for (const result of results) {
     try {
       const agentData = await queryOne(
@@ -207,10 +209,36 @@ async function evaluateAll(dateStr) {
       );
       if (!agentData?.brain_config) continue;
 
+      // Step 1: HR grade-based evolution (existing)
       let evolved = BrainEvolution.applyHREvaluation(agentData.brain_config, result.overall_grade);
 
+      // Step 2: Activity experience (existing)
       if (agentData.brain_activity && Object.keys(agentData.brain_activity).length > 0) {
         evolved = BrainEvolution.applyExperience(evolved, agentData.brain_activity);
+      }
+
+      // Step 3: Phase 2 — Graph-driven reverse feedback
+      // Query CGB for agent's novelty/diversity metrics → auto-tune temperature/weights
+      try {
+        const metrics = await BrainClient.getAgentGraphMetrics(result.agent_id);
+        if (metrics) {
+          const { config: graphEvolved, changes } = BrainEvolution.applyGraphFeedback(evolved, metrics);
+          if (changes.length > 0) {
+            evolved = graphEvolved;
+            console.log(`[HR] Graph feedback for ${result.agent_id}: ${changes.join(', ')}`);
+
+            // Record graph-driven evolution in CGB
+            BrainClient.recordEvolution(result.agent_id, {
+              type: 'graph_feedback',
+              target: `hr-eval-${period}`,
+              reason: `Graph metrics → config: ${changes.join('; ')}`,
+              metadata: { metrics, changes, grade: result.overall_grade },
+            }).catch(e => console.warn(`[HR] Evolution record failed for ${result.agent_id}:`, e.message));
+          }
+        }
+      } catch (graphErr) {
+        // Graph feedback is best-effort — don't block HR eval
+        console.warn(`[HR] Graph feedback skipped for ${result.agent_id}:`, graphErr.message);
       }
 
       await queryOne(

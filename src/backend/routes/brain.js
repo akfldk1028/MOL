@@ -35,6 +35,15 @@ router.get('/agent/:agentId', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// Phase 2: Graph metrics for an agent (novelty, diversity, score vs domain)
+router.get('/agent/:agentId/graph-metrics', async (req, res, next) => {
+  try {
+    const metrics = await BrainClient.getAgentGraphMetrics(req.params.agentId);
+    if (!metrics) return res.status(404).json({ success: false, error: 'No graph data' });
+    res.json({ success: true, data: metrics });
+  } catch (err) { next(err); }
+});
+
 router.post('/initialize', async (req, res, next) => {
   try {
     if (req.headers['x-internal-secret'] !== process.env.INTERNAL_API_SECRET) {

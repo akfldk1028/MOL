@@ -184,7 +184,84 @@ function applyScoreFeedback(currentConfig, changes) {
   return config;
 }
 
+// Phase 2: Graph feedback thresholds — tune these to control co-evolution speed
+const GRAPH_THRESHOLDS = {
+  lowDensity: 0.15,         // conceptDensity below this → raise temperature
+  highDensity: 0.5,         // conceptDensity above this → lower temperature
+  minNodesForDensity: 5,    // need ≥5 nodes before density is meaningful
+  underperformRatio: 0.8,   // scoreVsDomain below this → boost weakest
+  outperformRatio: 1.2,     // scoreVsDomain above this → reinforce strongest
+  minConceptsForBoost: 10,  // concept count above this → researcher boost
+  maxChangesPerCycle: 3,    // cap adjustments per evaluation to prevent drift
+  tempUp: 0.05,
+  tempDown: 0.03,
+  weightBoostSmall: 0.02,
+  weightBoostMed: 0.03,
+};
+
+/**
+ * Phase 2: Graph-driven reverse feedback — CGB novelty/diversity → brain_config tuning.
+ *
+ * Paper: "Agentic-KGR" (Li 2025, 2510.09156)
+ *   → KG+LLM co-evolution: graph metrics drive agent parameters
+ *
+ * @param {object} currentConfig - brain_config
+ * @param {object} metrics - from BrainClient.getAgentGraphMetrics()
+ * @returns {object} { config, changes } — updated config + changelog
+ */
+function applyGraphFeedback(currentConfig, metrics) {
+  if (!currentConfig || !metrics) return { config: currentConfig, changes: [] };
+
+  const config = JSON.parse(JSON.stringify(currentConfig));
+  const weights = config.weights || {};
+  const changes = [];
+  const T = GRAPH_THRESHOLDS;
+
+  // ── Temperature adjustment based on concept density (novelty proxy) ──
+  const density = metrics.conceptDensity || 0;
+  if (density < T.lowDensity && metrics.nodeCount >= T.minNodesForDensity) {
+    config.temperature = Math.min(1.2, Math.round(((config.temperature || 0.7) + T.tempUp) * 100) / 100);
+    changes.push(`temp +${T.tempUp} (low conceptDensity ${density})`);
+  } else if (density > T.highDensity) {
+    config.temperature = Math.max(0.3, Math.round(((config.temperature || 0.7) - T.tempDown) * 100) / 100);
+    changes.push(`temp -${T.tempDown} (high conceptDensity ${density})`);
+  }
+
+  // ── Weight adjustment based on score vs domain average ──
+  // Note: scoreVsDomain defaults to 1.0 when scores are zero (no data = no action)
+  const scoreRatio = metrics.scoreVsDomain || 1.0;
+  const sorted = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+  const strongest = sorted[0]?.[0];
+  const weakest = sorted[sorted.length - 1]?.[0];
+
+  if (changes.length < T.maxChangesPerCycle && scoreRatio < T.underperformRatio && weakest) {
+    weights[weakest] = (weights[weakest] || 0) + T.weightBoostMed;
+    changes.push(`${weakest} +${T.weightBoostMed} (scoreVsDomain ${scoreRatio})`);
+  } else if (changes.length < T.maxChangesPerCycle && scoreRatio > T.outperformRatio && strongest) {
+    weights[strongest] = (weights[strongest] || 0) + T.weightBoostSmall;
+    changes.push(`${strongest} +${T.weightBoostSmall} (scoreVsDomain ${scoreRatio})`);
+  }
+
+  // ── Cross-domain bonus → connector/director behavior ──
+  if (changes.length < T.maxChangesPerCycle && metrics.hasCrossDomain) {
+    weights.director = (weights.director || 0) + T.weightBoostSmall;
+    changes.push('director +0.02 (cross-domain)');
+  }
+
+  // ── Knowledge accumulation → researcher boost ──
+  if (changes.length < T.maxChangesPerCycle && metrics.conceptCount > T.minConceptsForBoost && metrics.nodeCount >= T.minNodesForDensity) {
+    weights.researcher = (weights.researcher || 0) + T.weightBoostSmall;
+    changes.push(`researcher +0.02 (${metrics.conceptCount} concepts)`);
+  }
+
+  if (changes.length > 0) {
+    config.weights = normalize(weights);
+  }
+
+  return { config, changes };
+}
+
 module.exports = {
-  calculateInitial, applyHREvaluation, applyExperience, applyScoreFeedback, initializeAll,
+  calculateInitial, applyHREvaluation, applyExperience, applyScoreFeedback, applyGraphFeedback, initializeAll,
   normalize, ARCHETYPE_WEIGHTS, LEVEL_PERMISSIONS, LEVEL_TOOLS,
 };

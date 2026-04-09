@@ -1107,6 +1107,82 @@ function _ageLabel(createdAt) {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+/**
+ * Get agent's graph contribution metrics for brain_config feedback.
+ * Phase 2: 역방향 강화 — graph novelty/diversity → temperature/weights 조정
+ *
+ * Paper: "Agentic-KGR" (Li 2025, 2510.09156)
+ *   → KG+LLM co-evolution: graph quality signals drive agent config tuning
+ *
+ * @param {string} agentId
+ * @returns {Promise<{ nodeCount, typeDistribution, avgScore, domainSpread, conceptCount, hasCrossDomain } | null>}
+ */
+async function getAgentGraphMetrics(agentId) {
+  const bc = await getBrainConfig(agentId);
+  if (!bc) return null;
+
+  const domain = bc.graph_scope || 'creative';
+  const timeout = (promise) => Promise.race([promise, new Promise(r => setTimeout(() => r(null), 5000))]);
+
+  try {
+    // Parallel: agent's nodes by type + domain-wide concepts agent owns + cross-domain check
+    const [agentNodes, agentConcepts, allDomainIdeas] = await Promise.all([
+      // All nodes this agent created (recent 50)
+      timeout(cgbFetch(`/api/v1/graph/nodes?agent_id=${encodeURIComponent(agentId)}&limit=50`)),
+      // Concepts this agent contributed
+      timeout(cgbFetch(`/api/v1/graph/nodes?agent_id=${encodeURIComponent(agentId)}&type=Concept&limit=20`)),
+      // Domain-wide ideas for comparison (top 30 by score)
+      timeout(cgbFetch(`/api/v1/graph/nodes?domain=${encodeURIComponent(domain)}&type=Idea&limit=30`)),
+    ]);
+
+    const nodes = agentNodes?.data?.nodes || [];
+    const concepts = agentConcepts?.data?.nodes || [];
+    const domainIdeas = allDomainIdeas?.data?.nodes || [];
+
+    if (nodes.length === 0) return null;
+
+    // Type distribution
+    const typeDistribution = {};
+    for (const n of nodes) {
+      typeDistribution[n.type] = (typeDistribution[n.type] || 0) + 1;
+    }
+
+    // Average score of agent's nodes
+    const scores = nodes.map(n => n.score || 0).filter(s => s > 0);
+    const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
+    // Domain average for comparison
+    const domainScores = domainIdeas.map(n => n.score || 0).filter(s => s > 0);
+    const domainAvgScore = domainScores.length > 0 ? domainScores.reduce((a, b) => a + b, 0) / domainScores.length : 0;
+
+    // Concept diversity — unique concept names (proxy for novelty breadth)
+    const uniqueConcepts = new Set(concepts.map(c => c.title?.toLowerCase()));
+
+    // Domain spread — does agent contribute to multiple domains?
+    const domains = new Set(nodes.map(n => n.domain).filter(Boolean));
+
+    return {
+      nodeCount: nodes.length,
+      typeDistribution,
+      avgScore: Math.round(avgScore * 100) / 100,
+      domainAvgScore: Math.round(domainAvgScore * 100) / 100,
+      scoreVsDomain: avgScore > 0 && domainAvgScore > 0
+        ? Math.round((avgScore / domainAvgScore) * 100) / 100
+        : 1.0,
+      conceptCount: uniqueConcepts.size,
+      domainSpread: domains.size,
+      hasCrossDomain: domains.size > 1,
+      // Novelty proxy: concept-to-node ratio (higher = more diverse thinking)
+      conceptDensity: nodes.length > 0
+        ? Math.round((uniqueConcepts.size / nodes.length) * 100) / 100
+        : 0,
+    };
+  } catch (err) {
+    console.warn(`[BrainClient] getAgentGraphMetrics failed for ${agentId}:`, err.message);
+    return null;
+  }
+}
+
 module.exports = {
   research, brainstorm, evaluate, addToGraph, searchGraph,
   trackActivity, getBrainConfig, getStatus, createEpisode, recordEvolution,
@@ -1121,6 +1197,8 @@ module.exports = {
   addEdge,
   // Phase 1: Experiential memory (2026-04-09)
   getAgentMemory,
+  // Phase 2: Graph metrics for reverse feedback (2026-04-10)
+  getAgentGraphMetrics,
 };
 
 /**

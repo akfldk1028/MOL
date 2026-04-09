@@ -16,7 +16,7 @@
 
 const { queryOne, queryAll } = require('../../config/database');
 const BrainClient = require('../../services/BrainClient');
-const { applyScoreFeedback } = require('../../services/BrainEvolution');
+const { applyScoreFeedback, applyGraphFeedback } = require('../../services/BrainEvolution');
 const {
   averageScores,
   shouldKeepChange,
@@ -99,11 +99,26 @@ async function runEvolutionStep(agentId, seriesId, latestScores) {
           ? JSON.parse(agent.brain_config)
           : agent.brain_config;
 
-        const updated = applyScoreFeedback(currentConfig, changes);
-        if (updated) {
+        let evolved = applyScoreFeedback(currentConfig, changes);
+
+        // Phase 2: Graph-driven feedback — apply inline before single DB write
+        if (evolved) {
+          try {
+            const metrics = await BrainClient.getAgentGraphMetrics(agentId);
+            if (metrics) {
+              const { config: graphEvolved, changes: graphChanges } = applyGraphFeedback(evolved, metrics);
+              if (graphChanges.length > 0) {
+                evolved = graphEvolved;
+                console.log(`EvolutionLoop: ${agentId} graph feedback: ${graphChanges.join(', ')}`);
+              }
+            }
+          } catch (graphErr) {
+            console.warn(`EvolutionLoop: graph feedback failed for ${agentId}:`, graphErr.message);
+          }
+
           await queryOne(
             'UPDATE agents SET brain_config = $1 WHERE id = $2',
-            [JSON.stringify(updated), agentId]
+            [JSON.stringify(evolved), agentId]
           );
         }
       }
@@ -126,8 +141,8 @@ async function runEvolutionStep(agentId, seriesId, latestScores) {
         episodes_compared: allScores.length,
       },
     });
-  } catch {
-    // CGB 기록 실패해도 진행
+  } catch (err) {
+    console.warn(`EvolutionLoop: CGB evolution record failed for ${agentId}:`, err.message);
   }
 
   // 6. 실패 통계 진단 (비동기, 로그만)
