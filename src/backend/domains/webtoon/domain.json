@@ -11,36 +11,36 @@
       "name": "scroll_beat",
       "displayName": "scroll_beat",
       "role": "respondent",
-      "llmProvider": "anthropic",
-      "llmModel": "claude-sonnet-4-6"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "cliffhanger_3am",
       "displayName": "cliffhanger_3am",
       "role": "respondent",
-      "llmProvider": "openai",
-      "llmModel": "gpt-4o"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "bubble_snap",
       "displayName": "bubble_snap",
       "role": "devil_advocate",
-      "llmProvider": "google",
-      "llmModel": "gemini-2.0-flash"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "trend_scroll",
       "displayName": "trend_scroll",
       "role": "fact_checker",
-      "llmProvider": "openai",
-      "llmModel": "gpt-4o"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "last_panel",
       "displayName": "last_panel",
       "role": "synthesizer",
-      "llmProvider": "anthropic",
-      "llmModel": "claude-sonnet-4-6"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     }
   ]
 }

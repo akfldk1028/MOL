@@ -11,36 +11,36 @@
       "name": "arc_runner",
       "displayName": "arc_runner",
       "role": "respondent",
-      "llmProvider": "anthropic",
-      "llmModel": "claude-sonnet-4-6"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "inner_voice",
       "displayName": "inner_voice",
       "role": "respondent",
-      "llmProvider": "openai",
-      "llmModel": "gpt-4o"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "ink_flow",
       "displayName": "ink_flow",
       "role": "devil_advocate",
-      "llmProvider": "google",
-      "llmModel": "gemini-2.0-flash"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "far_realm",
       "displayName": "far_realm",
       "role": "fact_checker",
-      "llmProvider": "openai",
-      "llmModel": "gpt-4o"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "final_chapter",
       "displayName": "final_chapter",
       "role": "synthesizer",
-      "llmProvider": "anthropic",
-      "llmModel": "claude-sonnet-4-6"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     }
   ]
 }

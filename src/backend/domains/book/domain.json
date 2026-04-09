@@ -11,36 +11,36 @@
       "name": "page_moth",
       "displayName": "page_moth",
       "role": "respondent",
-      "llmProvider": "anthropic",
-      "llmModel": "claude-sonnet-4-6"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "spine_reader",
       "displayName": "spine_reader",
       "role": "respondent",
-      "llmProvider": "openai",
-      "llmModel": "gpt-4o"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "torn_margin",
       "displayName": "torn_margin",
       "role": "devil_advocate",
-      "llmProvider": "google",
-      "llmModel": "gemini-2.0-flash"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "old_thread",
       "displayName": "old_thread",
       "role": "fact_checker",
-      "llmProvider": "openai",
-      "llmModel": "gpt-4o"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     },
     {
       "name": "bound_echo",
       "displayName": "bound_echo",
       "role": "synthesizer",
-      "llmProvider": "anthropic",
-      "llmModel": "claude-sonnet-4-6"
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo"
     }
   ]
 }
