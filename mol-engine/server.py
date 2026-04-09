@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from api import agents, evolution, generate, health, interest, learning, traces
+from api import agents, evolution, generate, health, interest, learning, pageindex, traces
 from core.config import BRIDGE_HOST, BRIDGE_PORT, LLM_PROVIDER
 from core.llm import close_provider, get_provider
 from core.trace_store import TraceStore
@@ -157,6 +157,7 @@ app.include_router(agents.router)
 app.include_router(learning.router)
 app.include_router(generate.router)
 app.include_router(evolution.router)
+app.include_router(pageindex.router)
 
 
 if __name__ == "__main__":

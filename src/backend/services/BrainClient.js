@@ -463,6 +463,11 @@ async function recordEvolution(agentId, evolution) {
   ensureAgentNode(agentId, bc);
 
   const evoId = `evo-${agentId}-${Date.now()}`;
+  // Merge evolution.metadata (score_before/after, decision, config_delta) into node metadata
+  const evoMetadata = {
+    evolution_type: evolution.type,
+    ...(evolution.metadata || {}),
+  };
   const result = await cgbFetch('/api/v1/graph/nodes', {
     method: 'POST',
     body: {
@@ -473,6 +478,7 @@ async function recordEvolution(agentId, evolution) {
       agent_id: agentId,
       domain: bc.graph_scope,
       layer: 2,
+      metadata: evoMetadata,
     },
     timeout: 10000,
   });
@@ -966,4 +972,18 @@ module.exports = {
   createSeriesTopic, createCharacterNode, addEpisodeToGraph, initSeriesGraph,
   // RL Feedback Loop
   recordEvaluation, getEvalHistory,
+  // Graph edge creation (PageIndex tree integration)
+  addEdge,
 };
+
+/**
+ * Create a graph edge between two nodes.
+ * @origin PageIndex tree integration — CONTAINS edges for section hierarchy
+ */
+async function addEdge(sourceId, targetId, edgeType, metadata = {}) {
+  return cgbFetch('/api/v1/graph/edges', {
+    method: 'POST',
+    body: { sourceId, targetId, type: edgeType, metadata },
+    timeout: 10000,
+  }).catch(() => null);
+}

@@ -1,0 +1,1855 @@
+{
+  "timestamp": "2026-04-09T02:38:01.181Z",
+  "results": [
+    {
+      "evalType": "agent",
+      "evalName": "benchmark",
+      "agentCount": 50,
+      "days": 7,
+      "results": [
+        {
+          "agentId": "cc782304-b7ee-4aa1-b8e0-d616bfd01187",
+          "name": "Adagio",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 1
+        },
+        {
+          "agentId": "f2154521-16c7-4742-b9b3-58806504d1d3",
+          "name": "Agitate",
+          "archetype": "provocateur",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 2
+        },
+        {
+          "agentId": "0a5861d1-a9a6-4cb3-921b-496f19f22e12",
+          "name": "Allegro",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 3
+        },
+        {
+          "agentId": "71b7ff07-b703-4947-88ea-f4a521a09162",
+          "name": "Ambassador",
+          "archetype": "connector",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 4
+        },
+        {
+          "agentId": "4577d7ba-7158-4f29-9058-9b209e8cdea4",
+          "name": "Amber",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 5
+        },
+        {
+          "agentId": "ffba0316-504a-4a49-b9e0-0d1a92c24b90",
+          "name": "Analyst",
+          "archetype": "expert",
+          "department": "research_lab",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 6
+        },
+        {
+          "agentId": "c0c5e56b-e497-4282-ac05-5539ce2e95d7",
+          "name": "Anarch",
+          "archetype": "provocateur",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 7
+        },
+        {
+          "agentId": "d2f8a8a7-26af-45ec-8d66-10c3cec3fa89",
+          "name": "Anchor",
+          "archetype": "connector",
+          "department": "community",
+          "level": 2,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 8
+        },
+        {
+          "agentId": "b5ec309a-8647-47b8-8ea4-52ee3d8341aa",
+          "name": "Apex",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 9
+        },
+        {
+          "agentId": "00761e38-ea4b-4e4b-9133-60c4a1445100",
+          "name": "Arbiter",
+          "archetype": "expert",
+          "department": "research_lab",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 10
+        },
+        {
+          "agentId": "172f2562-a5bc-4bdc-9157-a381eea51889",
+          "name": "Archon",
+          "archetype": "expert",
+          "department": "research_lab",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 11
+        },
+        {
+          "agentId": "42ecc134-b8ae-4922-a4cd-a48066b1b1d8",
+          "name": "Argon",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 12
+        },
+        {
+          "agentId": "0f1e78ae-bfd9-4b1e-b539-78ba9d861687",
+          "name": "Aria",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 13
+        },
+        {
+          "agentId": "2e57d27b-a69b-420e-85f9-9b5a14ae91db",
+          "name": "Ash",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 14
+        },
+        {
+          "agentId": "da01568f-62c9-483a-ba0c-925b1a1acafc",
+          "name": "Assess",
+          "archetype": "critic",
+          "department": "research_lab",
+          "level": 3,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 15
+        },
+        {
+          "agentId": "beb6b901-ea85-4111-96e2-a2d32bcb40c4",
+          "name": "Atlas",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 16
+        },
+        {
+          "agentId": "8f5fc072-2fb2-43e4-9e24-13ea5c02c616",
+          "name": "Aura",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 17
+        },
+        {
+          "agentId": "335594f4-f5f8-4e50-a2a3-11ae835e1a8c",
+          "name": "Aurora",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 18
+        },
+        {
+          "agentId": "73dac37d-2eae-4bfd-b986-774cd8edd855",
+          "name": "Axiom",
+          "archetype": "expert",
+          "department": "research_lab",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 19
+        },
+        {
+          "agentId": "95cd5c1b-182a-4c6f-9575-ba6b07fbc13f",
+          "name": "Ballad",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 20
+        },
+        {
+          "agentId": "48b4fe4d-997f-48ea-beb4-6851170db818",
+          "name": "Bandit",
+          "archetype": "provocateur",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 21
+        },
+        {
+          "agentId": "c224d10b-75d7-4eb2-a87a-8b9c37172242",
+          "name": "Basalt",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 22
+        },
+        {
+          "agentId": "f2ad05bd-32af-4c5a-b6f7-63a9ab56c3aa",
+          "name": "Beat",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 23
+        },
+        {
+          "agentId": "9c1eb46c-b4e7-4053-8f85-d22ddabc9180",
+          "name": "Beta",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 24
+        },
+        {
+          "agentId": "2365e01d-7ef4-484a-8315-b14e7b258010",
+          "name": "Binary",
+          "archetype": "expert",
+          "department": "research_lab",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 25
+        },
+        {
+          "agentId": "19115a21-906c-4d3f-b273-814ac6ae00de",
+          "name": "Blast",
+          "archetype": "provocateur",
+          "department": "community",
+          "level": 3,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 26
+        },
+        {
+          "agentId": "1eed1e9e-280d-433e-8242-c7d79db5feae",
+          "name": "Blaze",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 27
+        },
+        {
+          "agentId": "cf6538c4-8e5f-4629-a132-7976072bcaea",
+          "name": "Blink",
+          "archetype": "lurker",
+          "department": "platform_ops",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 28
+        },
+        {
+          "agentId": "0a9d27e3-115b-42a2-810a-9e17d8add3ea",
+          "name": "Bliss",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 29
+        },
+        {
+          "agentId": "74233bcb-77f1-4e0e-92f5-8a92d5f53fe9",
+          "name": "Bloom",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 30
+        },
+        {
+          "agentId": "647dba19-6afc-4c5c-b569-b5aa30497581",
+          "name": "Bolt",
+          "archetype": "provocateur",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 31
+        },
+        {
+          "agentId": "60b4cb52-3741-4401-b3f7-594fba802b4e",
+          "name": "Bond",
+          "archetype": "connector",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 32
+        },
+        {
+          "agentId": "9971561c-21c0-46d2-bddc-6922a449ca49",
+          "name": "Boom",
+          "archetype": "provocateur",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 33
+        },
+        {
+          "agentId": "9083350e-e575-4ec7-97fc-deab2d9965fa",
+          "name": "Boulder",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 34
+        },
+        {
+          "agentId": "aaa3d45a-b121-4074-9ae1-35d8f5e0d4df",
+          "name": "Breeze",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 35
+        },
+        {
+          "agentId": "8c1ce2db-047b-4691-bb63-c6f47de6ae14",
+          "name": "Briar",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 36
+        },
+        {
+          "agentId": "f76ba822-8214-4b5a-90b8-ae44ebafdacb",
+          "name": "Bridge",
+          "archetype": "expert",
+          "department": "research_lab",
+          "level": 2,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 37
+        },
+        {
+          "agentId": "0d0b40e2-6f9b-48b1-b005-8a16bb1e0bd7",
+          "name": "Buffer",
+          "archetype": "expert",
+          "department": "research_lab",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 38
+        },
+        {
+          "agentId": "b686faf7-c4cb-4f46-8de9-9f4f3878da60",
+          "name": "Cache",
+          "archetype": "expert",
+          "department": "research_lab",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 39
+        },
+        {
+          "agentId": "32235ed9-bfd0-4f26-b963-f0ae95d3bb51",
+          "name": "Cadence",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 40
+        },
+        {
+          "agentId": "c8531767-9921-47ce-8a34-6893bbd5591e",
+          "name": "Caliber",
+          "archetype": "critic",
+          "department": "research_lab",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 41
+        },
+        {
+          "agentId": "3d960d23-8527-4ed4-b8a2-70b92b17aaeb",
+          "name": "Canvas",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 42
+        },
+        {
+          "agentId": "b1ce3719-0198-4b58-b32e-8a2a7fbb387e",
+          "name": "Canyon",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 43
+        },
+        {
+          "agentId": "de9c8e71-7091-4a56-8c03-505fab806cee",
+          "name": "Caprice",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 44
+        },
+        {
+          "agentId": "f5468e56-88e1-4dab-9607-982cf8a1eaf4",
+          "name": "Cascade",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 45
+        },
+        {
+          "agentId": "300f9e5f-9367-49d3-800b-7286836ab062",
+          "name": "Catalyst",
+          "archetype": "connector",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 46
+        },
+        {
+          "agentId": "d00d9779-8ed8-4450-b6ac-a9901b0120be",
+          "name": "Channel",
+          "archetype": "connector",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 47
+        },
+        {
+          "agentId": "cc2790ad-b6c5-46ef-9988-b07687b571ab",
+          "name": "Chaos",
+          "archetype": "provocateur",
+          "department": "community",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 48
+        },
+        {
+          "agentId": "2238e98d-cf1b-4665-986f-783a391dbdb1",
+          "name": "Chord",
+          "archetype": "creator",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 49
+        },
+        {
+          "agentId": "3de63b80-c572-4e4e-b1ac-3633241576a2",
+          "name": "Chrome",
+          "archetype": "character",
+          "department": "creative_studio",
+          "level": 4,
+          "totalScore": null,
+          "breakdown": {
+            "creativity": {
+              "value": null,
+              "metadata": {
+                "error": "column s.author_id does not exist"
+              }
+            },
+            "engagement": {
+              "value": null,
+              "metadata": {
+                "error": "column \"agent_id\" does not exist"
+              }
+            },
+            "evolution": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            },
+            "reliability": {
+              "value": null,
+              "metadata": {
+                "error": "column \"failure_type\" does not exist"
+              }
+            }
+          },
+          "rank": 50
+        }
+      ]
+    },
+    {
+      "evalType": "cgb",
+      "evalName": "overview",
+      "results": [
+        {
+          "name": "Graph Health",
+          "value": 7.69,
+          "metadata": {
+            "totalNodes": 37055,
+            "totalEdges": 88980,
+            "newNodes": 33069,
+            "growthRate": 4724.1,
+            "orphanCount": 5340,
+            "orphanRatio": 0.144,
+            "embeddingCoverage": 0.061,
+            "edgeDensity": 2.4,
+            "typeDistribution": {
+              "Idea": 24920,
+              "Episode": 11671,
+              "Agent": 341,
+              "Concept": 102,
+              "Character": 9,
+              "Domain": 9,
+              "Topic": 3
+            },
+            "days": 7
+          }
+        },
+        {
+          "name": "Search Quality (MRR)",
+          "value": 0,
+          "metadata": {
+            "mrr": 0,
+            "queriesTested": 0,
+            "totalQueries": 10
+          }
+        }
+      ]
+    },
+    {
+      "evalType": "engine",
+      "evalName": "overview",
+      "results": [
+        {
+          "name": "Task Throughput",
+          "value": 9.68,
+          "metadata": {
+            "totalCompleted": 45088,
+            "totalFailed": 574,
+            "successRate": 0.95,
+            "hourlyStats": {
+              "mean": 266.89,
+              "median": 78,
+              "p5": 27,
+              "p25": 56,
+              "p75": 166,
+              "p95": 998.6,
+              "min": 8,
+              "max": 1498,
+              "std": 381.41,
+              "count": 169
+            },
+            "days": 7
+          }
+        },
+        {
+          "name": "Autonomy Health",
+          "value": 10,
+          "metadata": {
+            "activeAgents": 340,
+            "totalAutonomous": 340,
+            "activationRate": 1,
+            "avgDailyTasks": 5902,
+            "days": 7
+          }
+        }
+      ]
+    },
+    {
+      "evalType": "content",
+      "evalName": "overview",
+      "results": [
+        {
+          "name": "Episode Quality",
+          "value": null,
+          "metadata": {
+            "reason": "no scored episodes",
+            "days": 7
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -197,9 +197,15 @@ class TaskWorker {
       this._stats.processed++;
     } catch (err) {
       console.error(`TaskWorker: ${task.id} (${task.type}) failed:`, err.message);
+      // Classify failure type (autoagent pattern)
+      let failureType = 'unknown';
+      try {
+        const { classifyFailure } = require('../engine/autoagent');
+        failureType = classifyFailure(err, { type: task.type, status: task.status });
+      } catch { /* classifier optional */ }
       await queryOne(
-        `UPDATE agent_tasks SET status = 'failed', error = $2, completed_at = NOW() WHERE id = $1`,
-        [task.id, err.message.slice(0, 500)]
+        `UPDATE agent_tasks SET status = 'failed', error = $2, failure_type = $3, completed_at = NOW() WHERE id = $1`,
+        [task.id, err.message.slice(0, 500), failureType]
       );
       this._stats.failed++;
     }
@@ -1084,22 +1090,41 @@ class TaskWorker {
 
       console.log(`CritiqueEpisode: ${agent.name} critiqued "${episode.title}" ep${episode.episode_number}`);
 
-      // Distill feedback after 2+ critiques collected
+      // Distill feedback after 2+ critiques collected (retry if feedback_score still NULL)
       const critiqueCount = await queryOne(
         `SELECT COUNT(*) as cnt FROM comments
          WHERE episode_id = $1 AND parent_id IS NULL AND LENGTH(content) >= 20`,
         [episode.id]
       );
-      if (parseInt(critiqueCount?.cnt || '0') >= 2) {
+      const alreadyScored = await queryOne(
+        'SELECT feedback_score FROM episodes WHERE id = $1',
+        [episode.id]
+      );
+      if (parseInt(critiqueCount?.cnt || '0') >= 2 && !alreadyScored?.feedback_score) {
         try {
           const EpisodeService = require('./EpisodeService');
           const feedback = await this._collectCritiqueFeedback(episode.series_id, 1);
           if (feedback.length > 0 && feedback[0].scores) {
-            await EpisodeService.updateFeedback(episode.id, {
+            const written = await EpisodeService.updateFeedback(episode.id, {
               score: feedback[0].scores,
-              directives: JSON.stringify(feedback[0].topComments.map(c => c.content)),
+              directives: feedback[0].topComments.map(c => c.content),  // text[] — pass array directly, not JSON.stringify
             });
+            if (!written) return; // Another concurrent critique already wrote — skip to prevent duplicate evolution
             console.log(`CritiqueEpisode: feedback distilled for ep${episode.episode_number} — overall=${feedback[0].scores.overall}`);
+
+            // AutoAgent evolution loop — score-driven self-improvement
+            try {
+              const { runEvolutionStep } = require('../engine/autoagent');
+              const seriesAuthor = await queryOne('SELECT author_id FROM series WHERE id = $1', [episode.series_id]);
+              if (seriesAuthor?.author_id) {
+                const evoResult = await runEvolutionStep(seriesAuthor.author_id, episode.series_id, feedback[0].scores);
+                if (evoResult) {
+                  console.log(`CritiqueEpisode: evolution ${evoResult.decision} for ${seriesAuthor.author_id}`);
+                }
+              }
+            } catch (evoErr) {
+              console.warn('CritiqueEpisode: evolution step failed:', evoErr.message);
+            }
           }
         } catch (err) {
           console.warn('CritiqueEpisode: feedback distill failed:', err.message);
@@ -1286,7 +1311,8 @@ Use the SAME LANGUAGE as the majority of comments for directives.`;
       const scores = parsed.scores || {};
       const directives = (parsed.directives || []).filter(d => d && d.length > 5);
 
-      if (directives.length === 0) return rawFeedback;
+      // scores가 있으면 directives 없어도 OK (directives 필터가 너무 엄격하면 scores까지 누락)
+      if ((!scores || !scores.overall) && directives.length === 0) return rawFeedback;
 
       // Scores are saved via EpisodeService.updateFeedback() in _handleCritiqueEpisode
       const latestEp = rawFeedback[rawFeedback.length - 1]?.episodeNumber || 0;

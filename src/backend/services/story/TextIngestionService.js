@@ -48,8 +48,8 @@ class TextIngestionService {
     // Common metadata for all nodes from this ingestion
     const nodeMeta = { genre, category, source, sourceTitle: title, sourceAuthor: author };
 
-    // 1. Split into chapters
-    const chapters = this._splitChapters(text);
+    // 1. Split into chapters — LLM tree first, regex fallback
+    const chapters = (await this._splitChaptersWithLLM(text)) || this._splitChapters(text);
     console.log(`[TextIngestion] "${title}": ${chapters.length} chapters, ${text.length} chars`);
 
     let nodesCreated = 0;
@@ -98,16 +98,27 @@ class TextIngestionService {
     const opts = { skipSimilarSearch: true };
 
     if (agentId) {
-      // 3a. Chapter summary node (구조 학습)
+      // 3a. Chapter/Section node — with hierarchy info from PageIndex tree
+      const sectionLevel = chapter.level || 1;
+      const nodeRole = sectionLevel === 1 ? 'section' : 'subsection';
+      const sectionId = `${domainId}-ch${index}`;
       try {
         await BrainClient.addToGraph(agentId, {
+          id: sectionId,
           type: 'Idea',
           title: `[${genre}] ${chapter.title || `${title} Ch.${index + 1}`}`,
           description: chapter.content.slice(0, 500),
-          metadata: { ...nodeMeta, chapterIndex: index, nodeRole: 'summary' },
+          metadata: { ...nodeMeta, chapterIndex: index, nodeRole, level: sectionLevel, hasChildren: !!chapter.hasChildren },
           parentId: domainId,
         }, null, opts);
         created++;
+
+        // CONTAINS edge from domain → section (structural hierarchy)
+        if (sectionLevel === 1) {
+          try {
+            await BrainClient.addEdge(domainId, sectionId, 'CONTAINS');
+          } catch {}
+        }
       } catch {}
 
       // 3b. Best paragraphs node — Level 2: 원문 문단 저장 (스타일 학습)
@@ -189,6 +200,52 @@ class TextIngestionService {
       h = ((h << 5) - h + str.charCodeAt(i)) | 0;
     }
     return Math.abs(h).toString(36);
+  }
+
+  /**
+   * Split text into chapters using LLM tree builder (PageIndex pattern).
+   * Falls back to regex if mol-engine unavailable.
+   * @origin clone/PageIndex pageindex/page_index.py
+   */
+  async _splitChaptersWithLLM(text) {
+    try {
+      const MOL_ENGINE_URL = process.env.MOL_ENGINE_URL || 'http://localhost:5000';
+      const res = await fetch(`${MOL_ENGINE_URL}/v1/pageindex/build-tree`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.slice(0, 200000), max_preview: 5000 }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) return null;
+
+      const { tree } = await res.json();
+      if (!tree || tree.length === 0) return null;
+
+      // Convert tree to chapter format with hierarchy info
+      const chapters = [];
+      const flatten = (nodes, level = 1) => {
+        for (const node of nodes) {
+          const content = text.slice(node.start_offset || 0, node.end_offset || text.length);
+          if (content.length > 30) {
+            chapters.push({
+              title: node.title,
+              content,
+              level,
+              start_offset: node.start_offset,
+              end_offset: node.end_offset,
+              hasChildren: !!(node.nodes && node.nodes.length > 0),
+            });
+          }
+          if (node.nodes) flatten(node.nodes, level + 1);
+        }
+      };
+      flatten(tree);
+      console.log(`[TextIngestion] LLM tree: ${chapters.length} sections (${tree.length} top-level)`);
+      return chapters.length >= 2 ? chapters : null;
+    } catch (err) {
+      console.warn('[TextIngestion] LLM tree builder unavailable:', err.message);
+      return null;
+    }
   }
 
   /**

@@ -148,7 +148,43 @@ async function initializeAll() {
   return count;
 }
 
+/**
+ * Apply score-driven feedback from autoagent evolution loop.
+ * @origin clone/autoagent program.md — keep/discard 패턴
+ *
+ * @param {object} currentConfig - brain_config
+ * @param {{ weightChanges: object, tempChange: number }} changes - from suggestConfigChanges()
+ * @returns {object|null} updated config, or null if no changes
+ */
+function applyScoreFeedback(currentConfig, changes) {
+  if (!currentConfig || !changes) return null;
+  const { weightChanges, tempChange } = changes;
+
+  if ((!weightChanges || Object.keys(weightChanges).length === 0) && !tempChange) return null;
+
+  const config = JSON.parse(JSON.stringify(currentConfig));
+  const weights = config.weights || {};
+
+  // Apply weight changes
+  if (weightChanges) {
+    for (const [role, delta] of Object.entries(weightChanges)) {
+      if (typeof delta !== 'number') continue;
+      weights[role] = Math.max(0.01, (weights[role] || 0) + delta);
+    }
+    config.weights = normalize(weights);
+  }
+
+  // Apply temperature change
+  if (typeof tempChange === 'number' && tempChange !== 0) {
+    config.temperature = Math.max(0.1, Math.min(1.5,
+      Math.round(((config.temperature || 0.7) + tempChange) * 100) / 100
+    ));
+  }
+
+  return config;
+}
+
 module.exports = {
-  calculateInitial, applyHREvaluation, applyExperience, initializeAll,
+  calculateInitial, applyHREvaluation, applyExperience, applyScoreFeedback, initializeAll,
   normalize, ARCHETYPE_WEIGHTS, LEVEL_PERMISSIONS, LEVEL_TOOLS,
 };

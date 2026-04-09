@@ -18,6 +18,8 @@ Formerly `openjarvis-bridge/`. Renamed 2026-04-07.
 |--------|-----------|-------------|--------|--------|
 | `src/backend/engine/open-multi-agent/` | clone/open-multi-agent | `src/` | `607ba57` | 2026-04-07 |
 
+| `pageindex/` | clone/PageIndex | `pageindex/` | HEAD | 2026-04-09 |
+
 ## Modifications from Original
 
 ### open-multi-agent (TypeScript → CommonJS JS)

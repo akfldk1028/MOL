@@ -66,8 +66,11 @@ class EpisodeService {
   }
 
   static async updateFeedback(episodeId, { score, directives }) {
+    // Atomic: only update if feedback_score IS NULL (prevents TOCTOU double-write under concurrent critiques)
     return queryOne(
-      `UPDATE episodes SET feedback_score = $1, feedback_directives = $2 WHERE id = $3 RETURNING id`,
+      `UPDATE episodes SET feedback_score = $1, feedback_directives = $2
+       WHERE id = $3 AND feedback_score IS NULL
+       RETURNING id`,
       [JSON.stringify(score), directives, episodeId]
     );
   }
