@@ -359,6 +359,15 @@ async function addToGraph(agentId, node, episodeId = null, options = {}) {
       }).catch(() => {});
     }
 
+    // Phase 3: CROSS_REFERENCES edge if inspired by peer insight
+    if (node.peerInsightId) {
+      cgbFetch('/api/v1/graph/edges', {
+        method: 'POST',
+        body: { sourceId: result.data.id, targetId: node.peerInsightId, type: 'CROSS_REFERENCES' },
+        timeout: 10000,
+      }).catch(() => {});
+    }
+
     // Create INSPIRED_BY edge if parentId provided
     if (node.parentId) {
       cgbFetch('/api/v1/graph/edges', {
@@ -994,7 +1003,11 @@ async function getAgentMemory(agentId, options = {}) {
 
     const timeout = (promise) => Promise.race([promise, new Promise(r => setTimeout(() => r(null), 3000))]);
 
-    const [topicResult, recentResult, highScoreResult, domainConceptsResult] = await Promise.all([
+    // Phase 3: Check if connector archetype for cross-domain bonus
+    const agentRow = await queryOne('SELECT archetype FROM agents WHERE id = $1', [agentId]);
+    const isConnector = agentRow?.archetype === 'connector';
+
+    const [topicResult, recentResult, highScoreResult, domainConceptsResult, peerInsightsResult] = await Promise.all([
       // 1. Topic-focused semantic search (3중 RRF) — 현재 맥락 관련
       options.topicHint
         ? timeout(cgbFetch(`/api/v1/graph/search?q=${encodeURIComponent(options.topicHint)}&domain=${encodeURIComponent(domain)}&limit=4`))
@@ -1008,6 +1021,10 @@ async function getAgentMemory(agentId, options = {}) {
 
       // 4. Domain-wide top concepts — 이 에이전트 것이 아닌 도메인 전체 핵심 개념
       timeout(cgbFetch(`/api/v1/graph/nodes?domain=${encodeURIComponent(domain)}&type=Concept&limit=4`)),
+
+      // 5. Phase 3: Peer insights — 같은 도메인 다른 에이전트의 최근 노드
+      // Paper: "Graphs Meet AI Agents" (2506.18019) — coordination via shared KG
+      timeout(getCrossDomainInsights(agentId, domain, isConnector)),
     ]);
 
     // ── Merge + deduplicate (4소스) ──
@@ -1026,6 +1043,15 @@ async function getAgentMemory(agentId, options = {}) {
     addNodes(recentResult);
     addNodes(highScoreResult);
     addNodes(domainConceptsResult);
+    // Phase 3: peer insights are added with source tagging
+    const peerNodes = peerInsightsResult?.nodes || [];
+    for (const n of peerNodes) {
+      if (!seen.has(n.id)) {
+        seen.add(n.id);
+        n._isPeerInsight = true;
+        allNodes.push(n);
+      }
+    }
 
     if (allNodes.length === 0) return null;
 
@@ -1081,6 +1107,17 @@ async function getAgentMemory(agentId, options = {}) {
       }
     }
 
+    // F. Phase 3: Peer insights — 동료 에이전트의 발견
+    const peerInsightNodes = allNodes.filter(n => n._isPeerInsight).slice(0, 3);
+    if (peerInsightNodes.length > 0) {
+      parts.push('**Peer discoveries (from fellow agents in your domain):**');
+      for (const p of peerInsightNodes) {
+        const peerAgent = p.agentId || p.agent_id || '?';
+        parts.push(`- [${p.type}] ${p.title} (by agent-${peerAgent.slice(0, 8)}): ${(p.description || '').slice(0, 80)}`);
+      }
+      parts.push('Consider building on or challenging these ideas from your unique perspective.');
+    }
+
     parts.push('');
     parts.push('Use this memory naturally — build on past ideas, connect concepts, maintain your unique perspective.');
 
@@ -1105,6 +1142,48 @@ function _ageLabel(createdAt) {
   if (days < 7) return `${days}d ago`;
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
   return `${Math.floor(days / 30)}mo ago`;
+}
+
+/**
+ * Phase 3: Get insights from peer agents in the same domain (and cross-domain for connectors).
+ * Paper: "Graphs Meet AI Agents" (2506.18019) — agent coordination via shared KG
+ *
+ * Returns nodes from OTHER agents in the same domain, plus cross-domain if connector.
+ * Filters out the requesting agent's own nodes.
+ *
+ * @param {string} agentId
+ * @param {string} domain - agent's primary domain
+ * @param {boolean} isConnector - connector archetype gets cross-domain bonus
+ * @returns {Promise<{ nodes: Array, crossDomain: boolean }>}
+ */
+async function getCrossDomainInsights(agentId, domain, isConnector = false) {
+  try {
+    // Get recent domain nodes (includes all agents) — filter out own nodes client-side
+    const domainResult = await cgbFetch(
+      `/api/v1/graph/nodes?domain=${encodeURIComponent(domain)}&limit=15`
+    );
+    const domainNodes = (domainResult?.data?.nodes || [])
+      .filter(n => n.agent_id !== agentId && n.agentId !== agentId)
+      .slice(0, 4);
+
+    let crossNodes = [];
+    if (isConnector) {
+      // Connector archetype: also peek into adjacent domains
+      // Use a general search to find high-quality nodes outside own domain
+      const crossResult = await cgbFetch(`/api/v1/graph/nodes?type=Idea&limit=8`);
+      crossNodes = (crossResult?.data?.nodes || [])
+        .filter(n => {
+          const nodeDomain = n.domain || '';
+          return nodeDomain !== domain && n.agent_id !== agentId && n.agentId !== agentId;
+        })
+        .slice(0, 2);
+    }
+
+    return { nodes: [...domainNodes, ...crossNodes], crossDomain: crossNodes.length > 0 };
+  } catch (err) {
+    console.warn(`[BrainClient] getCrossDomainInsights failed:`, err.message);
+    return { nodes: [], crossDomain: false };
+  }
 }
 
 /**
@@ -1199,6 +1278,8 @@ module.exports = {
   getAgentMemory,
   // Phase 2: Graph metrics for reverse feedback (2026-04-10)
   getAgentGraphMetrics,
+  // Phase 3: Cross-pollination — peer agent insights (2026-04-10)
+  getCrossDomainInsights,
 };
 
 /**
