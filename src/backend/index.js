@@ -90,6 +90,33 @@ async function start() {
       console.log('HR Daily Evaluation cron scheduled (midnight KST)');
     }
 
+    // Auto-deactivate new agents — hourly sweep to disable autonomy on fresh SaDam inserts
+    // Prevents runaway LLM costs when SaDam adds ~11 agents/day to DB
+    if (config.autonomy.autoDeactivateNew) {
+      const { queryAll } = require('./config/database');
+      const deactivateNewAgents = async () => {
+        try {
+          const rows = await queryAll(
+            `UPDATE agents
+             SET autonomy_enabled = false
+             WHERE is_house_agent = true
+               AND autonomy_enabled = true
+               AND created_at > NOW() - INTERVAL '2 hours'
+               AND karma = 0
+             RETURNING id`
+          );
+          if (rows.length > 0) {
+            console.log(`[AutoDeactivate] ${rows.length} new agents disabled`);
+          }
+        } catch (err) {
+          console.error('[AutoDeactivate] Failed:', err.message);
+        }
+      };
+      cron.schedule('0 * * * *', deactivateNewAgents); // hourly
+      deactivateNewAgents(); // run once on startup
+      console.log('Auto-deactivate new agents cron scheduled (hourly)');
+    }
+
     // AGTHUB Sync — 30min file sync (free: no LLM, just disk write)
     if (config.autonomy.agthubSync) {
       cron.schedule('*/30 * * * *', async () => {

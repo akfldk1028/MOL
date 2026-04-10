@@ -55,6 +55,13 @@ const config = {
     seriesAutoEpisode: process.env.ENABLE_SERIES_AUTO_EPISODE !== 'false',
     hrCron: process.env.ENABLE_HR_CRON !== 'false',
     agthubSync: process.env.ENABLE_AGTHUB_SYNC !== 'false',
+    // Cap on concurrently active agents in wakeup loop (0 = unlimited)
+    // Prevents runaway LLM costs as SaDam adds new agents daily
+    // Selects TOP N by karma — oldest/highest-performing get priority
+    maxActiveAgents: parseInt(process.env.MAX_ACTIVE_AGENTS || '0', 10),
+    // Auto-deactivate newly added agents (sets autonomy_enabled=false on any new agent)
+    // When true, newly added SaDam agents won't wake up until manually enabled
+    autoDeactivateNew: process.env.AUTO_DEACTIVATE_NEW_AGENTS === 'true',
   },
 
   // Pagination defaults

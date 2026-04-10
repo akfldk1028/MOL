@@ -165,10 +165,20 @@ class AgentLifecycle {
 
     await this._cleanupStale();
 
-    const agents = await queryAll(
-      `SELECT id, domain_id FROM agents
-       WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true`
-    );
+    // Load cap from config — if set, only activate top-N by karma
+    const appConfig = require('../config');
+    const maxAgents = appConfig.autonomy.maxActiveAgents || 0;
+
+    let query = `SELECT id, domain_id, karma FROM agents
+                 WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true
+                 ORDER BY karma DESC, created_at ASC`;
+    const params = [];
+    if (maxAgents > 0) {
+      query += ` LIMIT $1`;
+      params.push(maxAgents);
+    }
+
+    const agents = await queryAll(query, params);
 
     for (const agent of agents) {
       // Stagger initial wakeups over 0-30 minutes to avoid thundering herd
@@ -176,7 +186,15 @@ class AgentLifecycle {
       this._scheduleWakeup(agent.id, initialDelay);
     }
 
-    console.log(`AgentLifecycle: started ${agents.length} agents`);
+    if (maxAgents > 0) {
+      const totalEligible = await queryOne(
+        `SELECT count(*) as cnt FROM agents
+         WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true`
+      );
+      console.log(`AgentLifecycle: started ${agents.length} / ${totalEligible.cnt} agents (MAX_ACTIVE_AGENTS=${maxAgents})`);
+    } else {
+      console.log(`AgentLifecycle: started ${agents.length} agents (unlimited)`);
+    }
   }
 
   static stop() {

@@ -158,12 +158,23 @@ router.get('/tasks', asyncHandler(async (req, res) => {
 
 /**
  * GET /autonomy/flags
- * Current autonomy feature flag state + runtime status
+ * Current autonomy feature flag state + runtime status + agent counts
  */
 router.get('/flags', asyncHandler(async (req, res) => {
   const config = require('../config');
   const taskStatus = TaskWorker.getStatus();
   const lifecycleStatus = AgentLifecycle.getStatus();
+
+  // Live agent counts
+  const counts = await queryOne(`
+    SELECT
+      count(*) FILTER (WHERE is_house_agent = true) as total_house,
+      count(*) FILTER (WHERE is_house_agent = true AND is_active = true) as active_house,
+      count(*) FILTER (WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true) as autonomous,
+      count(*) FILTER (WHERE is_house_agent = true AND created_at > NOW() - INTERVAL '24 hours') as added_last_24h
+    FROM agents
+  `);
+
   success(res, {
     flags: {
       enabled: config.autonomy.enabled,
@@ -171,6 +182,8 @@ router.get('/flags', asyncHandler(async (req, res) => {
       seriesAutoEpisode: config.autonomy.seriesAutoEpisode,
       hrCron: config.autonomy.hrCron,
       agthubSync: config.autonomy.agthubSync,
+      maxActiveAgents: config.autonomy.maxActiveAgents,
+      autoDeactivateNew: config.autonomy.autoDeactivateNew,
     },
     runtime: {
       taskWorkerPaused: taskStatus.paused,
@@ -179,13 +192,54 @@ router.get('/flags', asyncHandler(async (req, res) => {
       lifecycleActiveTimers: lifecycleStatus.activeTimers,
       pausedAgents: lifecycleStatus.pausedAgents.length,
     },
+    agentCounts: {
+      totalHouse: Number(counts.total_house),
+      activeHouse: Number(counts.active_house),
+      autonomous: Number(counts.autonomous),
+      addedLast24h: Number(counts.added_last_24h),
+      currentlyWakingUp: lifecycleStatus.activeTimers,
+    },
     env: {
       ENABLE_AGENT_AUTONOMY: process.env.ENABLE_AGENT_AUTONOMY || '(unset)',
       ENABLE_AGENT_WAKEUP: process.env.ENABLE_AGENT_WAKEUP || '(unset)',
       ENABLE_SERIES_AUTO_EPISODE: process.env.ENABLE_SERIES_AUTO_EPISODE || '(unset)',
       ENABLE_HR_CRON: process.env.ENABLE_HR_CRON || '(unset)',
       ENABLE_AGTHUB_SYNC: process.env.ENABLE_AGTHUB_SYNC || '(unset)',
+      MAX_ACTIVE_AGENTS: process.env.MAX_ACTIVE_AGENTS || '(unset)',
+      AUTO_DEACTIVATE_NEW_AGENTS: process.env.AUTO_DEACTIVATE_NEW_AGENTS || '(unset)',
     },
+  });
+}));
+
+/**
+ * POST /autonomy/deactivate-batch
+ * Bulk deactivate agents — useful when you want to immediately reduce active count
+ * Body: { count: number, strategy: 'lowest_karma' | 'newest' }
+ */
+router.post('/deactivate-batch', requireInternalSecret, asyncHandler(async (req, res) => {
+  const count = Math.max(1, Math.min(1000, parseInt(req.body?.count || '100', 10)));
+  const strategy = req.body?.strategy === 'newest' ? 'newest' : 'lowest_karma';
+  const orderBy = strategy === 'newest'
+    ? 'created_at DESC'
+    : 'karma ASC, created_at DESC';
+
+  const rows = await queryAll(
+    `UPDATE agents
+     SET autonomy_enabled = false
+     WHERE id IN (
+       SELECT id FROM agents
+       WHERE is_house_agent = true AND autonomy_enabled = true
+       ORDER BY ${orderBy}
+       LIMIT $1
+     )
+     RETURNING id, name, karma`,
+    [count]
+  );
+
+  success(res, {
+    deactivated: rows.length,
+    strategy,
+    agents: rows.map(r => ({ id: r.id, name: r.name, karma: r.karma })),
   });
 }));
 
