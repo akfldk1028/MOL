@@ -157,18 +157,13 @@ class AgentLifecycle {
   // Lifecycle
   // ──────────────────────────────────────────
 
-  static async start() {
-    if (this._started) return;
-    this._started = true;
-    this._paused = false;
-    this._stats.startedAt = new Date();
-
-    await this._cleanupStale();
-
-    // Load cap from config — if set, only activate top-N by karma
+  /**
+   * Load eligible agents for wakeup, honoring MAX_ACTIVE_AGENTS cap.
+   * Top performers by karma are selected first; ties broken by oldest.
+   */
+  static async _loadEligibleAgents() {
     const appConfig = require('../config');
     const maxAgents = appConfig.autonomy.maxActiveAgents || 0;
-
     let query = `SELECT id, domain_id, karma FROM agents
                  WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true
                  ORDER BY karma DESC, created_at ASC`;
@@ -177,8 +172,20 @@ class AgentLifecycle {
       query += ` LIMIT $1`;
       params.push(maxAgents);
     }
+    return queryAll(query, params);
+  }
 
-    const agents = await queryAll(query, params);
+  static async start() {
+    if (this._started) return;
+    this._started = true;
+    this._paused = false;
+    this._stats.startedAt = new Date();
+
+    await this._cleanupStale();
+
+    const agents = await this._loadEligibleAgents();
+    const appConfig = require('../config');
+    const maxAgents = appConfig.autonomy.maxActiveAgents || 0;
 
     for (const agent of agents) {
       // Stagger initial wakeups over 0-30 minutes to avoid thundering herd
@@ -236,10 +243,8 @@ class AgentLifecycle {
     for (const timer of this._timers.values()) clearTimeout(timer);
     this._timers.clear();
 
-    const agents = await queryAll(
-      `SELECT id FROM agents
-       WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true`
-    );
+    // Honors MAX_ACTIVE_AGENTS cap — resume won't bypass the limit
+    const agents = await this._loadEligibleAgents();
 
     for (const agent of agents) {
       const delay = Math.floor(Math.random() * 10 * 60 * 1000);

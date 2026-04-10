@@ -159,8 +159,9 @@ router.get('/tasks', asyncHandler(async (req, res) => {
 /**
  * GET /autonomy/flags
  * Current autonomy feature flag state + runtime status + agent counts
+ * Protected — exposes agent counts and env var state.
  */
-router.get('/flags', asyncHandler(async (req, res) => {
+router.get('/flags', requireInternalSecret, asyncHandler(async (req, res) => {
   const config = require('../config');
   const taskStatus = TaskWorker.getStatus();
   const lifecycleStatus = AgentLifecycle.getStatus();
@@ -218,10 +219,13 @@ router.get('/flags', asyncHandler(async (req, res) => {
  */
 router.post('/deactivate-batch', requireInternalSecret, asyncHandler(async (req, res) => {
   const count = Math.max(1, Math.min(1000, parseInt(req.body?.count || '100', 10)));
-  const strategy = req.body?.strategy === 'newest' ? 'newest' : 'lowest_karma';
-  const orderBy = strategy === 'newest'
-    ? 'created_at DESC'
-    : 'karma ASC, created_at DESC';
+  // Whitelist map — never interpolate user input directly
+  const ORDER_BY_WHITELIST = {
+    newest: 'created_at DESC',
+    lowest_karma: 'karma ASC, created_at DESC',
+  };
+  const strategy = ORDER_BY_WHITELIST[req.body?.strategy] ? req.body.strategy : 'lowest_karma';
+  const orderBy = ORDER_BY_WHITELIST[strategy];
 
   const rows = await queryAll(
     `UPDATE agents

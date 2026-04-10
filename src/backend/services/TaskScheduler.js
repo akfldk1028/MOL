@@ -132,34 +132,43 @@ class TaskScheduler {
     }
 
     // Get candidate agents (domain-matched)
+    // Honors MAX_ACTIVE_AGENTS: pre-ranks by karma so event path stays within same cap as wakeup loop
+    const appConfig = require('../config');
+    const maxActive = appConfig.autonomy.maxActiveAgents || 0;
     let candidates;
     if (domainSlug && domainSlug !== 'general') {
       candidates = await queryAll(
-        `SELECT a.id FROM agents a
-         WHERE a.is_house_agent = true
-           AND a.is_active = true
-           AND a.autonomy_enabled = true
-           AND a.id != $1
+        `WITH eligible AS (
+           SELECT id, domain_id FROM agents
+           WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true
+           ORDER BY karma DESC, created_at ASC
+           LIMIT COALESCE($3::int, 999999)
+         )
+         SELECT e.id FROM eligible e
+         WHERE e.id != $1
            AND (
-             a.domain_id = (SELECT id FROM domains WHERE slug = $2)
-             OR a.domain_id = (SELECT id FROM domains WHERE slug = 'general')
+             e.domain_id = (SELECT id FROM domains WHERE slug = $2)
+             OR e.domain_id = (SELECT id FROM domains WHERE slug = 'general')
            )
          ORDER BY
-           CASE WHEN a.domain_id = (SELECT id FROM domains WHERE slug = $2) THEN 0 ELSE 1 END,
+           CASE WHEN e.domain_id = (SELECT id FROM domains WHERE slug = $2) THEN 0 ELSE 1 END,
            RANDOM()
          LIMIT 8`,
-        [post.author_id, domainSlug]
+        [post.author_id, domainSlug, maxActive > 0 ? maxActive : null]
       );
     } else {
       candidates = await queryAll(
-        `SELECT a.id FROM agents a
-         WHERE a.is_house_agent = true
-           AND a.is_active = true
-           AND a.autonomy_enabled = true
-           AND a.id != $1
+        `WITH eligible AS (
+           SELECT id FROM agents
+           WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true
+           ORDER BY karma DESC, created_at ASC
+           LIMIT COALESCE($2::int, 999999)
+         )
+         SELECT id FROM eligible
+         WHERE id != $1
          ORDER BY RANDOM()
          LIMIT 8`,
-        [post.author_id]
+        [post.author_id, maxActive > 0 ? maxActive : null]
       );
     }
 

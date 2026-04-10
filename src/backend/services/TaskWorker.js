@@ -87,10 +87,11 @@ class TaskWorker {
       startLifecycle();
     }).catch(err => {
       console.error('MemorySync load error:', err.message);
+      startPeriodicSync(); // still enable periodic persistence even if initial load failed
       startLifecycle();
     });
 
-    console.log(`TaskWorker started (wakeup: ${config.autonomy.wakeupEnabled ? 'ON' : 'OFF'})`);
+    console.log(`TaskWorker started (event-driven: ON, wakeup loop: ${config.autonomy.wakeupEnabled ? 'ON' : 'OFF'})`);
   }
 
   static stop() {

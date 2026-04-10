@@ -92,17 +92,23 @@ async function start() {
 
     // Auto-deactivate new agents — hourly sweep to disable autonomy on fresh SaDam inserts
     // Prevents runaway LLM costs when SaDam adds ~11 agents/day to DB
+    //
+    // Strategy: any house agent created in the last 25 hours that has never
+    // run a task yet is considered fresh. This is robust against schema changes
+    // (doesn't depend on karma default) and survives server downtime up to 25h.
     if (config.autonomy.autoDeactivateNew) {
       const { queryAll } = require('./config/database');
       const deactivateNewAgents = async () => {
         try {
           const rows = await queryAll(
-            `UPDATE agents
+            `UPDATE agents a
              SET autonomy_enabled = false
-             WHERE is_house_agent = true
-               AND autonomy_enabled = true
-               AND created_at > NOW() - INTERVAL '2 hours'
-               AND karma = 0
+             WHERE a.is_house_agent = true
+               AND a.autonomy_enabled = true
+               AND a.created_at > NOW() - INTERVAL '25 hours'
+               AND NOT EXISTS (
+                 SELECT 1 FROM agent_tasks t WHERE t.agent_id = a.id
+               )
              RETURNING id`
           );
           if (rows.length > 0) {
