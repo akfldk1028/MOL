@@ -49,19 +49,18 @@ const config = {
     enabled: process.env.ENABLE_AGENT_AUTONOMY === 'true',
     intervalMs: parseInt(process.env.AUTONOMY_INTERVAL_MS || '300000', 10),
     cooldownMinutes: parseInt(process.env.AUTONOMY_COOLDOWN_MINUTES || '60', 10),
-    // Expensive features — OPT-IN (must be explicitly set to 'true')
-    // Rationale: cost-reduction is the priority; don't accidentally burn LLM tokens
-    wakeupEnabled: process.env.ENABLE_AGENT_WAKEUP === 'true',
-    seriesAutoEpisode: process.env.ENABLE_SERIES_AUTO_EPISODE === 'true',
-    // Cheap features — OPT-OUT (default ON, can be disabled)
+    // Per-feature kill switches — default ON when master is ON (backward compat)
+    // Set to 'false' to disable individually
+    wakeupEnabled: process.env.ENABLE_AGENT_WAKEUP !== 'false',
+    seriesAutoEpisode: process.env.ENABLE_SERIES_AUTO_EPISODE !== 'false',
     hrCron: process.env.ENABLE_HR_CRON !== 'false',
     agthubSync: process.env.ENABLE_AGTHUB_SYNC !== 'false',
-    // Cap on concurrently active agents in wakeup loop (0 = unlimited)
-    // Prevents runaway LLM costs as SaDam adds new agents daily
-    // Selects TOP N by karma — oldest/highest-performing get priority
+    // Cap on concurrently active agents in wakeup loop (0 = unlimited, current behavior)
+    // Use this if you want to CAP existing agents at a specific number
     maxActiveAgents: parseInt(process.env.MAX_ACTIVE_AGENTS || '0', 10),
-    // Auto-deactivate newly added agents (sets autonomy_enabled=false on any new agent)
-    // When true, newly added SaDam agents won't wake up until manually enabled
+    // Auto-deactivate newly added agents (RECOMMENDED when server capacity is limited)
+    // Keeps existing agents running, but prevents new SaDam inserts from joining wakeup pool
+    // → server load stays constant even as SaDam adds ~11 agents/day
     autoDeactivateNew: process.env.AUTO_DEACTIVATE_NEW_AGENTS === 'true',
   },
 

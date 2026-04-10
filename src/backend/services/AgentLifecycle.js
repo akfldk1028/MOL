@@ -158,14 +158,31 @@ class AgentLifecycle {
   // ──────────────────────────────────────────
 
   /**
-   * Load eligible agents for wakeup, honoring MAX_ACTIVE_AGENTS cap.
+   * Load eligible agents for wakeup, honoring MAX_ACTIVE_AGENTS cap + auto-deactivate filter.
+   *
+   * When AUTO_DEACTIVATE_NEW_AGENTS=true, only agents that have already run at least
+   * one task are eligible. This prevents brand-new SaDam inserts from entering the
+   * wakeup pool — existing 451 agents keep running, new ones stay dormant.
+   *
    * Top performers by karma are selected first; ties broken by oldest.
    */
   static async _loadEligibleAgents() {
     const appConfig = require('../config');
     const maxAgents = appConfig.autonomy.maxActiveAgents || 0;
+    const excludeUntested = appConfig.autonomy.autoDeactivateNew === true;
+
+    const filters = [
+      'is_house_agent = true',
+      'is_active = true',
+      'autonomy_enabled = true',
+    ];
+    if (excludeUntested) {
+      // Only agents that have run at least 1 task before — keeps fresh SaDam inserts out
+      filters.push('EXISTS (SELECT 1 FROM agent_tasks t WHERE t.agent_id = agents.id)');
+    }
+
     let query = `SELECT id, domain_id, karma FROM agents
-                 WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true
+                 WHERE ${filters.join(' AND ')}
                  ORDER BY karma DESC, created_at ASC`;
     const params = [];
     if (maxAgents > 0) {

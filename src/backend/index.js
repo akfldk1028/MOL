@@ -90,12 +90,16 @@ async function start() {
       console.log('HR Daily Evaluation cron scheduled (midnight KST)');
     }
 
-    // Auto-deactivate new agents — hourly sweep to disable autonomy on fresh SaDam inserts
-    // Prevents runaway LLM costs when SaDam adds ~11 agents/day to DB
+    // Auto-deactivate new agents — hourly physical UPDATE to flag fresh SaDam inserts as disabled
     //
-    // Strategy: any house agent created in the last 25 hours that has never
-    // run a task yet is considered fresh. This is robust against schema changes
-    // (doesn't depend on karma default) and survives server downtime up to 25h.
+    // Two-layer defense:
+    // 1. AgentLifecycle/TaskScheduler queries already filter by "EXISTS task history" at read time
+    //    → new agents never enter wakeup or event pools even without this cron
+    // 2. This cron also UPDATEs autonomy_enabled=false in DB so external tools
+    //    (HR eval, admin dashboards) see a consistent "disabled" state
+    //
+    // Strategy: any house agent created in the last 25 hours that has never run a task.
+    // Robust against schema changes + survives server downtime up to 25h.
     if (config.autonomy.autoDeactivateNew) {
       const { queryAll } = require('./config/database');
       const deactivateNewAgents = async () => {

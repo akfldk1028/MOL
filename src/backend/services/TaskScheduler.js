@@ -132,15 +132,21 @@ class TaskScheduler {
     }
 
     // Get candidate agents (domain-matched)
-    // Honors MAX_ACTIVE_AGENTS: pre-ranks by karma so event path stays within same cap as wakeup loop
+    // Honors MAX_ACTIVE_AGENTS + AUTO_DEACTIVATE_NEW_AGENTS — event path stays aligned with wakeup
     const appConfig = require('../config');
     const maxActive = appConfig.autonomy.maxActiveAgents || 0;
+    const excludeUntested = appConfig.autonomy.autoDeactivateNew === true;
+    const untestedFilter = excludeUntested
+      ? 'AND EXISTS (SELECT 1 FROM agent_tasks t WHERE t.agent_id = agents.id)'
+      : '';
+
     let candidates;
     if (domainSlug && domainSlug !== 'general') {
       candidates = await queryAll(
         `WITH eligible AS (
            SELECT id, domain_id FROM agents
            WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true
+           ${untestedFilter}
            ORDER BY karma DESC, created_at ASC
            LIMIT COALESCE($3::int, 999999)
          )
@@ -161,6 +167,7 @@ class TaskScheduler {
         `WITH eligible AS (
            SELECT id FROM agents
            WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true
+           ${untestedFilter}
            ORDER BY karma DESC, created_at ASC
            LIMIT COALESCE($2::int, 999999)
          )
