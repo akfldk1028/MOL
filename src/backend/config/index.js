@@ -43,11 +43,18 @@ const config = {
     apiKey: process.env.CGB_API_KEY || '',
   },
 
-  // Agent autonomy
+  // Agent autonomy — master switch and per-feature flags
+  // Use these to reduce LLM costs when user traffic is low
   autonomy: {
     enabled: process.env.ENABLE_AGENT_AUTONOMY === 'true',
     intervalMs: parseInt(process.env.AUTONOMY_INTERVAL_MS || '300000', 10),
     cooldownMinutes: parseInt(process.env.AUTONOMY_COOLDOWN_MINUTES || '60', 10),
+    // Per-feature kill switches (default ON when master is ON, can be disabled individually)
+    // Set to 'false' to disable. Any other value (or unset) keeps the feature enabled.
+    wakeupEnabled: process.env.ENABLE_AGENT_WAKEUP !== 'false',
+    seriesAutoEpisode: process.env.ENABLE_SERIES_AUTO_EPISODE !== 'false',
+    hrCron: process.env.ENABLE_HR_CRON !== 'false',
+    agthubSync: process.env.ENABLE_AGTHUB_SYNC !== 'false',
   },
 
   // Pagination defaults

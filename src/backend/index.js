@@ -48,51 +48,70 @@ async function start() {
 
   // Start event-driven agent autonomy system
   if (config.autonomy.enabled) {
-    await TaskWorker.start(); // recover pending tasks + start catalyst
+    console.log('Agent Autonomy master switch: ON');
+    console.log(`  wakeup: ${config.autonomy.wakeupEnabled ? 'ON' : 'OFF'}`);
+    console.log(`  series auto-episode: ${config.autonomy.seriesAutoEpisode ? 'ON' : 'OFF'}`);
+    console.log(`  HR cron: ${config.autonomy.hrCron ? 'ON' : 'OFF'}`);
+    console.log(`  AGTHUB sync: ${config.autonomy.agthubSync ? 'ON' : 'OFF'}`);
+
+    // TaskWorker always runs (handles event-driven tasks from user actions too)
+    // AgentLifecycle wakeup loop is gated by wakeupEnabled flag inside TaskWorker.start
+    await TaskWorker.start();
+
     // Reset daily action counters every hour
     resetInterval = setInterval(() => {
       TaskScheduler.resetDailyCounters().catch(err => {
         console.error('TaskScheduler.resetDailyCounters error:', err.message);
       });
     }, 3_600_000);
-    SeriesContentScheduler.start();
 
-    // HR Daily Evaluation — midnight KST
-    cron.schedule('0 0 * * *', async () => {
-      try {
-        // Use KST date (UTC+9) for evaluation period
-        const now = new Date();
-        const kstOffset = 9 * 60 * 60 * 1000;
-        const kstDate = new Date(now.getTime() + kstOffset);
-        const dateStr = kstDate.toISOString().split('T')[0];
-        console.log(`[HR Cron] Starting daily evaluation for ${dateStr}...`);
-        const result = await HRSystem.runDailyEvaluation(dateStr);
-        console.log(`[HR Cron] Done: ${result.agentCount} agents, promoted=${result.summary.promoted}, demoted=${result.summary.demoted}`);
-      } catch (err) {
-        console.error('[HR Cron] Daily evaluation failed:', err.message);
-      }
-    }, { timezone: 'Asia/Seoul' });
-    console.log('HR Daily Evaluation cron scheduled (midnight KST)');
+    // Series auto-episode generation (expensive LLM calls)
+    if (config.autonomy.seriesAutoEpisode) {
+      SeriesContentScheduler.start();
+    } else {
+      console.log('SeriesContentScheduler: disabled by ENABLE_SERIES_AUTO_EPISODE=false');
+    }
 
-    // AGTHUB Sync — every 30 minutes, sync new DB agents to AGTHUB folders
-    cron.schedule('*/30 * * * *', async () => {
-      try {
-        const result = await AGTHUBSync.backfillAll();
-        if (result.created > 0) {
-          console.log(`[AGTHUB Sync] ${result.created} new agents synced (total: ${result.total})`);
+    // HR Daily Evaluation — midnight KST (cheap: only DB + CGB reads)
+    if (config.autonomy.hrCron) {
+      cron.schedule('0 0 * * *', async () => {
+        try {
+          const now = new Date();
+          const kstOffset = 9 * 60 * 60 * 1000;
+          const kstDate = new Date(now.getTime() + kstOffset);
+          const dateStr = kstDate.toISOString().split('T')[0];
+          console.log(`[HR Cron] Starting daily evaluation for ${dateStr}...`);
+          const result = await HRSystem.runDailyEvaluation(dateStr);
+          console.log(`[HR Cron] Done: ${result.agentCount} agents, promoted=${result.summary.promoted}, demoted=${result.summary.demoted}`);
+        } catch (err) {
+          console.error('[HR Cron] Daily evaluation failed:', err.message);
         }
-      } catch (err) {
-        console.error('[AGTHUB Sync] Failed:', err.message);
-      }
-    });
-    // Run once on startup
-    AGTHUBSync.backfillAll().then(r => {
-      if (r.created > 0) console.log(`[AGTHUB Sync] Startup: ${r.created} new agents synced`);
-      else console.log(`[AGTHUB Sync] Startup: all ${r.total} agents in sync`);
-    }).catch(err => console.error('[AGTHUB Sync] Startup failed:', err.message));
-    console.log('AGTHUB Sync cron scheduled (every 30 min)');
+      }, { timezone: 'Asia/Seoul' });
+      console.log('HR Daily Evaluation cron scheduled (midnight KST)');
+    }
+
+    // AGTHUB Sync — 30min file sync (free: no LLM, just disk write)
+    if (config.autonomy.agthubSync) {
+      cron.schedule('*/30 * * * *', async () => {
+        try {
+          const result = await AGTHUBSync.backfillAll();
+          if (result.created > 0) {
+            console.log(`[AGTHUB Sync] ${result.created} new agents synced (total: ${result.total})`);
+          }
+        } catch (err) {
+          console.error('[AGTHUB Sync] Failed:', err.message);
+        }
+      });
+      AGTHUBSync.backfillAll().then(r => {
+        if (r.created > 0) console.log(`[AGTHUB Sync] Startup: ${r.created} new agents synced`);
+        else console.log(`[AGTHUB Sync] Startup: all ${r.total} agents in sync`);
+      }).catch(err => console.error('[AGTHUB Sync] Startup failed:', err.message));
+      console.log('AGTHUB Sync cron scheduled (every 30 min)');
+    }
 
     console.log('Agent Autonomy enabled (event-driven, no polling)');
+  } else {
+    console.log('Agent Autonomy master switch: OFF (ENABLE_AGENT_AUTONOMY != true)');
   }
 
   // Start server

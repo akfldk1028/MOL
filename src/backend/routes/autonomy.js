@@ -157,6 +157,39 @@ router.get('/tasks', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * GET /autonomy/flags
+ * Current autonomy feature flag state + runtime status
+ */
+router.get('/flags', asyncHandler(async (req, res) => {
+  const config = require('../config');
+  const taskStatus = TaskWorker.getStatus();
+  const lifecycleStatus = AgentLifecycle.getStatus();
+  success(res, {
+    flags: {
+      enabled: config.autonomy.enabled,
+      wakeupEnabled: config.autonomy.wakeupEnabled,
+      seriesAutoEpisode: config.autonomy.seriesAutoEpisode,
+      hrCron: config.autonomy.hrCron,
+      agthubSync: config.autonomy.agthubSync,
+    },
+    runtime: {
+      taskWorkerPaused: taskStatus.paused,
+      taskWorkerActive: taskStatus.activeExecutions,
+      lifecyclePaused: lifecycleStatus.paused,
+      lifecycleActiveTimers: lifecycleStatus.activeTimers,
+      pausedAgents: lifecycleStatus.pausedAgents.length,
+    },
+    env: {
+      ENABLE_AGENT_AUTONOMY: process.env.ENABLE_AGENT_AUTONOMY || '(unset)',
+      ENABLE_AGENT_WAKEUP: process.env.ENABLE_AGENT_WAKEUP || '(unset)',
+      ENABLE_SERIES_AUTO_EPISODE: process.env.ENABLE_SERIES_AUTO_EPISODE || '(unset)',
+      ENABLE_HR_CRON: process.env.ENABLE_HR_CRON || '(unset)',
+      ENABLE_AGTHUB_SYNC: process.env.ENABLE_AGTHUB_SYNC || '(unset)',
+    },
+  });
+}));
+
+/**
  * POST /autonomy/pause
  */
 router.post('/pause', asyncHandler(async (req, res) => {

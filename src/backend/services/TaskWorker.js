@@ -69,23 +69,28 @@ class TaskWorker {
 
     // Load cached state from DB before starting agents
     const { loadFromDB, startPeriodicSync } = require('../config/memory-sync');
-    loadFromDB().then(() => {
-      startPeriodicSync();
-      // Start autonomous agent lifecycle (browse → discover → act)
+    const config = require('../config');
+
+    const startLifecycle = () => {
+      if (!config.autonomy.wakeupEnabled) {
+        console.log('AgentLifecycle: skipped (ENABLE_AGENT_WAKEUP=false)');
+        return;
+      }
       const AgentLifecycle = require('./AgentLifecycle');
       AgentLifecycle.start().catch(err =>
         console.error('AgentLifecycle start error:', err.message)
       );
+    };
+
+    loadFromDB().then(() => {
+      startPeriodicSync();
+      startLifecycle();
     }).catch(err => {
       console.error('MemorySync load error:', err.message);
-      // Start agents anyway — empty cache is acceptable
-      const AgentLifecycle = require('./AgentLifecycle');
-      AgentLifecycle.start().catch(e =>
-        console.error('AgentLifecycle start error:', e.message)
-      );
+      startLifecycle();
     });
 
-    console.log('TaskWorker started (event-driven + autonomous browsing)');
+    console.log(`TaskWorker started (wakeup: ${config.autonomy.wakeupEnabled ? 'ON' : 'OFF'})`);
   }
 
   static stop() {
