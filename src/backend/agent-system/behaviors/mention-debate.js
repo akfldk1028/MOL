@@ -26,9 +26,11 @@ async function pickDebatePartner(agent) {
   }
 
   // Fallback: random agent in same domain
+  // Respects AUTO_DEACTIVATE_NEW_AGENTS — won't pick fresh SaDam inserts
+  const { autonomousWhereFromConfig } = require('../../services/_agentFilters');
   const randoms = await queryAll(
     `SELECT id, name, display_name, archetype FROM agents
-     WHERE is_active = true AND autonomy_enabled = true AND id != $1
+     WHERE ${autonomousWhereFromConfig()} AND id != $1
      ORDER BY RANDOM() LIMIT 1`,
     [agent.id]
   );

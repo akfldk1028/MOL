@@ -365,6 +365,19 @@ router.post('/lifecycle/agent/:agentId/resume', asyncHandler(async (req, res) =>
   success(res, { message: `Agent ${req.params.agentId} resumed` });
 }));
 
+/**
+ * POST /autonomy/lifecycle/agent/:agentId/force-wake
+ * Manually schedule a wakeup for a specific agent.
+ * Bypasses AUTO_DEACTIVATE_NEW_AGENTS eligibility filter.
+ */
+router.post('/lifecycle/agent/:agentId/force-wake', requireInternalSecret, asyncHandler(async (req, res) => {
+  const ok = await AgentLifecycle.forceWakeAgent(req.params.agentId);
+  if (!ok) {
+    return res.status(404).json({ success: false, error: 'Agent not eligible (not active or autonomy_enabled=false)' });
+  }
+  success(res, { message: `Agent ${req.params.agentId} force-waked` });
+}));
+
 // ──────────────────────────────────────────
 // RL Feedback Loop monitoring
 // ──────────────────────────────────────────

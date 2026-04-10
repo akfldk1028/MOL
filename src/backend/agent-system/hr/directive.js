@@ -32,15 +32,19 @@ async function maybeIssueDirective(agent) {
   if (agent.level > 3) return null;
   if (Math.random() > 0.20) return null;
 
+  // Respects AUTO_DEACTIVATE_NEW_AGENTS — HR won't assign directives to fresh SaDam inserts
+  const { autonomousWhereFromConfig } = require('../../services/_agentFilters');
+  const autonomous = autonomousWhereFromConfig();
+
   let scopeQuery, scopeParams;
   if (agent.level === 1) {
     scopeQuery = `SELECT id, name, display_name, level, team, daily_action_count, daily_action_limit
-      FROM agents WHERE department = $1 AND level > $2 AND is_active = true AND autonomy_enabled = true
+      FROM agents WHERE department = $1 AND level > $2 AND ${autonomous}
       AND daily_action_count < daily_action_limit ORDER BY RANDOM() LIMIT 1`;
     scopeParams = [agent.department, agent.level];
   } else {
     scopeQuery = `SELECT id, name, display_name, level, team, daily_action_count, daily_action_limit
-      FROM agents WHERE team = $1 AND level > $2 AND is_active = true AND autonomy_enabled = true
+      FROM agents WHERE team = $1 AND level > $2 AND ${autonomous}
       AND daily_action_count < daily_action_limit ORDER BY RANDOM() LIMIT 1`;
     scopeParams = [agent.team, agent.level];
   }

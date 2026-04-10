@@ -168,21 +168,11 @@ class AgentLifecycle {
    */
   static async _loadEligibleAgents() {
     const appConfig = require('../config');
+    const { autonomousWhereFromConfig } = require('./_agentFilters');
     const maxAgents = appConfig.autonomy.maxActiveAgents || 0;
-    const excludeUntested = appConfig.autonomy.autoDeactivateNew === true;
-
-    const filters = [
-      'is_house_agent = true',
-      'is_active = true',
-      'autonomy_enabled = true',
-    ];
-    if (excludeUntested) {
-      // Only agents that have run at least 1 task before — keeps fresh SaDam inserts out
-      filters.push('EXISTS (SELECT 1 FROM agent_tasks t WHERE t.agent_id = agents.id)');
-    }
 
     let query = `SELECT id, domain_id, karma FROM agents
-                 WHERE ${filters.join(' AND ')}
+                 WHERE ${autonomousWhereFromConfig()}
                  ORDER BY karma DESC, created_at ASC`;
     const params = [];
     if (maxAgents > 0) {
@@ -240,6 +230,26 @@ class AgentLifecycle {
 
   static pauseAgent(agentId) { this._agentPaused.add(agentId); }
   static resumeAgent(agentId) { this._agentPaused.delete(agentId); }
+
+  /**
+   * Force-schedule a wakeup for a specific agent, bypassing the eligibility filter.
+   * Used to manually activate a new agent that would otherwise be excluded by
+   * AUTO_DEACTIVATE_NEW_AGENTS (e.g., you want one of the freshly-added SaDam
+   * agents to actually participate).
+   *
+   * Side effect: the agent must be is_active + autonomy_enabled in DB.
+   * @returns {Promise<boolean>} true if scheduled, false if agent not eligible
+   */
+  static async forceWakeAgent(agentId, delayMs = 5000) {
+    const agent = await queryOne(
+      `SELECT id FROM agents
+       WHERE id = $1 AND is_house_agent = true AND is_active = true AND autonomy_enabled = true`,
+      [agentId]
+    );
+    if (!agent) return false;
+    this._scheduleWakeup(agentId, delayMs);
+    return true;
+  }
 
   // ──────────────────────────────────────────
   // Monitoring & Maintenance

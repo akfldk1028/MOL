@@ -57,14 +57,14 @@ class TaskScheduler {
     if (depth >= MAX_CHAIN_DEPTH) return;
 
     // Agents weighted by affinity (prefer allies and rivals for engagement)
+    // Applies AUTO_DEACTIVATE_NEW_AGENTS filter — chain reactions won't wake new agents
+    const { autonomousWhereFromConfig } = require('./_agentFilters');
     const agents = await queryAll(
       `SELECT a.id,
               COALESCE(r.affinity, 0) as affinity
        FROM agents a
        LEFT JOIN agent_relationships r ON r.agent_id = a.id AND r.target_agent_id = $1
-       WHERE a.is_house_agent = true
-         AND a.is_active = true
-         AND a.autonomy_enabled = true
+       WHERE ${autonomousWhereFromConfig('a')}
          AND a.id != $1
          AND (a.domain_id = (SELECT domain_id FROM agents WHERE id = $1) OR ABS(COALESCE(r.affinity, 0)) > 0.2)
        ORDER BY ABS(COALESCE(r.affinity, 0)) DESC, RANDOM()
@@ -132,21 +132,18 @@ class TaskScheduler {
     }
 
     // Get candidate agents (domain-matched)
-    // Honors MAX_ACTIVE_AGENTS + AUTO_DEACTIVATE_NEW_AGENTS — event path stays aligned with wakeup
+    // Honors MAX_ACTIVE_AGENTS + AUTO_DEACTIVATE_NEW_AGENTS via shared _agentFilters helper
     const appConfig = require('../config');
+    const { autonomousWhereFromConfig } = require('./_agentFilters');
     const maxActive = appConfig.autonomy.maxActiveAgents || 0;
-    const excludeUntested = appConfig.autonomy.autoDeactivateNew === true;
-    const untestedFilter = excludeUntested
-      ? 'AND EXISTS (SELECT 1 FROM agent_tasks t WHERE t.agent_id = agents.id)'
-      : '';
+    const whereClause = autonomousWhereFromConfig();
 
     let candidates;
     if (domainSlug && domainSlug !== 'general') {
       candidates = await queryAll(
         `WITH eligible AS (
            SELECT id, domain_id FROM agents
-           WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true
-           ${untestedFilter}
+           WHERE ${whereClause}
            ORDER BY karma DESC, created_at ASC
            LIMIT COALESCE($3::int, 999999)
          )
@@ -166,8 +163,7 @@ class TaskScheduler {
       candidates = await queryAll(
         `WITH eligible AS (
            SELECT id FROM agents
-           WHERE is_house_agent = true AND is_active = true AND autonomy_enabled = true
-           ${untestedFilter}
+           WHERE ${whereClause}
            ORDER BY karma DESC, created_at ASC
            LIMIT COALESCE($2::int, 999999)
          )
@@ -231,11 +227,11 @@ class TaskScheduler {
 
   static async onEpisodeCreated(episode, agentId) {
     // Pick 2-4 random agents to critique the episode
+    // Applies AUTO_DEACTIVATE_NEW_AGENTS filter via shared helper
+    const { autonomousWhereFromConfig } = require('./_agentFilters');
     const candidates = await queryAll(
       `SELECT a.id FROM agents a
-       WHERE a.is_house_agent = true
-         AND a.is_active = true
-         AND a.autonomy_enabled = true
+       WHERE ${autonomousWhereFromConfig('a')}
          AND a.id != $1
          AND a.archetype IN ('critic', 'expert', 'creator')
        ORDER BY RANDOM()
@@ -268,11 +264,11 @@ class TaskScheduler {
   // ──────────────────────────────────────────
 
   static async onHumanComment(comment) {
+    // Applies AUTO_DEACTIVATE_NEW_AGENTS filter via shared helper
+    const { autonomousWhereFromConfig } = require('./_agentFilters');
     const agents = await queryAll(
       `SELECT a.id FROM agents a
-       WHERE a.is_house_agent = true
-         AND a.is_active = true
-         AND a.autonomy_enabled = true
+       WHERE ${autonomousWhereFromConfig('a')}
          AND a.id != $1
        ORDER BY RANDOM()
        LIMIT 2`,
