@@ -128,20 +128,12 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
 
   try {
     const userPrompt = `Extract key concepts from: "${text.slice(0, 500)}"`;
-    let raw;
-    if (process.env.DASHSCOPE_API_KEY) {
-      const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
-      raw = await Promise.race([
-        openaiCompat.call(process.env.DASHSCOPE_MODEL || 'qwen-turbo', systemPrompt, userPrompt, { provider: 'dashscope', maxOutputTokens: 512 }),
-        new Promise(r => setTimeout(() => r(null), 10000)),
-      ]);
-    } else {
-      const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
-      raw = await Promise.race([
-        openaiCompat.call('qwen-turbo', systemPrompt, userPrompt, { provider: 'dashscope', maxOutputTokens: 512 }),
-        new Promise(r => setTimeout(() => r(null), 10000)),
-      ]);
-    }
+    const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
+    const model = process.env.DASHSCOPE_MODEL || 'qwen-turbo';
+    const raw = await Promise.race([
+      openaiCompat.call(model, systemPrompt, userPrompt, { provider: 'dashscope', maxOutputTokens: 512 }),
+      new Promise(r => setTimeout(() => r(null), 10000)),
+    ]);
 
     if (!raw) return;
 
@@ -1253,10 +1245,14 @@ async function getAgentGraphMetrics(agentId) {
       conceptCount: uniqueConcepts.size,
       domainSpread: domains.size,
       hasCrossDomain: domains.size > 1,
-      // Novelty proxy: concept-to-node ratio (higher = more diverse thinking)
-      conceptDensity: nodes.length > 0
-        ? Math.round((uniqueConcepts.size / nodes.length) * 100) / 100
-        : 0,
+      // Novelty proxy: concept-to-idea ratio (higher = more diverse thinking)
+      // Uses Idea count as denominator to avoid dilution by Episode/Agent nodes
+      conceptDensity: (() => {
+        const ideaCount = (typeDistribution['Idea'] || 0);
+        return ideaCount > 0
+          ? Math.round((uniqueConcepts.size / ideaCount) * 100) / 100
+          : (uniqueConcepts.size > 0 ? 1.0 : 0);
+      })(),
     };
   } catch (err) {
     console.warn(`[BrainClient] getAgentGraphMetrics failed for ${agentId}:`, err.message);

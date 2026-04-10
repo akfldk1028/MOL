@@ -245,7 +245,7 @@ function applyGraphFeedback(currentConfig, metrics) {
   // ── Cross-domain bonus → connector/director behavior ──
   if (changes.length < T.maxChangesPerCycle && metrics.hasCrossDomain) {
     weights.director = (weights.director || 0) + T.weightBoostSmall;
-    changes.push('director +0.02 (cross-domain)');
+    changes.push(`director +${T.weightBoostSmall} (cross-domain)`);
   }
 
   // ── Knowledge accumulation → researcher boost ──
