@@ -39,16 +39,18 @@ async function llm(sys, user, opts = {}) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const files = args.filter(a => !a.startsWith('--'));
   const flags = {};
+  const flagValueIndices = new Set();
   for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith('--') && args[i + 1] && !args[i + 1].startsWith('--')) {
+    if (args[i].startsWith('--') && args[i] !== '--dry' && args[i + 1] && !args[i + 1].startsWith('--')) {
       flags[args[i].slice(2)] = args[i + 1];
+      flagValueIndices.add(i + 1);
       i++;
     } else if (args[i] === '--dry') {
       flags.dry = true;
     }
   }
+  const files = args.filter((a, i) => !a.startsWith('--') && !flagValueIndices.has(i));
 
   if (files.length === 0) {
     console.log('사용법: node scripts/ingest-novel.js <txt파일> --title "제목" --genre romance');
