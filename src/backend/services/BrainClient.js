@@ -5,9 +5,27 @@
 
 const config = require('../config');
 const { queryOne } = require('../config/database');
+const crypto = require('crypto');
 
 const CGB_URL = config.cgb?.apiUrl || 'http://localhost:3001';
 const CGB_KEY = config.cgb?.apiKey || '';
+
+/**
+ * Build a deterministic Concept node ID from its display name.
+ * Uses ASCII slug if possible; falls back to md5 hash for non-ASCII or empty slugs.
+ * Returns null if name is unusable.
+ */
+function _buildConceptId(name) {
+  if (!name || typeof name !== 'string') return null;
+  const ascii = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  // Require at least 3 meaningful chars after slug — rejects '-', '--', '-vs-', etc.
+  if (ascii.length >= 3) {
+    return `concept-${ascii.slice(0, 50)}`;
+  }
+  // Fallback: md5 hash of the raw name (deterministic, safe for Korean/emoji)
+  const hash = crypto.createHash('md5').update(name).digest('hex').slice(0, 12);
+  return `concept-h-${hash}`;
+}
 
 /** Edge creation with 1 retry (FK may fail if node not yet committed) */
 async function cgbEdge(sourceId, targetId, type) {
@@ -34,8 +52,19 @@ async function cgbFetch(path, options = {}) {
       signal: controller.signal,
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.warn(`[BrainClient] ${path} failed: ${res.status}`, err.error?.message || '');
+      // Try JSON parse, fall back to raw text so we always see the body
+      let detail = '';
+      try {
+        const body = await res.text();
+        try {
+          const json = JSON.parse(body);
+          detail = json.error?.message || json.error?.code || body.slice(0, 300);
+        } catch {
+          detail = body.slice(0, 300);
+        }
+      } catch {}
+      const method = options.method || 'GET';
+      console.warn(`[BrainClient] ${method} ${path} failed: ${res.status} ${detail}`);
       return null;
     }
     return res.json();
@@ -143,19 +172,25 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
     const concepts = JSON.parse(match[0]);
     if (!Array.isArray(concepts) || concepts.length === 0) return;
 
-    for (const concept of concepts.slice(0, 3)) {
-      if (!concept.name) continue;
+    // Track successfully created concept IDs for cross-linking
+    const createdConceptIds = [];
 
-      // Create or reuse Concept node (deterministic ID by name)
-      const conceptId = `concept-${concept.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50)}`;
+    for (const concept of concepts.slice(0, 3)) {
+      if (!concept.name || typeof concept.name !== 'string') continue;
+      const name = concept.name.trim();
+      if (name.length < 2) continue;
+
+      // Deterministic slug — falls back to hash when name is non-ASCII (Korean, emoji, etc.)
+      const conceptId = _buildConceptId(name);
+      if (!conceptId) continue;
 
       const conceptResult = await cgbFetch('/api/v1/graph/nodes', {
         method: 'POST',
         body: {
           id: conceptId,
           type: 'Concept',
-          title: concept.name,
-          description: concept.description || concept.name,
+          title: name,
+          description: concept.description || name,
           agent_id: agentId,
           domain: bc.graph_scope,
           layer: 1, // domain level (shared within department)
@@ -163,34 +198,34 @@ async function extractConcepts(agentId, ideaNodeId, node, bc) {
         timeout: 10000,
       });
 
-      if (conceptResult?.data) {
+      // Only track + create edges if node was actually stored
+      if (conceptResult?.data?.id) {
+        createdConceptIds.push(conceptResult.data.id);
+        const storedId = conceptResult.data.id;
+
         // Idea → USES_CONCEPT → Concept
         cgbFetch('/api/v1/graph/edges', {
           method: 'POST',
-          body: { sourceId: ideaNodeId, targetId: conceptId, type: 'USES_CONCEPT' },
+          body: { sourceId: ideaNodeId, targetId: storedId, type: 'USES_CONCEPT' },
           timeout: 10000,
         }).catch(() => {});
 
         // Agent → OWNS → Concept
         cgbFetch('/api/v1/graph/edges', {
           method: 'POST',
-          body: { sourceId: `agent-${agentId}`, targetId: conceptId, type: 'OWNS' },
+          body: { sourceId: `agent-${agentId}`, targetId: storedId, type: 'OWNS' },
           timeout: 10000,
         }).catch(() => {});
       }
     }
 
-    // Cross-link: search for related Concepts in graph
-    if (concepts.length >= 2) {
-      for (let i = 0; i < concepts.length - 1; i++) {
-        const id1 = `concept-${concepts[i].name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50)}`;
-        const id2 = `concept-${concepts[i + 1].name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 50)}`;
-        cgbFetch('/api/v1/graph/edges', {
-          method: 'POST',
-          body: { sourceId: id1, targetId: id2, type: 'RELATED_TO' },
-          timeout: 10000,
-        }).catch(() => {});
-      }
+    // Cross-link: only use IDs that were actually stored (prevents FK errors)
+    for (let i = 0; i < createdConceptIds.length - 1; i++) {
+      cgbFetch('/api/v1/graph/edges', {
+        method: 'POST',
+        body: { sourceId: createdConceptIds[i], targetId: createdConceptIds[i + 1], type: 'RELATED_TO' },
+        timeout: 10000,
+      }).catch(() => {});
     }
 
     await trackActivity(agentId, 'concept_extract');
