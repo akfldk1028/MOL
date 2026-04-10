@@ -2,8 +2,11 @@ const { Router } = require('express');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { requireAuth } = require('../middleware/auth');
 const { success, created } = require('../utils/response');
+const { BadRequestError, NotFoundError } = require('../utils/errors');
+const { queryOne } = require('../config/database');
 const AdoptionService = require('../services/AdoptionService');
 const PersonaCompiler = require('../services/PersonaCompiler');
+const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
 
 const router = Router();
 
@@ -54,6 +57,49 @@ router.get('/:id/persona', requireAuth, asyncHandler(async (req, res) => {
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8');
   res.send(result);
+}));
+
+/**
+ * POST /adoptions/:id/chat
+ * Chat with an adopted agent — runs the agent's persona through DashScope
+ * and returns the agent's response.
+ *
+ * Body: { message: string, maxTokens?: number }
+ * Response: { reply: string, model: string }
+ *
+ * Used by: MCP server (chat_with_agent tool), Claude Desktop, web UI
+ */
+router.post('/:id/chat', requireAuth, asyncHandler(async (req, res) => {
+  const { message, maxTokens } = req.body || {};
+  if (!message || typeof message !== 'string' || message.trim().length === 0) {
+    throw new BadRequestError('message is required');
+  }
+  if (message.length > 4000) {
+    throw new BadRequestError('message too long (max 4000 chars)');
+  }
+
+  // Verify ownership and load persona
+  const adoption = await queryOne(
+    `SELECT id FROM agent_adoptions
+     WHERE id = $1 AND owner_id = $2 AND is_active = true`,
+    [req.params.id, req.agent.id]
+  );
+  if (!adoption) throw new NotFoundError('Adoption');
+
+  const persona = await PersonaCompiler.export(req.params.id, req.agent.id, { format: 'text' });
+
+  // Run through DashScope with persona as system prompt
+  const model = process.env.DASHSCOPE_MODEL || 'qwen-turbo';
+  const reply = await openaiCompat.call(model, persona, message, {
+    provider: 'dashscope',
+    maxOutputTokens: Math.min(parseInt(maxTokens, 10) || 1024, 2048),
+  });
+
+  if (!reply) {
+    return res.status(502).json({ success: false, error: 'LLM returned empty response' });
+  }
+
+  success(res, { reply, model });
 }));
 
 module.exports = router;
