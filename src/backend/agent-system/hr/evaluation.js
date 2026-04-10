@@ -201,6 +201,12 @@ async function evaluateAll(dateStr) {
   const BrainEvolution = require('../../services/BrainEvolution');
   const BrainClient = require('../../services/BrainClient');
 
+  // Domain cache: shared across agents to avoid redundant CGB domain-wide fetches
+  // Without this, 451 agents would make ~1350 CGB calls. With cache: ~902 + unique domains.
+  const domainCache = {};
+  // Batch evolution records to avoid CGB write burst
+  const pendingEvolutions = [];
+
   for (const result of results) {
     try {
       const agentData = await queryOne(
@@ -218,22 +224,25 @@ async function evaluateAll(dateStr) {
       }
 
       // Step 3: Phase 2 — Graph-driven reverse feedback
-      // Query CGB for agent's novelty/diversity metrics → auto-tune temperature/weights
+      // Domain cache shared across loop iterations to avoid N×domain CGB calls
       try {
-        const metrics = await BrainClient.getAgentGraphMetrics(result.agent_id);
+        const metrics = await BrainClient.getAgentGraphMetrics(result.agent_id, { domainCache });
         if (metrics) {
           const { config: graphEvolved, changes } = BrainEvolution.applyGraphFeedback(evolved, metrics);
           if (changes.length > 0) {
             evolved = graphEvolved;
             console.log(`[HR] Graph feedback for ${result.agent_id}: ${changes.join(', ')}`);
 
-            // Record graph-driven evolution in CGB
-            BrainClient.recordEvolution(result.agent_id, {
-              type: 'graph_feedback',
-              target: `hr-eval-${period}`,
-              reason: `Graph metrics → config: ${changes.join('; ')}`,
-              metadata: { metrics, changes, grade: result.overall_grade },
-            }).catch(e => console.warn(`[HR] Evolution record failed for ${result.agent_id}:`, e.message));
+            // Queue evolution record (batch write after loop to avoid CGB burst)
+            pendingEvolutions.push({
+              agentId: result.agent_id,
+              evolution: {
+                type: 'graph_feedback',
+                target: `hr-eval-${period}`,
+                reason: `Graph metrics → config: ${changes.join('; ')}`,
+                metadata: { metrics, changes, grade: result.overall_grade },
+              },
+            });
           }
         }
       } catch (graphErr) {
@@ -247,6 +256,21 @@ async function evaluateAll(dateStr) {
       );
     } catch (err) {
       console.warn(`[HR] Brain evolution failed for ${result.agent_id}:`, err.message);
+    }
+  }
+
+  // Flush batched evolution records (staggered to avoid CGB burst)
+  if (pendingEvolutions.length > 0) {
+    console.log(`[HR] Recording ${pendingEvolutions.length} evolution events...`);
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < pendingEvolutions.length; i += BATCH_SIZE) {
+      const batch = pendingEvolutions.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(
+        batch.map(({ agentId, evolution }) =>
+          BrainClient.recordEvolution(agentId, evolution)
+            .catch(e => console.warn(`[HR] Evolution record failed for ${agentId}:`, e.message))
+        )
+      );
     }
   }
 

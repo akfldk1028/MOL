@@ -1162,15 +1162,24 @@ async function getCrossDomainInsights(agentId, domain, isConnector = false) {
 
     let crossNodes = [];
     if (isConnector) {
-      // Connector archetype: also peek into adjacent domains
-      // Use a general search to find high-quality nodes outside own domain
-      const crossResult = await cgbFetch(`/api/v1/graph/nodes?type=Idea&limit=8`);
-      crossNodes = (crossResult?.data?.nodes || [])
+      // Connector archetype: peek into adjacent domains
+      // Fetch more nodes (20) to ensure domain diversity after filtering out own domain
+      const crossResult = await cgbFetch(`/api/v1/graph/nodes?type=Idea&limit=20`);
+      const candidates = (crossResult?.data?.nodes || [])
         .filter(n => {
           const nodeDomain = n.domain || '';
-          return nodeDomain !== domain && n.agent_id !== agentId && n.agentId !== agentId;
-        })
-        .slice(0, 2);
+          return nodeDomain && nodeDomain !== domain && n.agent_id !== agentId && n.agentId !== agentId;
+        });
+      // Pick from diverse domains (max 1 per foreign domain, up to 3 total)
+      const seenDomains = new Set();
+      for (const n of candidates) {
+        if (crossNodes.length >= 3) break;
+        const nd = n.domain || '';
+        if (!seenDomains.has(nd)) {
+          seenDomains.add(nd);
+          crossNodes.push(n);
+        }
+      }
     }
 
     return { nodes: [...domainNodes, ...crossNodes], crossDomain: crossNodes.length > 0 };
@@ -1188,9 +1197,11 @@ async function getCrossDomainInsights(agentId, domain, isConnector = false) {
  *   → KG+LLM co-evolution: graph quality signals drive agent config tuning
  *
  * @param {string} agentId
+ * @param {object} [options]
+ * @param {object} [options.domainCache] - Pre-fetched domain ideas keyed by domain scope (avoids redundant CGB calls in batch)
  * @returns {Promise<{ nodeCount, typeDistribution, avgScore, domainSpread, conceptCount, hasCrossDomain } | null>}
  */
-async function getAgentGraphMetrics(agentId) {
+async function getAgentGraphMetrics(agentId, options = {}) {
   const bc = await getBrainConfig(agentId);
   if (!bc) return null;
 
@@ -1198,19 +1209,33 @@ async function getAgentGraphMetrics(agentId) {
   const timeout = (promise) => Promise.race([promise, new Promise(r => setTimeout(() => r(null), 5000))]);
 
   try {
-    // Parallel: agent's nodes by type + domain-wide concepts agent owns + cross-domain check
-    const [agentNodes, agentConcepts, allDomainIdeas] = await Promise.all([
+    // Use cached domain ideas if available (batch HR eval optimization)
+    const domainCache = options.domainCache || {};
+    const needDomainFetch = !domainCache[domain];
+
+    const promises = [
       // All nodes this agent created (recent 50)
       timeout(cgbFetch(`/api/v1/graph/nodes?agent_id=${encodeURIComponent(agentId)}&limit=50`)),
       // Concepts this agent contributed
       timeout(cgbFetch(`/api/v1/graph/nodes?agent_id=${encodeURIComponent(agentId)}&type=Concept&limit=20`)),
-      // Domain-wide ideas for comparison (top 30 by score)
-      timeout(cgbFetch(`/api/v1/graph/nodes?domain=${encodeURIComponent(domain)}&type=Idea&limit=30`)),
-    ]);
+    ];
+    // Only fetch domain-wide ideas if not cached
+    if (needDomainFetch) {
+      promises.push(timeout(cgbFetch(`/api/v1/graph/nodes?domain=${encodeURIComponent(domain)}&type=Idea&limit=30`)));
+    }
+
+    const results = await Promise.all(promises);
+    const [agentNodes, agentConcepts] = results;
+    const allDomainIdeas = needDomainFetch ? results[2] : null;
+
+    // Cache domain result for reuse by other agents in same domain
+    if (needDomainFetch && allDomainIdeas) {
+      domainCache[domain] = allDomainIdeas?.data?.nodes || [];
+    }
 
     const nodes = agentNodes?.data?.nodes || [];
     const concepts = agentConcepts?.data?.nodes || [];
-    const domainIdeas = allDomainIdeas?.data?.nodes || [];
+    const domainIdeas = domainCache[domain] || [];
 
     if (nodes.length === 0) return null;
 
