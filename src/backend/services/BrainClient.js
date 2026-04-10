@@ -1004,6 +1004,7 @@ async function getAgentMemory(agentId, options = {}) {
     const timeout = (promise) => Promise.race([promise, new Promise(r => setTimeout(() => r(null), 3000))]);
 
     // Phase 3: Check if connector archetype for cross-domain bonus
+    // Sequential before Promise.all — single indexed row lookup (~1-3ms), acceptable
     const agentRow = await queryOne('SELECT archetype FROM agents WHERE id = $1', [agentId]);
     const isConnector = agentRow?.archetype === 'connector';
 
@@ -1043,12 +1044,13 @@ async function getAgentMemory(agentId, options = {}) {
     addNodes(recentResult);
     addNodes(highScoreResult);
     addNodes(domainConceptsResult);
-    // Phase 3: peer insights are added with source tagging
+    // Phase 3: peer insights — local function returns { nodes, crossDomain }, not cgbFetch shape
     const peerNodes = peerInsightsResult?.nodes || [];
+    const peerNodeIds = new Set();
     for (const n of peerNodes) {
       if (!seen.has(n.id)) {
         seen.add(n.id);
-        n._isPeerInsight = true;
+        peerNodeIds.add(n.id);
         allNodes.push(n);
       }
     }
@@ -1108,7 +1110,7 @@ async function getAgentMemory(agentId, options = {}) {
     }
 
     // F. Phase 3: Peer insights — 동료 에이전트의 발견
-    const peerInsightNodes = allNodes.filter(n => n._isPeerInsight).slice(0, 3);
+    const peerInsightNodes = allNodes.filter(n => peerNodeIds.has(n.id)).slice(0, 3);
     if (peerInsightNodes.length > 0) {
       parts.push('**Peer discoveries (from fellow agents in your domain):**');
       for (const p of peerInsightNodes) {
