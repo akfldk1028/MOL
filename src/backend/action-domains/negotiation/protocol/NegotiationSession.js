@@ -90,8 +90,13 @@ class NegotiationSession extends SessionBase {
       : null;
   }
 
+  /**
+   * Round count — uses total turns, not just proposals.
+   * REJECT/DEADLOCK_SIGNAL turns also count toward the deadline,
+   * otherwise an LLM stuck in a REJECT loop would burn infinite LLM calls.
+   */
   currentRound() {
-    return this.proposals.length;
+    return Math.max(this.proposals.length, this.turns.length);
   }
 
   // ─────────────────────────────────────────────

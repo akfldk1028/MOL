@@ -74,15 +74,20 @@ class NegotiationHarness extends HarnessBase {
       session.addProposal(initialOffer);
     }
 
-    // Alternate parties 0 ↔ 1 each turn
-    let currentIdx = initialOffer ? 1 : 0;
+    // State-based actor selection: whoever received the latest proposal speaks next.
+    // This is idempotent and prevents drift from counter-based alternation.
+    const pickNextActor = () => {
+      const latest = session.latestProposal();
+      if (!latest) return session.parties[0];
+      return session.parties.find((p) => p.agent_id === latest.to) || session.parties[0];
+    };
 
     while (
       session.state === STATES.NEGOTIATING &&
       !session.isDeadlineReached()
     ) {
-      const actor = session.parties[currentIdx];
-      const counterpart = session.parties[1 - currentIdx];
+      const actor = pickNextActor();
+      const counterpart = session.parties.find((p) => p.agent_id !== actor.agent_id);
 
       let action = null;
       for (let attempt = 1; attempt <= MAX_INVALID_RETRIES; attempt++) {
@@ -127,9 +132,7 @@ class NegotiationHarness extends HarnessBase {
       if (applied.terminated) {
         return this._result(session, applied.reason || 'terminated');
       }
-
-      // Alternate
-      currentIdx = 1 - currentIdx;
+      // Next actor is picked from session state at the top of the loop
     }
 
     // Fell through the loop — deadline reached
