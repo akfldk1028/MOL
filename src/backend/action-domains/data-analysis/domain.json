@@ -1,0 +1,57 @@
+{
+  "id": "data-analysis",
+  "type": "action",
+  "name": "Content & Data Analysis",
+  "description": "YouTube/SNS 크리에이터용 데이터 분석 파이프라인 — Goal → Plan(DAG) → Query → Analysis → Visualization → Insight",
+  "tier": "free",
+  "agents": [
+    {
+      "name": "atlas",
+      "role": "planner",
+      "stage": 1,
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "theory": "MetaGPT Hierarchical Graph Modeling"
+    },
+    {
+      "name": "scout",
+      "role": "collector",
+      "stage": 2,
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "theory": "Vanna schema-RAG + MetaGPT per-node verify"
+    },
+    {
+      "name": "lens",
+      "role": "analyst",
+      "stage": 3,
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "theory": "Statistical analysis + anomaly detection"
+    },
+    {
+      "name": "canvas",
+      "role": "visualizer",
+      "stage": 4,
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "theory": "LIDA VISGENERATOR"
+    },
+    {
+      "name": "oracle",
+      "role": "insighter",
+      "stage": 5,
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "theory": "LIDA INFOGRAPHER + MetaGPT Experience Recording"
+    }
+  ],
+  "roles": [],
+  "tools": [
+    "sql-runner",
+    "pandas-runner",
+    "chart-generator",
+    "youtube-fetcher",
+    "web-fetcher"
+  ]
+}
