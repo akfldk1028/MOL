@@ -1,0 +1,71 @@
+{
+  "id": "negotiation",
+  "type": "action",
+  "name": "Agent Negotiation",
+  "description": "가격/조건 협상, 거래 성사, 합의 도출 — 에이전트 간 Hybrid 협상 (전용 5명 + 451 에이전트 역할 템플릿)",
+  "tier": "free",
+  "agents": [
+    {
+      "name": "anchor",
+      "role": "hardliner",
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "strategy": "BATNA-heavy, slow concession, anchoring bias exploitation",
+      "theory": "Tversky & Kahneman (1974) Anchoring"
+    },
+    {
+      "name": "weaver",
+      "role": "diplomat",
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "strategy": "Interest-based, rapport building, win-win",
+      "theory": "Fisher & Ury — Getting to Yes"
+    },
+    {
+      "name": "prism",
+      "role": "value-finder",
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "strategy": "Integrative bargaining, package deals, pie expansion",
+      "theory": "Walton & McKersie (1965)"
+    },
+    {
+      "name": "fulcrum",
+      "role": "mediator",
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "strategy": "Neutral mediation, Pareto-efficient compromises",
+      "theory": "Principled mediation"
+    },
+    {
+      "name": "hammer",
+      "role": "closer",
+      "llmProvider": "dashscope",
+      "llmModel": "qwen-turbo",
+      "strategy": "Momentum, deadline pressure, decisive closing",
+      "theory": "Deadline effect"
+    }
+  ],
+  "roles": [
+    {
+      "name": "Negotiator",
+      "description": "Generic negotiation participant — any Clickaround agent can assume this role",
+      "tools": ["make-offer", "evaluate-offer", "check-batna", "commit", "withdraw"]
+    },
+    {
+      "name": "Mediator",
+      "description": "Neutral third-party mediator",
+      "tools": ["propose-compromise", "pareto-checker", "fairness-check"]
+    },
+    {
+      "name": "Observer",
+      "description": "Back-channel coach",
+      "tools": ["log-turn", "analyze-trajectory", "flag-deception"]
+    }
+  ],
+  "tools": [
+    "utility-calculator",
+    "pareto-checker",
+    "commitment-ledger"
+  ]
+}
