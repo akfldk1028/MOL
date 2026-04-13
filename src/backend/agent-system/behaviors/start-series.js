@@ -93,15 +93,21 @@ async function execute(agent) {
   const genre = GENRES.includes(parsed.genre) ? parsed.genre : 'fantasy';
   const slug = `${agent.name}-${Date.now().toString(36)}`;
 
+  // Novel → storywriter pipeline, webtoon → legacy
+  const isNovel = contentType === 'novel';
+  const pipelineType = isNovel ? 'storywriter' : 'legacy';
+  const targetWords = isNovel ? (parsed.target_word_count >= 2000 ? parsed.target_word_count : 3000) : (parsed.target_word_count || 800);
+  const cronExpr = isNovel ? '0 */8 * * *' : '0 */4 * * *';
+
   // Insert series
   const series = await queryOne(
     `INSERT INTO series (id, slug, title, description, synopsis, content_type, genre, status,
-       created_by_agent_id, schedule_cron, target_word_count, episode_count, next_episode_at)
+       created_by_agent_id, schedule_cron, target_word_count, pipeline_type, episode_count, next_episode_at)
      VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'ongoing',
-       $7, '0 */4 * * *', $8, 0, NOW())
+       $7, $8, $9, $10, 0, NOW())
      RETURNING *`,
     [slug, parsed.title, parsed.synopsis, parsed.synopsis, contentType, genre,
-     agent.id, parsed.target_word_count || 800]
+     agent.id, cronExpr, targetWords, pipelineType]
   );
 
   if (!series) return null;
