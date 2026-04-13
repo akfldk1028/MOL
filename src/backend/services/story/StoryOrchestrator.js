@@ -36,6 +36,7 @@ const { TruthManager } = require('./truth/TruthManager');
 const { getAgenda, formatAgendaForPrompt, parseHooksFromTruth } = require('./HookManager');
 const { StoryStateTracker } = require('./StoryStateTracker');
 const BrainClient = require('../BrainClient');
+const { ContextComposer } = require('./ContextComposer');
 
 class StoryOrchestrator {
   /**
@@ -189,59 +190,55 @@ class StoryOrchestrator {
       writeAttempt++;
       this._emit('stage_start', { stage: 'writing', agent: 'writer', attempt: writeAttempt });
 
+      // ─── ContextComposer: InkOS P11 — 4-layer prioritized context selection ───
+      const composer = new ContextComposer({ budgetChars: 12000 });
+
+      // L1: Hard facts
+      composer.addTruthFiles(truthFiles, 3000);
+      composer.addCharacterSheet(this._seriesContext?.characterSheet);
+      composer.addWorldSetting(this._seriesContext?.worldSetting);
+
+      // L2: Author intent
+      composer.addSynopsis(series.synopsis);
+      composer.addHookAgenda(hookAgendaPrompt);
+      composer.addPacingRule(genreProfile.pacingRule);
+
+      // L3: Planning
+      composer.addRLFeedback(evalHistory);
+      composer.addPreviousEpisodes(previousEpisodes);
+
+      // L4: Current task
+      composer.addStateTracker(this.stateTracker.getSummary());
+      composer.addFatigue(fatiguePrompt);
+      composer.addRecentTrail(previousEpisodes);
+
+      // L4: CGB style references (async — fetched inside getContext)
+      let _styleRefs = null;
+      if (this.getBrainContext) {
+        try {
+          const styleNodes = await this.getBrainContext(`${genre} style 명문장 대화 문체`);
+          _styleRefs = (styleNodes || []).filter(n => {
+            const meta = n.metadata || {};
+            const nodeGenre = meta.genre || meta.category || '';
+            const genreMatch = !nodeGenre || nodeGenre === genre || nodeGenre === 'general';
+            const roleMatch = meta.nodeRole === 'style' || meta.nodeRole === 'dialogue' || meta.nodeRole === 'style-analysis'
+              || n.title?.includes('/style') || n.title?.includes('/dialogue') || n.title?.includes('명문장');
+            return genreMatch && roleMatch;
+          }).slice(0, 3);
+          composer.addStyleReferences(_styleRefs, genre);
+        } catch {}
+      }
+
+      const composed = composer.compose();
+      if (composed.droppedCount > 0) {
+        this._emit('composer_budget', { usedChars: composed.usedChars, dropped: composed.droppedCount, trace: composed.trace.length });
+      }
+
       const writeConfig = createWritingHarness({
         genre,
         chapterNumber: episodeNumber,
         targetWordCount: this.targetWordCount,
-        getContext: async () => {
-              const parts = [];
-              // S1: Inject StoryStateTracker context (SCORE paper)
-              const stateSummary = this.stateTracker.getSummary();
-              if (stateSummary) parts.push(stateSummary);
-
-              // Truth Files injection (InkOS-inspired)
-              const truthPrompt = TruthManager.formatForPrompt(truthFiles, 3000);
-              if (truthPrompt) parts.push(truthPrompt);
-
-              // Hook agenda injection
-              if (hookAgendaPrompt) parts.push(hookAgendaPrompt);
-
-              // Fatigue warnings injection
-              if (fatiguePrompt) parts.push(fatiguePrompt);
-
-              // Genre pacing rule
-              if (genreProfile.pacingRule) parts.push(`\n## 페이싱 규칙\n${genreProfile.pacingRule}`);
-
-              // Inject previous episode summaries as long-term memory
-              if (previousEpisodes.length > 0) {
-                parts.push('## Previous Episodes (Long-Term Memory)');
-                for (const ep of previousEpisodes.slice(-3)) {
-                  parts.push(`Episode ${ep.episode_number}: "${ep.title}" — ${(ep.script_content || '').slice(0, 300)}...`);
-                }
-              }
-              // Level 2: Style reference from CGB (genre-filtered metadata query)
-              if (this.getBrainContext) {
-                try {
-                  const styleNodes = await this.getBrainContext(`${genre} style 명문장 대화 문체`);
-                  const styleRefs = (styleNodes || []).filter(n => {
-                    const meta = n.metadata || {};
-                    const nodeGenre = meta.genre || meta.category || '';
-                    const genreMatch = !nodeGenre || nodeGenre === genre || nodeGenre === 'general';
-                    const roleMatch = meta.nodeRole === 'style' || meta.nodeRole === 'dialogue' || meta.nodeRole === 'style-analysis'
-                      || n.title?.includes('/style') || n.title?.includes('/dialogue') || n.title?.includes('명문장');
-                    return genreMatch && roleMatch;
-                  }).slice(0, 3);
-                  if (styleRefs.length > 0) {
-                    parts.push(`\n## Writing Style References (${genre} genre, from ingested novels)`);
-                    parts.push('Use these as STYLE REFERENCE — mimic this quality of prose:');
-                    for (const ref of styleRefs) {
-                      parts.push(`\n### ${ref.title}\n${(ref.description || '').slice(0, 500)}`);
-                    }
-                  }
-                } catch {}
-              }
-              return parts.length > 0 ? parts.join('\n') : null;
-            },
+        getContext: async () => composed.prompt || null,
       });
       const writeHarness = new AgentHarness(writeConfig, this.llmCall, this.sharedMemory);
       const chapterPlan = planResult.artifact?.data || planResult.output;

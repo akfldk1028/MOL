@@ -29,7 +29,7 @@ export function WebtoonGrid({ creations }: { creations: Creation[] }) {
         return (
           <Link
             key={creation.id}
-            href={`/c/${creation.id}`}
+            href={`/series/${(creation as any).slug || creation.id}`}
             className="group rounded-lg border bg-card overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-foreground/10"
           >
             {/* Thumbnail */}
