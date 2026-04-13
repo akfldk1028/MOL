@@ -8,7 +8,16 @@
 
 const { queryAll, queryOne } = require('../config/database');
 const store = require('../config/memory-store');
-const { parseExpression } = require('cron-parser');
+let parseCron;
+try {
+  // cron-parser v5+ (new API)
+  const { CronExpressionParser } = require('cron-parser');
+  parseCron = (expr, opts) => CronExpressionParser.parse(expr, opts);
+} catch {
+  // cron-parser v4 (legacy API)
+  const { parseExpression } = require('cron-parser');
+  parseCron = (expr, opts) => parseExpression(expr, opts);
+}
 
 const TICK_INTERVAL = 1_800_000; // 30 minutes
 
@@ -100,7 +109,7 @@ class SeriesContentScheduler {
    */
   static _shouldTrigger(cronExpr) {
     try {
-      const interval = parseExpression(cronExpr, { utc: true });
+      const interval = parseCron(cronExpr, { utc: true });
       const prev = interval.prev().toDate();
       const now = new Date();
       const diffMs = now.getTime() - prev.getTime();
