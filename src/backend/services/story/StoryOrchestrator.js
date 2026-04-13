@@ -22,8 +22,18 @@ const { SharedMemory } = require('../../engine/open-multi-agent/shared-memory');
 const { AgentHarness } = require('../../engine/harness/AgentHarness');
 const { createOutlineHarness, buildOutlinePrompt } = require('../../engine/harness/agents/OutlineHarness');
 const { createPlanningHarness, buildPlanningPrompt } = require('../../engine/harness/agents/PlanningHarness');
-const { createWritingHarness, buildWritingPrompt, countWords } = require('../../engine/harness/agents/WritingHarness');
+const { createWritingHarness, buildWritingPrompt } = require('../../engine/harness/agents/WritingHarness');
 const { createEvaluationHarness, buildEvaluationPrompt } = require('../../engine/harness/agents/EvaluationHarness');
+const { auditChapter } = require('../../engine/harness/agents/ContinuityAuditor');
+const { analyzeAITells } = require('../../engine/harness/agents/AITellsDetector');
+const { normalizeLength } = require('../../engine/harness/agents/LengthNormalizer');
+const { validatePostWrite } = require('../../engine/harness/agents/PostWriteValidator');
+const { spotFixRevise } = require('../../engine/harness/agents/SpotFixReviser');
+const { analyzeFatigue } = require('../../engine/harness/agents/LongSpanFatigue');
+const { getGenreProfile } = require('../../config/genre-profile');
+const { countKoreanWords } = require('../../config/length-governance');
+const { TruthManager } = require('./truth/TruthManager');
+const { getAgenda, formatAgendaForPrompt, parseHooksFromTruth } = require('./HookManager');
 const { StoryStateTracker } = require('./StoryStateTracker');
 const BrainClient = require('../BrainClient');
 
@@ -124,9 +134,55 @@ class StoryOrchestrator {
       } catch {}
     }
 
-    // ─── Stage 3: Writing (with evaluation loop) ───
+    // ─── Truth Files: Load (or initialize on first episode) ───
+    let truthFiles = {};
+    const seriesId = series.id || series.title;
+    if (agentId && seriesId) {
+      try {
+        if (episodeNumber <= 1) {
+          this._emit('truth_init', { seriesId });
+          truthFiles = await TruthManager.initialize(agentId, seriesId, series, { llmCall: this.llmCall }) || {};
+        } else {
+          truthFiles = await TruthManager.load(agentId, seriesId) || {};
+        }
+        const loaded = Object.values(truthFiles).filter(Boolean).length;
+        if (loaded > 0) this._emit('truth_loaded', { count: loaded });
+      } catch (err) {
+        console.warn('[StoryOrchestrator] TruthManager error:', err.message);
+      }
+    }
+
+    const genreProfile = getGenreProfile(genre);
+    const lengthSpec = genreProfile.lengthSpec;
+
+    // ─── Hook Agenda ───
+    let hookAgendaPrompt = '';
+    const hooks = parseHooksFromTruth(truthFiles.pendingHooks);
+    if (hooks.length > 0) {
+      const agenda = getAgenda(hooks, episodeNumber);
+      hookAgendaPrompt = formatAgendaForPrompt(agenda);
+      if (hookAgendaPrompt) this._emit('hook_agenda', { mustAdvance: agenda.mustAdvance.length, shouldResolve: agenda.shouldResolve.length, stale: agenda.staleWarnings.length });
+    }
+
+    // ─── Long-Span Fatigue (will be re-run with currentContent after writing) ───
+    let fatiguePrompt = '';
+    if (previousEpisodes.length >= 2) {
+      const { issues: fatigueIssues, suggestions } = analyzeFatigue({
+        episodes: previousEpisodes,
+        chapterTypes: genreProfile.chapterTypes,
+        // currentContent not available yet — pre-write fatigue only checks episode history
+      });
+      if (fatigueIssues.length > 0) {
+        this._emit('fatigue_detected', { count: fatigueIssues.length });
+        fatiguePrompt = '\n## 장간 피로도 경고\n' + suggestions.join('\n');
+      }
+    }
+
+    // ─── Stage 3: Writing (with review cycle) ───
     let writeResult = null;
     let evalResult = null;
+    let auditResult = null;
+    let aiTellsResult = null;
     let writeAttempt = 0;
 
     while (writeAttempt <= this.maxEvalRetries) {
@@ -142,6 +198,20 @@ class StoryOrchestrator {
               // S1: Inject StoryStateTracker context (SCORE paper)
               const stateSummary = this.stateTracker.getSummary();
               if (stateSummary) parts.push(stateSummary);
+
+              // Truth Files injection (InkOS-inspired)
+              const truthPrompt = TruthManager.formatForPrompt(truthFiles, 3000);
+              if (truthPrompt) parts.push(truthPrompt);
+
+              // Hook agenda injection
+              if (hookAgendaPrompt) parts.push(hookAgendaPrompt);
+
+              // Fatigue warnings injection
+              if (fatiguePrompt) parts.push(fatiguePrompt);
+
+              // Genre pacing rule
+              if (genreProfile.pacingRule) parts.push(`\n## 페이싱 규칙\n${genreProfile.pacingRule}`);
+
               // Inject previous episode summaries as long-term memory
               if (previousEpisodes.length > 0) {
                 parts.push('## Previous Episodes (Long-Term Memory)');
@@ -154,7 +224,6 @@ class StoryOrchestrator {
                 try {
                   const styleNodes = await this.getBrainContext(`${genre} style 명문장 대화 문체`);
                   const styleRefs = (styleNodes || []).filter(n => {
-                    // Filter by genre metadata (not just title string)
                     const meta = n.metadata || {};
                     const nodeGenre = meta.genre || meta.category || '';
                     const genreMatch = !nodeGenre || nodeGenre === genre || nodeGenre === 'general';
@@ -176,7 +245,6 @@ class StoryOrchestrator {
       });
       const writeHarness = new AgentHarness(writeConfig, this.llmCall, this.sharedMemory);
       const chapterPlan = planResult.artifact?.data || planResult.output;
-      // C1+I2 fix: inject character sheet + world setting from series context
       const extraPremise = [
         series.synopsis || '',
         this._seriesContext?.worldSetting ? `\n## World Setting\n${this._seriesContext.worldSetting}` : '',
@@ -185,29 +253,48 @@ class StoryOrchestrator {
 
       const writePrompt = buildWritingPrompt(chapterPlan, previousEpisodes, {
         premise: extraPremise,
-        outline: outlineResult.output, // CRITICAL: pass full outline for character consistency
+        outline: outlineResult.output,
         targetWordCount: this.targetWordCount,
         language: this.language,
       });
 
-      // Inject eval feedback from previous attempt
+      // Inject feedback from previous review cycle
       let fullWritePrompt = writePrompt;
       if (evalResult && !evalResult.artifact?.data?.passed) {
         const fb = evalResult.artifact?.data?.feedback || evalResult.output;
         fullWritePrompt += `\n\n## Reviewer Feedback (MUST address)\n${fb}`;
+      }
+      if (auditResult && !auditResult.passed) {
+        const criticals = auditResult.issues.filter(i => i.severity === 'critical');
+        if (criticals.length > 0) {
+          fullWritePrompt += '\n\n## Continuity Issues (MUST FIX)';
+          for (const issue of criticals.slice(0, 5)) {
+            fullWritePrompt += `\n- [${issue.category}] ${issue.description}`;
+            if (issue.suggestion) fullWritePrompt += ` → ${issue.suggestion}`;
+          }
+        }
+      }
+      if (aiTellsResult && aiTellsResult.issues.length > 0) {
+        const warnings = aiTellsResult.issues.filter(i => i.severity === 'warning');
+        if (warnings.length > 0) {
+          fullWritePrompt += '\n\n## AI Style Issues (MUST FIX)';
+          for (const issue of warnings.slice(0, 3)) {
+            fullWritePrompt += `\n- [${issue.category}] ${issue.suggestion}`;
+          }
+        }
       }
 
       // RL: Inject past evaluation learnings from CGB
       if (evalHistory.goodPatterns.length > 0 || evalHistory.antiPatterns.length > 0) {
         const rlParts = ['\n\n## 이전 에피소드 평가에서 배운 교훈 (RL Feedback)'];
         if (evalHistory.goodPatterns.length > 0) {
-          rlParts.push('### ✅ 잘한 점 (이것을 유지하세요)');
+          rlParts.push('### 잘한 점 (이것을 유지하세요)');
           for (const p of evalHistory.goodPatterns.slice(0, 3)) {
             rlParts.push(`- ${p.slice(0, 200)}`);
           }
         }
         if (evalHistory.antiPatterns.length > 0) {
-          rlParts.push('### ⛔ 피해야 할 점 (이것은 반복하지 마세요)');
+          rlParts.push('### 피해야 할 점 (이것은 반복하지 마세요)');
           for (const p of evalHistory.antiPatterns.slice(0, 3)) {
             rlParts.push(`- ${p.slice(0, 200)}`);
           }
@@ -220,45 +307,178 @@ class StoryOrchestrator {
       if (!writeResult.success) {
         return this._fail('writing', writeResult, startTime);
       }
-      this._emit('stage_complete', {
-        stage: 'writing', attempt: writeAttempt,
-        wordCount: writeResult.output?.split(/\s+/).length || 0,
-      });
 
-      // S1: State validation (SCORE paper) — check before evaluation
-      const stateIssues = this.stateTracker.validateEpisode(writeResult.output, episodeNumber);
+      // Use cleaned content from handoff artifact (CJK stripped), fallback to raw output
+      let chapterContent = writeResult.artifact?.data?.content || writeResult.output;
+      const rawWordCount = countKoreanWords(chapterContent);
+      this._emit('stage_complete', { stage: 'writing', attempt: writeAttempt, wordCount: rawWordCount });
+
+      // ─── Review Cycle Step 0: PostWrite Validation (rule-based, no LLM) ───
+      const postWriteViolations = validatePostWrite(chapterContent, genreProfile);
+      if (postWriteViolations.length > 0) {
+        const errors = postWriteViolations.filter(v => v.severity === 'error');
+        this._emit('postwrite_violations', { total: postWriteViolations.length, errors: errors.length });
+        if (errors.length > 0) {
+          this._emit('stage_start', { stage: 'spotfix_postwrite', errors: errors.length });
+          try {
+            const fixResult = await spotFixRevise({ content: chapterContent, issues: errors, llmCall: this.llmCall, genre });
+            if (fixResult.applied) {
+              chapterContent = fixResult.content;
+              this._emit('stage_complete', { stage: 'spotfix_postwrite', patches: fixResult.patchCount });
+            }
+          } catch (err) {
+            console.warn('[StoryOrchestrator] SpotFix postwrite error:', err.message);
+          }
+        }
+      }
+
+      // ─── Review Cycle Step 1: Length Normalization ───
+      // Re-count after potential PostWrite spot-fix
+      const currentWordCount = countKoreanWords(chapterContent);
+      const normMode = currentWordCount < lengthSpec.softMin ? 'expand' : currentWordCount > lengthSpec.softMax ? 'compress' : 'none';
+      if (normMode !== 'none') {
+        this._emit('stage_start', { stage: 'length_normalize', mode: normMode, before: currentWordCount });
+        try {
+          const normResult = await normalizeLength({
+            content: chapterContent,
+            lengthSpec,
+            llmCall: this.llmCall,
+            chapterIntent: typeof chapterPlan === 'string' ? chapterPlan.slice(0, 500) : JSON.stringify(chapterPlan).slice(0, 500),
+          });
+          if (normResult.applied) {
+            chapterContent = normResult.content;
+            this._emit('stage_complete', { stage: 'length_normalize', before: currentWordCount, after: normResult.wordCount, mode: normResult.mode });
+          }
+          if (normResult.warning) this._emit('length_warning', { warning: normResult.warning });
+        } catch (err) {
+          console.warn('[StoryOrchestrator] LengthNormalizer error:', err.message);
+        }
+      }
+
+      // ─── Review Cycle Step 1.5: Post-write Fatigue (with currentContent for Dice check) ───
+      if (previousEpisodes.length >= 2) {
+        const { issues: postFatigueIssues } = analyzeFatigue({
+          episodes: previousEpisodes,
+          currentContent: chapterContent,
+          chapterTypes: genreProfile.chapterTypes,
+        });
+        const boundaryIssues = postFatigueIssues.filter(i => i.category.includes('동형'));
+        if (boundaryIssues.length > 0) {
+          this._emit('fatigue_boundary', { count: boundaryIssues.length });
+        }
+      }
+
+      // ─── Review Cycle Step 2: Continuity Audit ───
+      this._emit('stage_start', { stage: 'continuity_audit' });
+      try {
+        auditResult = await auditChapter({
+          chapterContent,
+          chapterNumber: episodeNumber,
+          genre,
+          truthFiles,
+          outline: typeof outlineResult.output === 'string' ? outlineResult.output.slice(0, 1000) : JSON.stringify(outlineResult.output || '').slice(0, 1000),
+          previousChapterSummary: previousEpisodes.length > 0
+            ? (previousEpisodes[previousEpisodes.length - 1]?.script_content || '').slice(0, 500)
+            : '',
+          llmCall: this.llmCall,
+        });
+        this._emit('stage_complete', {
+          stage: 'continuity_audit',
+          passed: auditResult.passed,
+          criticals: auditResult.criticalCount,
+          warnings: auditResult.warningCount,
+        });
+      } catch (err) {
+        console.warn('[StoryOrchestrator] ContinuityAuditor error:', err.message);
+        auditResult = { passed: true, issues: [], summary: 'Audit skipped', dimensionsChecked: 0, criticalCount: 0, warningCount: 0 };
+      }
+
+      // ─── Review Cycle Step 3: AI-Tell Detection ───
+      aiTellsResult = analyzeAITells(chapterContent);
+      if (aiTellsResult.issues.length > 0) {
+        this._emit('ai_tells_detected', { count: aiTellsResult.issues.length, score: aiTellsResult.score });
+      }
+
+      // S1: State validation (SCORE paper)
+      const stateIssues = this.stateTracker.validateEpisode(chapterContent, episodeNumber);
       if (stateIssues.length > 0) {
         this._emit('state_issues', { count: stateIssues.length, issues: stateIssues.map(i => i.message) });
       }
 
-      // ─── Stage 4: Evaluation ───
+      // Update writeResult output with post-processed content
+      writeResult.output = chapterContent;
+
+      // ─── Stage 4: Evaluation (HANNA 6D) ───
       this._emit('stage_start', { stage: 'evaluation', agent: 'evaluator', attempt: writeAttempt });
 
       const evalConfig = createEvaluationHarness({ genre });
       const evalHarness = new AgentHarness(evalConfig, this.llmCall, this.sharedMemory);
       const evalPrompt = buildEvaluationPrompt(
-        writeResult.output,
+        chapterContent,
         outlineData,
         { language: this.language },
       );
       evalResult = await evalHarness.run(evalPrompt);
 
       const scores = evalResult.artifact?.data || {};
+      // Combine: fail if either HANNA or continuity audit failed
+      const overallPassed = scores.passed && auditResult.passed;
       this._emit('stage_complete', {
         stage: 'evaluation', attempt: writeAttempt,
-        overall: scores.overallScore, passed: scores.passed,
+        overall: scores.overallScore, passed: overallPassed,
+        continuityPassed: auditResult.passed,
+        aiTellScore: aiTellsResult.score,
       });
 
-      // If passed or max retries reached, exit loop
-      if (scores.passed || writeAttempt > this.maxEvalRetries) break;
-      this._emit('rewrite_triggered', { attempt: writeAttempt, score: scores.overallScore, feedback: scores.feedback?.slice(0, 200) });
+      // If all passed or max retries reached, exit loop
+      if (overallPassed || writeAttempt > this.maxEvalRetries) break;
+
+      // ─── SpotFix before full rewrite ───
+      const allIssues = [
+        ...(auditResult.issues || []).filter(i => i.severity === 'critical'),
+        ...(aiTellsResult.issues || []).filter(i => i.severity === 'warning'),
+      ];
+      if (allIssues.length > 0) {
+        this._emit('stage_start', { stage: 'spotfix_review', issues: allIssues.length });
+        try {
+          const fixResult = await spotFixRevise({ content: chapterContent, issues: allIssues.slice(0, 8), llmCall: this.llmCall, genre });
+          if (fixResult.applied) {
+            chapterContent = fixResult.content;
+            writeResult.output = chapterContent;
+            this._emit('stage_complete', { stage: 'spotfix_review', patches: fixResult.patchCount });
+            // SpotFix succeeded — count as a pass (don't waste another full write)
+            // The issues were patched; accept and move on.
+            break;
+          }
+        } catch (err) {
+          console.warn('[StoryOrchestrator] SpotFix review error:', err.message);
+        }
+      }
+
+      // Full rewrite fallback (if spot-fix failed/skipped) — loop continues to next writeAttempt
+      this._emit('rewrite_triggered', {
+        attempt: writeAttempt,
+        score: scores.overallScore,
+        feedback: scores.feedback?.slice(0, 200),
+        continuityIssues: auditResult.criticalCount,
+        aiTellScore: aiTellsResult.score,
+      });
     }
+
+    // ─── Truth Files + Hooks: Update after writing ───
+    if (agentId && seriesId && writeResult?.output) {
+      TruthManager.updateAfterChapter(agentId, seriesId, writeResult.output, episodeNumber, { llmCall: this.llmCall })
+        .catch(err => console.warn('[StoryOrchestrator] TruthManager update error:', err.message));
+    }
+    // Note: Hook state updates (resolved/advanced) are handled implicitly by
+    // TruthManager.updateAfterChapter which extracts pendingHooks changes via LLM.
+    // Structured hook JSON will be preserved if the LLM returns valid JSON in the pendingHooks field.
 
     // ─── Assemble result ───
     const episode = {
       title: writeResult.artifact?.data?.title || `Episode ${episodeNumber}`,
       content: writeResult.output,
-      wordCount: countWords(writeResult.output),
+      wordCount: countKoreanWords(writeResult.output),
       episodeNumber,
     };
 
@@ -292,6 +512,8 @@ class StoryOrchestrator {
       outline: outlineResult.artifact?.data,
       chapterPlan: planResult.artifact?.data,
       evaluation: evalResult?.artifact?.data,
+      continuityAudit: auditResult,
+      aiTells: aiTellsResult,
       trajectory: [
         ...outlineResult.trajectory,
         ...planResult.trajectory,

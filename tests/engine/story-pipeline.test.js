@@ -17,6 +17,10 @@ function createMockLLM() {
     if (system.includes('structure architect')) return PLAN_RESPONSE;
     if (system.includes('Creative fiction writer')) return WRITE_RESPONSE;
     if (system.includes('literary critic')) return EVAL_RESPONSE;
+    if (system.includes('continuity auditor')) return '[]'; // no issues
+    if (system.includes('story state tracker') || system.includes('story architect')) return '{}'; // truth files
+    if (system.includes('챕터 길이 조정기')) return WRITE_RESPONSE; // length normalizer passthrough
+    if (system.includes('수정 편집자')) return ''; // spot-fix reviser (no patches = skip)
     return 'fallback';
   };
 }
@@ -58,6 +62,10 @@ describe('StoryOrchestrator', () => {
         }
         return EVAL_RESPONSE;
       }
+      if (system.includes('continuity auditor')) return '[]';
+      if (system.includes('story state tracker') || system.includes('story architect')) return '{}';
+      if (system.includes('챕터 길이 조정기')) return WRITE_RESPONSE;
+      if (system.includes('수정 편집자')) return '';
       return 'fallback';
     };
 
@@ -90,7 +98,7 @@ describe('StoryOrchestrator', () => {
 
     expect(events).toContain('pipeline_start');
     expect(events).toContain('pipeline_complete');
-    expect(events.filter(e => e === 'stage_start').length).toBe(4); // outline, plan, write, eval
+    expect(events.filter(e => e === 'stage_start').length).toBeGreaterThanOrEqual(4); // outline, plan, write, eval + continuity_audit, length_normalize
   });
 
   test('stateTracker is wired into pipeline', async () => {

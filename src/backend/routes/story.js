@@ -44,12 +44,15 @@ router.post('/generate', requireInternalAuth, async (req, res) => {
     const previousEpisodes = await EpisodeService.getRecentWithFeedback(seriesId, 3);
 
     // LLM call function using existing BridgeClient
+    // Respects opts.model and opts.maxOutputTokens from AgentHarness
     const llmCall = async (system, user, opts = {}) => {
+      const model = opts.model || 'qwen3.5-flash';
+      const maxTokens = opts.maxOutputTokens || 8192;
       const response = await bridgeGenerateWithFallback(
         '/v1/generate/episode',
-        { agent_name: 'story-pipeline', prompt: user, max_tokens: opts.maxOutputTokens || 4096 },
-        { model: opts.model || 'qwen3.5-flash', systemPrompt: system, userPrompt: user, options: { maxOutputTokens: opts.maxOutputTokens || 4096 } },
-        opts.timeout || 90000,
+        { agent_name: 'story-pipeline', prompt: user, max_tokens: maxTokens },
+        { model, systemPrompt: system, userPrompt: user, options: { maxOutputTokens: maxTokens } },
+        opts.timeout || 120000,
       );
       return response || '';
     };

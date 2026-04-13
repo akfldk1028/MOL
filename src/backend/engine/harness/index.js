@@ -23,6 +23,13 @@ const { createWritingHarness, buildWritingPrompt, compressChapter } = require('.
 const { createEvaluationHarness, parseEvaluationOutput, buildEvaluationPrompt } = require('./agents/EvaluationHarness');
 // Per-agent harnesses — Critique (all 8 domains)
 const { createCritiqueHarness, buildCritiquePrompt, getDomainSynthesisConfig, DOMAIN_SYNTHESIS } = require('./agents/CritiqueHarness');
+// Review cycle agents
+const { auditChapter } = require('./agents/ContinuityAuditor');
+const { analyzeAITells, isLikelyAIGenerated } = require('./agents/AITellsDetector');
+const { normalizeLength } = require('./agents/LengthNormalizer');
+const { validatePostWrite } = require('./agents/PostWriteValidator');
+const { spotFixRevise, parsePatches, applyPatches } = require('./agents/SpotFixReviser');
+const { analyzeFatigue } = require('./agents/LongSpanFatigue');
 
 module.exports = {
   // Framework
@@ -35,4 +42,7 @@ module.exports = {
   createEvaluationHarness, parseEvaluationOutput, buildEvaluationPrompt,
   // Per-agent harnesses — Critique
   createCritiqueHarness, buildCritiquePrompt, getDomainSynthesisConfig, DOMAIN_SYNTHESIS,
+  // Review cycle agents
+  auditChapter, analyzeAITells, isLikelyAIGenerated, normalizeLength,
+  validatePostWrite, spotFixRevise, parsePatches, applyPatches, analyzeFatigue,
 };

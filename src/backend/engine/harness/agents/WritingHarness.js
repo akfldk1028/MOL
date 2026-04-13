@@ -89,10 +89,12 @@ function createWritingHarness(options = {}) {
         if (output.includes('[continue]') || output.includes('[to be continued by]')) {
           return { valid: false, reason: 'LLM broke character — meta-text detected' };
         }
-        // Check for Chinese character contamination (>10 = likely Chinese text, not just Hanja)
+        // Check for Chinese character contamination
+        // >50 = likely entire response in Chinese (reject to retry)
+        // ≤50 = stray chars that transform will strip (accept)
         const chineseChars = output.match(/[\u4E00-\u9FFF]/g);
-        if (chineseChars && chineseChars.length > 10) {
-          return { valid: false, reason: `Chinese characters detected (${chineseChars.length} chars) — must be pure Korean` };
+        if (chineseChars && chineseChars.length > 50) {
+          return { valid: false, reason: `Chinese characters detected (${chineseChars.length} chars) — likely Chinese text, not Korean` };
         }
         return { valid: true };
       },
@@ -120,10 +122,10 @@ function createWritingHarness(options = {}) {
       artifactKey: `writer/chapter_${chapterNumber}`,
       artifactFormat: 'text',
       transform: (output) => {
-        // Post-process: strip stray Chinese/Japanese only if >5 chars detected
+        // Post-process: always strip stray Chinese/Japanese chars (Qwen leaks these)
         const cjkChars = output.match(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g);
         let cleaned = output;
-        if (cjkChars && cjkChars.length > 5) {
+        if (cjkChars && cjkChars.length > 0) {
           console.warn(`[WritingHarness] Stripping ${cjkChars.length} CJK chars from output`);
           cleaned = output.replace(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g, '');
         }
@@ -240,6 +242,14 @@ function buildWritingPrompt(chapterPlan, previousChapters = [], options = {}) {
       '',
     );
   }
+
+  // Title instruction
+  parts.push(
+    '## 제목 (첫 줄)',
+    '첫 줄에 반드시 "제목: [챕터 제목]" 형식으로 제목을 작성하세요.',
+    '예: 제목: 비 오는 한강',
+    '',
+  );
 
   // Word count enforcement (repeat for emphasis — LLMs respond to repetition)
   parts.push(
