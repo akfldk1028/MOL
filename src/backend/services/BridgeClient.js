@@ -50,16 +50,17 @@ async function bridgeGenerateWithFallback(endpoint, body, fallbackArgs, timeoutM
   // Fallback: DashScope (cheapest) → Gemini
   if (fallbackArgs) {
     const { model, systemPrompt, userPrompt, options } = fallbackArgs;
+    const maxTokens = options?.maxOutputTokens || 4096;
+    const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
     if (process.env.DASHSCOPE_API_KEY) {
-      const openaiCompat = require('../nodes/llm-call/providers/openai-compat');
-      const dsModel = process.env.DASHSCOPE_MODEL || 'qwen-turbo';
-      console.log(`BridgeClient: fallback to DashScope ${dsModel} for ${endpoint}`);
-      return openaiCompat.call(dsModel, systemPrompt, userPrompt, { provider: 'dashscope' });
+      const dsModel = model || process.env.DASHSCOPE_MODEL || 'qwen-turbo';
+      console.log(`BridgeClient: fallback to DashScope ${dsModel} for ${endpoint} (maxTokens: ${maxTokens})`);
+      return openaiCompat.call(dsModel, systemPrompt, userPrompt, { provider: 'dashscope', maxOutputTokens: maxTokens });
     }
     // Final fallback: also DashScope (no Gemini cost leak)
-    const dsFinal = process.env.DASHSCOPE_CONTENT_MODEL || 'qwen3.5-flash';
-    console.log(`BridgeClient: final fallback to DashScope ${dsFinal} for ${endpoint}`);
-    return openaiCompat.call(dsFinal, systemPrompt, userPrompt, { provider: 'dashscope' });
+    const dsFinal = model || process.env.DASHSCOPE_CONTENT_MODEL || 'qwen3.5-flash';
+    console.log(`BridgeClient: final fallback to DashScope ${dsFinal} for ${endpoint} (maxTokens: ${maxTokens})`);
+    return openaiCompat.call(dsFinal, systemPrompt, userPrompt, { provider: 'dashscope', maxOutputTokens: maxTokens });
   }
 
   return null;
