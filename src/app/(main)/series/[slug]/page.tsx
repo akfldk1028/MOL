@@ -52,7 +52,7 @@ export default function SeriesDetailPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`/api/series/${encodeURIComponent(slug)}`)
+    fetch(`/api/series/${slug}`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to load series');
         return res.json();
