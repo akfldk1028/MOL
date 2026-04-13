@@ -71,7 +71,7 @@ function createWritingHarness(options = {}) {
     },
 
     authority: {
-      maxTokens: 32768, // Long output for full chapters (increased from 16K)
+      maxTokens: 16384, // DashScope qwen3.5-flash max (32K은 API 400 에러)
       maxRetries: 2,
       timeoutMs: 300_000, // 5 min for long generation
       validate: (output) => {
