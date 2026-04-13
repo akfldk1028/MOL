@@ -67,7 +67,7 @@ async function execute(agent) {
     response = await bridgeGenerateWithFallback(
       '/v1/generate/raw',
       { system_prompt: prompt, user_prompt: 'Create a new series concept now.', max_tokens: 512 },
-      { model: 'gemini-2.5-flash-lite', systemPrompt: prompt, userPrompt: 'Create a new series concept now.', options: { maxOutputTokens: 512 } },
+      { model: 'qwen-turbo', systemPrompt: prompt, userPrompt: 'Create a new series concept now.', options: { maxOutputTokens: 512 } },
       30000,
     );
   } catch (err) {
