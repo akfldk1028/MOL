@@ -1,0 +1,615 @@
+{
+  "wordCountTarget": {
+    "samples": [
+      {
+        "episode": "[서연의 과거 - 진실의 단서]",
+        "series": "강남역 우연",
+        "language": "ko",
+        "target": 3000,
+        "actual": 669,
+        "ratio": 0.223
+      },
+      {
+        "episode": "タイトル: 春の約束",
+        "series": "桜の記憶",
+        "language": "ja",
+        "target": 3000,
+        "actual": 2391,
+        "ratio": 0.797
+      },
+      {
+        "episode": "감옥의 해방",
+        "series": "천마신공",
+        "language": "ko",
+        "target": 4000,
+        "actual": 274,
+        "ratio": 0.0685
+      },
+      {
+        "episode": "The Forgotten Algorithm",
+        "series": "The Midnight Debugger",
+        "language": "en",
+        "target": 3000,
+        "actual": 3124,
+        "ratio": 1.0413333333333334
+      },
+      {
+        "episode": "タイトル: 桜の下で目覚める",
+        "series": "桜の記憶",
+        "language": "ja",
+        "target": 3000,
+        "actual": 1133,
+        "ratio": 0.37766666666666665
+      },
+      {
+        "episode": "The Echo in the Code",
+        "series": "The Midnight Debugger",
+        "language": "en",
+        "target": 3000,
+        "actual": 3054,
+        "ratio": 1.018
+      },
+      {
+        "episode": "감옥의 문이 열리다",
+        "series": "천마신공",
+        "language": "ko",
+        "target": 4000,
+        "actual": 381,
+        "ratio": 0.09525
+      },
+      {
+        "episode": "유적지의 충돌",
+        "series": "별을 삼킨 자",
+        "language": "ko",
+        "target": 3500,
+        "actual": 1067,
+        "ratio": 0.3048571428571429
+      },
+      {
+        "episode": "[비밀의 카페]",
+        "series": "강남역 우연",
+        "language": "ko",
+        "target": 3000,
+        "actual": 612,
+        "ratio": 0.204
+      },
+      {
+        "episode": "[야간 회의의 은밀한 대화]",
+        "series": "강남역 우연",
+        "language": "ko",
+        "target": 3000,
+        "actual": 472,
+        "ratio": 0.15733333333333333
+      },
+      {
+        "episode": "감옥의 어둠 속에서",
+        "series": "천마신공",
+        "language": "ko",
+        "target": 4000,
+        "actual": 3809,
+        "ratio": 0.95225
+      },
+      {
+        "episode": "유물 발견",
+        "series": "별을 삼킨 자",
+        "language": "ko",
+        "target": 3500,
+        "actual": 496,
+        "ratio": 0.1417142857142857
+      },
+      {
+        "episode": "[야근의 공동 공간]",
+        "series": "강남역 우연",
+        "language": "ko",
+        "target": 3000,
+        "actual": 556,
+        "ratio": 0.18533333333333332
+      },
+      {
+        "episode": "불길한 꿈 (과거의 그림자)",
+        "series": "별을 삼킨 자",
+        "language": "ko",
+        "target": 3500,
+        "actual": 543,
+        "ratio": 0.15514285714285714
+      },
+      {
+        "episode": "별이 떨어지는 밤",
+        "series": "별을 삼킨 자",
+        "language": "ko",
+        "target": 3500,
+        "actual": 440,
+        "ratio": 0.12571428571428572
+      },
+      {
+        "episode": "낙하산",
+        "series": "강남역 우연",
+        "language": "ko",
+        "target": 3000,
+        "actual": 2828,
+        "ratio": 0.9426666666666667
+      },
+      {
+        "episode": "제 1 장: 로그와 침묵",
+        "series": "강남역 우연",
+        "language": "ko",
+        "target": 3000,
+        "actual": 2148,
+        "ratio": 0.716
+      }
+    ],
+    "summary": {
+      "ko": {
+        "n": 13,
+        "mean": 0.32859706959706964,
+        "median": 0.18533333333333332,
+        "min": 0.0685,
+        "max": 0.95225,
+        "below60pct": 10
+      },
+      "ja": {
+        "n": 2,
+        "mean": 0.5873333333333334,
+        "median": 0.797,
+        "min": 0.37766666666666665,
+        "max": 0.797,
+        "below60pct": 1
+      },
+      "en": {
+        "n": 2,
+        "mean": 1.0296666666666667,
+        "median": 1.0413333333333334,
+        "min": 1.018,
+        "max": 1.0413333333333334,
+        "below60pct": 0
+      }
+    }
+  },
+  "languagePurity": {
+    "samples": [
+      {
+        "episode": "[서연의 과거 - 진실의 단서]",
+        "series": "강남역 우연",
+        "language": "ko",
+        "valid": 1513,
+        "pollution": 0,
+        "total": 1513,
+        "purity": 1
+      },
+      {
+        "episode": "タイトル: 春の約束",
+        "series": "桜の記憶",
+        "language": "ja",
+        "valid": 0,
+        "pollution": 4059,
+        "total": 4059,
+        "purity": 0
+      },
+      {
+        "episode": "감옥의 해방",
+        "series": "천마신공",
+        "language": "ko",
+        "valid": 635,
+        "pollution": 0,
+        "total": 635,
+        "purity": 1
+      },
+      {
+        "episode": "The Forgotten Algorithm",
+        "series": "The Midnight Debugger",
+        "language": "en",
+        "valid": 14041,
+        "pollution": 0,
+        "total": 14041,
+        "purity": 1
+      },
+      {
+        "episode": "タイトル: 桜の下で目覚める",
+        "series": "桜の記憶",
+        "language": "ja",
+        "valid": 8,
+        "pollution": 1954,
+        "total": 1962,
+        "purity": 0.004077471967380225
+      },
+      {
+        "episode": "The Echo in the Code",
+        "series": "The Midnight Debugger",
+        "language": "en",
+        "valid": 13847,
+        "pollution": 0,
+        "total": 13847,
+        "purity": 1
+      },
+      {
+        "episode": "감옥의 문이 열리다",
+        "series": "천마신공",
+        "language": "ko",
+        "valid": 891,
+        "pollution": 0,
+        "total": 891,
+        "purity": 1
+      },
+      {
+        "episode": "유적지의 충돌",
+        "series": "별을 삼킨 자",
+        "language": "ko",
+        "valid": 2404,
+        "pollution": 0,
+        "total": 2404,
+        "purity": 1
+      },
+      {
+        "episode": "[비밀의 카페]",
+        "series": "강남역 우연",
+        "language": "ko",
+        "valid": 1384,
+        "pollution": 0,
+        "total": 1384,
+        "purity": 1
+      },
+      {
+        "episode": "[야간 회의의 은밀한 대화]",
+        "series": "강남역 우연",
+        "language": "ko",
+        "valid": 1047,
+        "pollution": 0,
+        "total": 1047,
+        "purity": 1
+      },
+      {
+        "episode": "감옥의 어둠 속에서",
+        "series": "천마신공",
+        "language": "ko",
+        "valid": 9064,
+        "pollution": 0,
+        "total": 9064,
+        "purity": 1
+      },
+      {
+        "episode": "유물 발견",
+        "series": "별을 삼킨 자",
+        "language": "ko",
+        "valid": 1142,
+        "pollution": 0,
+        "total": 1142,
+        "purity": 1
+      },
+      {
+        "episode": "[야근의 공동 공간]",
+        "series": "강남역 우연",
+        "language": "ko",
+        "valid": 1232,
+        "pollution": 0,
+        "total": 1232,
+        "purity": 1
+      },
+      {
+        "episode": "불길한 꿈 (과거의 그림자)",
+        "series": "별을 삼킨 자",
+        "language": "ko",
+        "valid": 1198,
+        "pollution": 0,
+        "total": 1198,
+        "purity": 1
+      },
+      {
+        "episode": "별이 떨어지는 밤",
+        "series": "별을 삼킨 자",
+        "language": "ko",
+        "valid": 1030,
+        "pollution": 0,
+        "total": 1030,
+        "purity": 1
+      },
+      {
+        "episode": "낙하산",
+        "series": "강남역 우연",
+        "language": "ko",
+        "valid": 6615,
+        "pollution": 2,
+        "total": 6617,
+        "purity": 0.9996977482242708
+      },
+      {
+        "episode": "제 1 장: 로그와 침묵",
+        "series": "강남역 우연",
+        "language": "ko",
+        "valid": 4030,
+        "pollution": 787,
+        "total": 4817,
+        "purity": 0.8366203030932116
+      }
+    ],
+    "summary": {
+      "ko": {
+        "n": 13,
+        "meanPurity": 0.9874090808705756,
+        "perfectPurity": 12,
+        "contaminated": 0
+      },
+      "ja": {
+        "n": 2,
+        "meanPurity": 0.0020387359836901123,
+        "perfectPurity": 0,
+        "contaminated": 2
+      },
+      "en": {
+        "n": 2,
+        "meanPurity": 1,
+        "perfectPurity": 2,
+        "contaminated": 0
+      }
+    }
+  },
+  "hanna": {
+    "samples": [
+      {
+        "episode": "[서연의 과거 - 진실의 단서]",
+        "series": "강남역 우연",
+        "genre": "romance",
+        "language": "ko",
+        "wordCount": 669,
+        "scores": {
+          "relevance": 3,
+          "coherence": 2,
+          "empathy": 2,
+          "surprise": 2,
+          "creativity": 3,
+          "complexity": 2
+        }
+      },
+      {
+        "episode": "タイトル: 春の約束",
+        "series": "桜の記憶",
+        "genre": "romance",
+        "language": "ja",
+        "wordCount": 1913,
+        "scores": {
+          "relevance": 3,
+          "coherence": 2,
+          "empathy": 2,
+          "surprise": 1,
+          "creativity": 2,
+          "complexity": 1
+        }
+      },
+      {
+        "episode": "감옥의 해방",
+        "series": "천마신공",
+        "genre": "martial_arts",
+        "language": "ko",
+        "wordCount": 274,
+        "scores": {
+          "relevance": 3,
+          "coherence": 3,
+          "empathy": 2,
+          "surprise": 2,
+          "creativity": 3,
+          "complexity": 2
+        }
+      },
+      {
+        "episode": "The Forgotten Algorithm",
+        "series": "The Midnight Debugger",
+        "genre": "sci-fi",
+        "language": "en",
+        "wordCount": 3124,
+        "scores": {
+          "relevance": 5,
+          "coherence": 4,
+          "empathy": 4,
+          "surprise": 4,
+          "creativity": 5,
+          "complexity": 4
+        }
+      },
+      {
+        "episode": "タイトル: 桜の下で目覚める",
+        "series": "桜の記憶",
+        "genre": "romance",
+        "language": "ja",
+        "wordCount": 906,
+        "scores": {
+          "relevance": 3,
+          "coherence": 3,
+          "empathy": 2,
+          "surprise": 2,
+          "creativity": 3,
+          "complexity": 2
+        }
+      },
+      {
+        "episode": "The Echo in the Code",
+        "series": "The Midnight Debugger",
+        "genre": "sci-fi",
+        "language": "en",
+        "wordCount": 3054,
+        "scores": {
+          "relevance": 5,
+          "coherence": 4,
+          "empathy": 4,
+          "surprise": 3,
+          "creativity": 4,
+          "complexity": 3
+        }
+      },
+      {
+        "episode": "감옥의 문이 열리다",
+        "series": "천마신공",
+        "genre": "martial_arts",
+        "language": "ko",
+        "wordCount": 381,
+        "scores": {
+          "relevance": 3,
+          "coherence": 2,
+          "empathy": 2,
+          "surprise": 2,
+          "creativity": 3,
+          "complexity": 2
+        }
+      },
+      {
+        "episode": "유적지의 충돌",
+        "series": "별을 삼킨 자",
+        "genre": "fantasy",
+        "language": "ko",
+        "wordCount": 1067,
+        "scores": {
+          "relevance": 4,
+          "coherence": 3,
+          "empathy": 3,
+          "surprise": 2,
+          "creativity": 4,
+          "complexity": 3
+        }
+      },
+      {
+        "episode": "[비밀의 카페]",
+        "series": "강남역 우연",
+        "genre": "romance",
+        "language": "ko",
+        "wordCount": 612,
+        "scores": {
+          "relevance": 4,
+          "coherence": 3,
+          "empathy": 3,
+          "surprise": 2,
+          "creativity": 3,
+          "complexity": 2
+        }
+      },
+      {
+        "episode": "[야간 회의의 은밀한 대화]",
+        "series": "강남역 우연",
+        "genre": "romance",
+        "language": "ko",
+        "wordCount": 472,
+        "scores": {
+          "relevance": 4,
+          "coherence": 3,
+          "empathy": 2,
+          "surprise": 2,
+          "creativity": 3,
+          "complexity": 2
+        }
+      },
+      {
+        "episode": "감옥의 어둠 속에서",
+        "series": "천마신공",
+        "genre": "martial_arts",
+        "language": "ko",
+        "wordCount": 3809,
+        "scores": {
+          "relevance": 3,
+          "coherence": 2,
+          "empathy": 2,
+          "surprise": 2,
+          "creativity": 3,
+          "complexity": 2
+        }
+      },
+      {
+        "episode": "유물 발견",
+        "series": "별을 삼킨 자",
+        "genre": "fantasy",
+        "language": "ko",
+        "wordCount": 496,
+        "scores": {
+          "relevance": 4,
+          "coherence": 3,
+          "empathy": 2,
+          "surprise": 2,
+          "creativity": 4,
+          "complexity": 3
+        }
+      },
+      {
+        "episode": "[야근의 공동 공간]",
+        "series": "강남역 우연",
+        "genre": "romance",
+        "language": "ko",
+        "wordCount": 556,
+        "scores": {
+          "relevance": 4,
+          "coherence": 3,
+          "empathy": 3,
+          "surprise": 2,
+          "creativity": 3,
+          "complexity": 2
+        }
+      },
+      {
+        "episode": "불길한 꿈 (과거의 그림자)",
+        "series": "별을 삼킨 자",
+        "genre": "fantasy",
+        "language": "ko",
+        "wordCount": 543,
+        "scores": {
+          "relevance": 4,
+          "coherence": 3,
+          "empathy": 2,
+          "surprise": 2,
+          "creativity": 4,
+          "complexity": 3
+        }
+      },
+      {
+        "episode": "별이 떨어지는 밤",
+        "series": "별을 삼킨 자",
+        "genre": "fantasy",
+        "language": "ko",
+        "wordCount": 440,
+        "scores": {
+          "relevance": 4,
+          "coherence": 3,
+          "empathy": 2,
+          "surprise": 3,
+          "creativity": 4,
+          "complexity": 2
+        }
+      },
+      {
+        "episode": "제 1 장: 로그와 침묵",
+        "series": "강남역 우연",
+        "genre": "romance",
+        "language": "ko",
+        "wordCount": 1438,
+        "scores": {
+          "overall": 3.2
+        },
+        "passed": false
+      }
+    ],
+    "summary": {
+      "ko": {
+        "n": 12,
+        "relevance": 3.6363636363636362,
+        "coherence": 2.727272727272727,
+        "empathy": 2.272727272727273,
+        "surprise": 2.090909090909091,
+        "creativity": 3.3636363636363638,
+        "complexity": 2.272727272727273,
+        "overall": 3.2
+      },
+      "ja": {
+        "n": 2,
+        "relevance": 3,
+        "coherence": 2.5,
+        "empathy": 2,
+        "surprise": 1.5,
+        "creativity": 2.5,
+        "complexity": 1.5
+      },
+      "en": {
+        "n": 2,
+        "relevance": 5,
+        "coherence": 4,
+        "empathy": 4,
+        "surprise": 3.5,
+        "creativity": 4.5,
+        "complexity": 3.5
+      }
+    }
+  }
+}
