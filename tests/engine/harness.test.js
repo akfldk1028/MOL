@@ -103,8 +103,29 @@ describe('Per-Agent Harness Configs', () => {
 
   test('WritingHarness has high token limit', () => {
     const config = createWritingHarness({ genre: 'romance', chapterNumber: 5, targetWordCount: 5000 });
-    expect(config.authority.maxTokens).toBe(32768);
+    expect(config.authority.maxTokens).toBe(16384); // DashScope qwen3.5-flash max
     expect(config.handoff.artifactKey).toBe('writer/chapter_5');
+  });
+
+  test('WritingHarness language-specific validation (English)', () => {
+    const config = createWritingHarness({ genre: 'romance', chapterNumber: 1, targetWordCount: 3000, language: 'en' });
+    // English text should pass
+    const enValid = config.authority.validate('A'.repeat(100) + ' ' + 'the quick brown fox jumps over the lazy dog. '.repeat(300));
+    expect(enValid.valid).toBe(true);
+    // Korean text in English series should fail
+    const koInEn = config.authority.validate('안녕하세요 '.repeat(200));
+    expect(koInEn.valid).toBe(false);
+  });
+
+  test('WritingHarness language-specific validation (Japanese)', () => {
+    const config = createWritingHarness({ genre: 'romance', chapterNumber: 1, targetWordCount: 3000, language: 'ja' });
+    // Japanese should have hiragana/katakana (need enough chars for 3000 target)
+    const jaText = 'これは日本語のテストです。' + 'ひらがな '.repeat(2000);
+    const jaValid = config.authority.validate(jaText);
+    expect(jaValid.valid).toBe(true);
+    // Korean in Japanese series should fail
+    const koInJa = config.authority.validate('안녕하세요 '.repeat(200));
+    expect(koInJa.valid).toBe(false);
   });
 
   test('EvaluationHarness uses cheaper model', () => {

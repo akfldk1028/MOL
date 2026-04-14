@@ -74,6 +74,7 @@ class StoryOrchestrator {
   async generateEpisode(params) {
     const { series, agentId, episodeNumber = 1, previousEpisodes = [] } = params;
     const genre = series.genre || this.genre;
+    const language = series.language || this.language || 'ko';
     const startTime = Date.now();
 
     if (!this.llmCall) throw new Error('StoryOrchestrator requires llmCall option');
@@ -238,6 +239,7 @@ class StoryOrchestrator {
         genre,
         chapterNumber: episodeNumber,
         targetWordCount: this.targetWordCount,
+        language,
         getContext: async () => composed.prompt || null,
       });
       const writeHarness = new AgentHarness(writeConfig, this.llmCall, this.sharedMemory);
@@ -258,8 +260,16 @@ class StoryOrchestrator {
       // Inject feedback from previous review cycle
       let fullWritePrompt = writePrompt;
       if (evalResult && !evalResult.artifact?.data?.passed) {
-        const fb = evalResult.artifact?.data?.feedback || evalResult.output;
+        const evalData = evalResult.artifact?.data || {};
+        const fb = evalData.feedback || evalResult.output;
         fullWritePrompt += `\n\n## Reviewer Feedback (MUST address)\n${fb}`;
+        // Reflexion pattern: structured missing/superfluous for targeted revision
+        if (evalData.missing) {
+          fullWritePrompt += `\n\n### 부족한 요소 (반드시 추가)\n${evalData.missing}`;
+        }
+        if (evalData.superfluous) {
+          fullWritePrompt += `\n\n### 불필요한 요소 (반드시 제거/축소)\n${evalData.superfluous}`;
+        }
       }
       if (auditResult && !auditResult.passed) {
         const criticals = auditResult.issues.filter(i => i.severity === 'critical');
@@ -429,6 +439,26 @@ class StoryOrchestrator {
 
       // If all passed or max retries reached, exit loop
       if (overallPassed || writeAttempt > this.maxEvalRetries) break;
+
+      // ─── Reflexion: CGB search queries from evaluation ───
+      if (this.getBrainContext && scores.searchQueries?.length > 0) {
+        try {
+          const queryResults = await Promise.all(
+            scores.searchQueries.slice(0, 2).map(q => this.getBrainContext(q).catch(() => []))
+          );
+          const extraRefs = queryResults.flat().filter(Boolean).slice(0, 3);
+          if (extraRefs.length > 0) {
+            evalHistory = {
+              ...evalHistory,
+              goodPatterns: [
+                ...evalHistory.goodPatterns,
+                ...extraRefs.map(n => `[CGB] ${n.title}: ${(n.description || '').slice(0, 150)}`),
+              ],
+            };
+            this._emit('reflexion_cgb_search', { queries: scores.searchQueries.length, results: extraRefs.length });
+          }
+        } catch {}
+      }
 
       // ─── SpotFix before full rewrite ───
       const allIssues = [

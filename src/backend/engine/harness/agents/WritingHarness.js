@@ -17,10 +17,53 @@
 
 const { createHarnessConfig } = require('../HarnessConfig');
 
+const LANG_CONFIG = {
+  ko: {
+    name: '한국어',
+    script: '한글',
+    writeRule: '반드시 100% 한국어로 작성 — 중국어/일본어/영어 단어 절대 금지',
+    failRules: [
+      'Using ANY Chinese characters (汉字) in the text — this is Korean fiction',
+      'Using Japanese (ひらがな/カタカナ) in the text',
+      'Mixing languages — the ENTIRE text must be pure Korean (한글)',
+    ],
+    validChar: /[\uAC00-\uD7AF]/,      // Hangul
+    badChars: /[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g, // Chinese + Hiragana + Katakana
+    charPerWord: 2.5,  // Korean: ~2.5 chars per "word"
+  },
+  en: {
+    name: 'English',
+    script: 'Latin alphabet',
+    writeRule: 'Write entirely in English — no Korean/Chinese/Japanese characters',
+    failRules: [
+      'Using any Korean (한글), Chinese (汉字), or Japanese characters',
+      'Mixing languages — the text must be pure English',
+    ],
+    validChar: /[a-zA-Z]/,
+    badChars: /[\uAC00-\uD7AF\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g,
+    charPerWord: 1,  // English words = actual words
+  },
+  ja: {
+    name: '日本語',
+    script: 'ひらがな・カタカナ・漢字',
+    writeRule: '必ず日本語で書く — 韓国語や純中国語は絶対禁止',
+    failRules: [
+      'Using Korean characters (한글)',
+      'Pure Chinese without Japanese (must use hiragana/katakana)',
+      'Mixing English words excessively',
+    ],
+    validChar: /[\u3040-\u309F\u30A0-\u30FF]/, // Hiragana + Katakana (Japanese markers)
+    badChars: /[\uAC00-\uD7AF]/g, // Korean only — Chinese kanji is OK in Japanese
+    charPerWord: 2,
+  },
+};
+
 function createWritingHarness(options = {}) {
   const genre = options.genre || 'romance';
   const targetWordCount = options.targetWordCount || 3000;
   const chapterNumber = options.chapterNumber || 1;
+  const language = options.language || 'ko';
+  const langCfg = LANG_CONFIG[language] || LANG_CONFIG.ko;
 
   return createHarnessConfig({
     name: 'writer',
@@ -34,7 +77,7 @@ function createWritingHarness(options = {}) {
         'End with a cliffhanger or emotional hook',
         'Maintain character voice consistency — use EXACT names from outline',
         'Show, don\'t tell — use sensory details (sight, sound, smell, touch, taste)',
-        '반드시 100% 한국어로 작성 — 중국어/일본어/영어 단어 절대 금지',
+        langCfg.writeRule,
         genre === 'romance' ? 'Build emotional tension between leads' :
         genre === 'fantasy' ? 'Vivid world-building through action' :
         genre === 'thriller' ? 'Escalating suspense and pacing' :
@@ -44,9 +87,7 @@ function createWritingHarness(options = {}) {
         'Deviating from the chapter plan outline',
         'INVENTING NEW CHARACTERS not in the outline — use ONLY provided character names',
         'Changing character names, ages, or occupations from the outline',
-        'Using ANY Chinese characters (汉字) in the text — this is Korean fiction',
-        'Using Japanese (ひらがな/カタカナ) in the text',
-        'Mixing languages — the ENTIRE text must be pure Korean (한글)',
+        ...langCfg.failRules,
         'Breaking character consistency',
         'Telling emotions instead of showing them',
         'Writing less than the minimum word count',
@@ -75,26 +116,28 @@ function createWritingHarness(options = {}) {
       maxRetries: 2,
       timeoutMs: 300_000, // 5 min for long generation
       validate: (output) => {
-        // S4: Korean text has fewer spaces — use char count as fallback
         const wordCount = output.split(/\s+/).length;
         const charCount = output.replace(/\s/g, '').length;
-        const isKorean = /[\uAC00-\uD7AF]/.test(output);
+        const hasValidScript = langCfg.validChar.test(output);
         const minWords = Math.floor(targetWordCount * 0.6);
-        // Korean: each 한글 char ≈ 1 syllable, avg word = 2-3 syllables → char/2.5
-        const effectiveCount = isKorean ? Math.max(wordCount, Math.floor(charCount / 2.5)) : wordCount;
+        // Language-aware word count (Korean/Japanese use char count, English uses word count)
+        const effectiveCount = langCfg.charPerWord > 1
+          ? Math.max(wordCount, Math.floor(charCount / langCfg.charPerWord))
+          : wordCount;
         if (effectiveCount < minWords) {
-          return { valid: false, reason: `Only ${effectiveCount} words (${charCount} chars), need at least ${minWords}` };
+          return { valid: false, reason: `Only ${effectiveCount} words (${charCount} chars), need at least ${minWords} for ${langCfg.name}` };
         }
-        // Check for common LLM failure modes
+        if (!hasValidScript) {
+          return { valid: false, reason: `No ${langCfg.script} detected — expected ${langCfg.name} text` };
+        }
+        // Meta-text check
         if (output.includes('[continue]') || output.includes('[to be continued by]')) {
           return { valid: false, reason: 'LLM broke character — meta-text detected' };
         }
-        // Check for Chinese character contamination
-        // >50 = likely entire response in Chinese (reject to retry)
-        // ≤50 = stray chars that transform will strip (accept)
-        const chineseChars = output.match(/[\u4E00-\u9FFF]/g);
-        if (chineseChars && chineseChars.length > 50) {
-          return { valid: false, reason: `Chinese characters detected (${chineseChars.length} chars) — likely Chinese text, not Korean` };
+        // Wrong-language contamination check
+        const badChars = output.match(langCfg.badChars);
+        if (badChars && badChars.length > 50) {
+          return { valid: false, reason: `Wrong-language contamination: ${badChars.length} invalid chars for ${langCfg.name}` };
         }
         return { valid: true };
       },
@@ -122,12 +165,12 @@ function createWritingHarness(options = {}) {
       artifactKey: `writer/chapter_${chapterNumber}`,
       artifactFormat: 'text',
       transform: (output) => {
-        // Post-process: always strip stray Chinese/Japanese chars (Qwen leaks these)
-        const cjkChars = output.match(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g);
+        // Language-specific cleanup: strip chars from wrong languages
+        const badChars = output.match(langCfg.badChars);
         let cleaned = output;
-        if (cjkChars && cjkChars.length > 0) {
-          console.warn(`[WritingHarness] Stripping ${cjkChars.length} CJK chars from output`);
-          cleaned = output.replace(/[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g, '');
+        if (badChars && badChars.length > 0) {
+          console.warn(`[WritingHarness:${language}] Stripping ${badChars.length} wrong-language chars`);
+          cleaned = output.replace(langCfg.badChars, '');
         }
         return {
           chapterNumber,
