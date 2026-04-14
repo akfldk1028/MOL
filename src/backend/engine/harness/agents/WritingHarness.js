@@ -116,16 +116,25 @@ function createWritingHarness(options = {}) {
       maxRetries: 2,
       timeoutMs: 300_000, // 5 min for long generation
       validate: (output) => {
-        const wordCount = output.split(/\s+/).length;
-        const charCount = output.replace(/\s/g, '').length;
-        const hasValidScript = langCfg.validChar.test(output);
+        // Pre-clean: strip wrong-language chars first, then check length
+        const cleaned = output.replace(langCfg.badChars, '');
+        const badCharsCount = (output.match(langCfg.badChars) || []).length;
+
+        // If contamination heavy, reject first (transform will strip but we want retry with cleaner output)
+        if (badCharsCount > 100) {
+          return { valid: false, reason: `Wrong-language contamination: ${badCharsCount} invalid chars for ${langCfg.name} — LLM wrote in wrong language` };
+        }
+
+        const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
+        const charCount = cleaned.replace(/\s/g, '').length;
+        const hasValidScript = langCfg.validChar.test(cleaned);
         const minWords = Math.floor(targetWordCount * 0.6);
-        // Language-aware word count (Korean/Japanese use char count, English uses word count)
+        // Language-aware word count on CLEANED text (after stripping wrong-lang chars)
         const effectiveCount = langCfg.charPerWord > 1
           ? Math.max(wordCount, Math.floor(charCount / langCfg.charPerWord))
           : wordCount;
         if (effectiveCount < minWords) {
-          return { valid: false, reason: `Only ${effectiveCount} words (${charCount} chars), need at least ${minWords} for ${langCfg.name}` };
+          return { valid: false, reason: `Only ${effectiveCount} effective words (${charCount} valid chars after cleaning), need at least ${minWords} for ${langCfg.name}` };
         }
         if (!hasValidScript) {
           return { valid: false, reason: `No ${langCfg.script} detected — expected ${langCfg.name} text` };
@@ -133,11 +142,6 @@ function createWritingHarness(options = {}) {
         // Meta-text check
         if (output.includes('[continue]') || output.includes('[to be continued by]')) {
           return { valid: false, reason: 'LLM broke character — meta-text detected' };
-        }
-        // Wrong-language contamination check
-        const badChars = output.match(langCfg.badChars);
-        if (badChars && badChars.length > 50) {
-          return { valid: false, reason: `Wrong-language contamination: ${badChars.length} invalid chars for ${langCfg.name}` };
         }
         return { valid: true };
       },
