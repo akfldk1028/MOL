@@ -94,12 +94,13 @@ class StoryOrchestrator {
 
     const outlineConfig = createOutlineHarness({
       genre,
+      language,
       getContext: brainContext.length > 0
         ? async () => brainContext.map(n => `- [${n.type}] ${n.title}: ${(n.description || '').slice(0, 80)}`).join('\n')
         : null,
     });
     const outlineHarness = new AgentHarness(outlineConfig, this.llmCall, this.sharedMemory);
-    const outlinePrompt = buildOutlinePrompt(series, { brainContext, language: this.language });
+    const outlinePrompt = buildOutlinePrompt(series, { brainContext, language });
     const outlineResult = await outlineHarness.run(outlinePrompt);
 
     if (!outlineResult.success) {
@@ -110,10 +111,10 @@ class StoryOrchestrator {
     // ─── Stage 2: Planning ───
     this._emit('stage_start', { stage: 'planning', agent: 'planner' });
 
-    const planConfig = createPlanningHarness({ genre });
+    const planConfig = createPlanningHarness({ genre, language });
     const planHarness = new AgentHarness(planConfig, this.llmCall, this.sharedMemory);
     const outlineData = outlineResult.artifact?.data || outlineResult.output;
-    const planPrompt = buildPlanningPrompt(outlineData, { language: this.language });
+    const planPrompt = buildPlanningPrompt(outlineData, { language });
     const planResult = await planHarness.run(planPrompt);
 
     if (!planResult.success) {
@@ -254,7 +255,7 @@ class StoryOrchestrator {
         premise: extraPremise,
         outline: outlineResult.output,
         targetWordCount: this.targetWordCount,
-        language: this.language,
+        language, // series.language (우선)
       });
 
       // Inject feedback from previous review cycle
@@ -418,12 +419,12 @@ class StoryOrchestrator {
       // ─── Stage 4: Evaluation (HANNA 6D) ───
       this._emit('stage_start', { stage: 'evaluation', agent: 'evaluator', attempt: writeAttempt });
 
-      const evalConfig = createEvaluationHarness({ genre });
+      const evalConfig = createEvaluationHarness({ genre, language });
       const evalHarness = new AgentHarness(evalConfig, this.llmCall, this.sharedMemory);
       const evalPrompt = buildEvaluationPrompt(
         chapterContent,
         outlineData,
-        { language: this.language },
+        { language },
       );
       evalResult = await evalHarness.run(evalPrompt);
 

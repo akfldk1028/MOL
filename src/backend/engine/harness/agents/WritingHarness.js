@@ -260,10 +260,7 @@ function buildWritingPrompt(chapterPlan, previousChapters = [], options = {}) {
     '',
     '## Ending (CRITICAL)',
     '- The LAST paragraph MUST be a cliffhanger or emotional hook',
-    '- Examples of good endings:',
-    '  - A shocking revelation: "그때 민준의 폰 화면에 뜬 이름을 보고 서연의 숨이 멎었다."',
-    '  - An unanswered question: "서연은 문고리를 잡은 채 돌아섰다. 그의 눈빛이... 웃고 있었다."',
-    '  - A dramatic reversal: "하지만 카페 문을 열고 들어선 사람은 민준이 아니었다."',
+    '- Types: shocking revelation / unanswered question / dramatic reversal',
     '- Do NOT end abruptly mid-sentence. Complete the chapter with a proper hook.',
     '',
   );
@@ -273,47 +270,112 @@ function buildWritingPrompt(chapterPlan, previousChapters = [], options = {}) {
     parts.push(`## Emotional Target: ${options.emotionTarget}`);
   }
 
-  if (options.language === 'ko') {
-    parts.push(
-      '## 언어 규칙 (절대 준수)',
-      '⛔ 절대 중국어(汉字) 사용 금지. 한자 한 글자도 포함하면 실패.',
-      '⛔ 절대 일본어(ひらがな/カタカナ) 사용 금지.',
-      '⛔ 영어 단어 삽입 금지 (고유명사 제외).',
-      '✅ 반드시 100% 한국어(한글)로만 작성하세요.',
-      '✅ 자연스러운 한국어 소설 문체. 설명문이 아닌 이야기체.',
-      '✅ 대화는 "쌍따옴표" 사용.',
-      '',
-    );
-  }
+  // Language-specific rules + title + word count + character rules
+  const lang = options.language || 'ko';
+  const LANG_PROMPT_BLOCK = {
+    ko: {
+      langRules: [
+        '## 언어 규칙 (절대 준수)',
+        '⛔ 절대 중국어(汉字) 사용 금지. 한자 한 글자도 포함하면 실패.',
+        '⛔ 절대 일본어(ひらがな/カタカナ) 사용 금지.',
+        '⛔ 영어 단어 삽입 금지 (고유명사 제외).',
+        '✅ 반드시 100% 한국어(한글)로만 작성하세요.',
+        '✅ 자연스러운 한국어 소설 문체. 설명문이 아닌 이야기체.',
+        '✅ 대화는 "쌍따옴표" 사용.',
+        '',
+      ],
+      titleInstr: [
+        '## 제목 (첫 줄)',
+        '첫 줄에 반드시 "제목: [챕터 제목]" 형식으로 제목을 작성하세요.',
+        '예: 제목: 비 오는 한강',
+        '',
+      ],
+      wordRule: [
+        '## 분량 규칙 (절대 준수)',
+        `⛔ ${wc}단어 미만이면 무조건 실패입니다. 절대 짧게 쓰지 마세요.`,
+        `✅ 최소 ${wc}단어, 목표 ${Math.floor(wc * 1.2)}단어 이상.`,
+        '✅ 각 서브이벤트를 충분히 전개하세요 — 요약하지 말고 장면을 풀어 쓰세요.',
+        '✅ 대화, 내면 독백, 감각 묘사를 풍부하게 넣으세요.',
+        '',
+      ],
+      charRule: [
+        '## 캐릭터명 규칙 (절대 준수)',
+        '⛔ 아웃라인에 없는 캐릭터를 새로 만들지 마세요.',
+        '⛔ 캐릭터 이름을 변경하거나 다른 이름으로 부르지 마세요.',
+        '✅ 위 아웃라인의 캐릭터 이름을 정확히 그대로 사용하세요.',
+        '',
+      ],
+    },
+    en: {
+      langRules: [
+        '## Language Rules (MUST FOLLOW)',
+        '⛔ NO Korean (한글), Chinese (汉字), or Japanese characters anywhere.',
+        '✅ Write in natural, flowing English prose.',
+        '✅ Use standard punctuation: "double quotes" for dialogue.',
+        '✅ Literary fiction style — show, don\'t tell.',
+        '',
+      ],
+      titleInstr: [
+        '## Title (First Line)',
+        'The first line MUST be in this exact format: "Title: [chapter title]"',
+        'Example: Title: The Midnight Stack Trace',
+        '',
+      ],
+      wordRule: [
+        '## Word Count Rule (MUST FOLLOW)',
+        `⛔ Any output below ${wc} words is an automatic failure. Do NOT write short.`,
+        `✅ Minimum ${wc} words, target ${Math.floor(wc * 1.2)}+ words.`,
+        '✅ Fully develop each sub-event — don\'t summarize, write scenes.',
+        '✅ Include dialogue, inner monologue, and sensory details.',
+        '',
+      ],
+      charRule: [
+        '## Character Name Rule (MUST FOLLOW)',
+        '⛔ Do NOT invent new characters not in the outline.',
+        '⛔ Do NOT change or rename characters.',
+        '✅ Use the EXACT character names from the outline above.',
+        '',
+      ],
+    },
+    ja: {
+      langRules: [
+        '## 言語ルール（絶対遵守）',
+        '⛔ 韓国語（한글）一切使用禁止。',
+        '⛔ 英単語の過度な混入禁止（固有名詞除く）。',
+        '✅ 必ず日本語（ひらがな・カタカナ・漢字）で執筆。',
+        '✅ 自然な日本語の小説文体。説明文ではなく物語体。',
+        '✅ 会話は「鍵括弧」を使用。',
+        '',
+      ],
+      titleInstr: [
+        '## タイトル（1行目）',
+        '1行目に必ず「タイトル: [章のタイトル]」形式で記載してください。',
+        '例: タイトル: 桜降る夜',
+        '',
+      ],
+      wordRule: [
+        '## 文字数ルール（絶対遵守）',
+        `⛔ ${wc}語未満は失敗。絶対に短く書かないでください。`,
+        `✅ 最低${wc}語、目標${Math.floor(wc * 1.2)}語以上。`,
+        '✅ 各サブイベントを十分に展開してください — 要約ではなく場面を描いてください。',
+        '✅ 対話、内心独白、感覚描写を豊富に入れてください。',
+        '',
+      ],
+      charRule: [
+        '## キャラクター名ルール（絶対遵守）',
+        '⛔ アウトラインにないキャラクターを作らないでください。',
+        '⛔ キャラクター名を変更・別名呼称しないでください。',
+        '✅ 上のアウトラインのキャラクター名を正確にそのまま使用してください。',
+        '',
+      ],
+    },
+  };
+  const block = LANG_PROMPT_BLOCK[lang] || LANG_PROMPT_BLOCK.ko;
 
-  // Title instruction
-  parts.push(
-    '## 제목 (첫 줄)',
-    '첫 줄에 반드시 "제목: [챕터 제목]" 형식으로 제목을 작성하세요.',
-    '예: 제목: 비 오는 한강',
-    '',
-  );
-
-  // Word count enforcement (repeat for emphasis — LLMs respond to repetition)
-  parts.push(
-    '## 분량 규칙 (절대 준수)',
-    `⛔ ${wc}단어 미만이면 무조건 실패입니다. 절대 짧게 쓰지 마세요.`,
-    `✅ 최소 ${wc}단어, 목표 ${Math.floor(wc * 1.2)}단어 이상.`,
-    '✅ 각 서브이벤트를 충분히 전개하세요 — 요약하지 말고 장면을 풀어 쓰세요.',
-    '✅ 대화, 내면 독백, 감각 묘사를 풍부하게 넣으세요.',
-    '',
-  );
-
-  // Character name lock
-  if (options.outline) {
-    parts.push(
-      '## 캐릭터명 규칙 (절대 준수)',
-      '⛔ 아웃라인에 없는 캐릭터를 새로 만들지 마세요.',
-      '⛔ 캐릭터 이름을 변경하거나 다른 이름으로 부르지 마세요.',
-      '✅ 위 아웃라인의 캐릭터 이름을 정확히 그대로 사용하세요.',
-      '',
-    );
-  }
+  parts.push(...block.langRules);
+  parts.push(...block.titleInstr);
+  parts.push(...block.wordRule);
+  if (options.outline) parts.push(...block.charRule);
 
   return parts.join('\n');
 }

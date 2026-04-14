@@ -114,7 +114,15 @@ function parseEvaluationOutput(raw, passThreshold = 3.5) {
         const overall = parsed.overallScore || (scoreVals.length > 0
           ? scoreVals.reduce((a, b) => a + b, 0) / scoreVals.length : 0);
         const passed = overall >= passThreshold;
-        return { ...parsed, overallScore: Math.round(overall * 10) / 10, passed, rewriteRequired: !passed };
+        return {
+          ...parsed,
+          overallScore: Math.round(overall * 10) / 10,
+          passed,
+          rewriteRequired: !passed,
+          missing: parsed.missing || '',
+          superfluous: parsed.superfluous || '',
+          searchQueries: Array.isArray(parsed.searchQueries) ? parsed.searchQueries.slice(0, 3) : [],
+        };
       }
     }
   } catch {}
@@ -138,6 +146,10 @@ function parseEvaluationOutput(raw, passThreshold = 3.5) {
   const feedbackMatch = raw.match(/(?:feedback|suggestions?|improvements?)[:\s]*([\s\S]+?)(?=##|\n\n\n|$)/i);
   feedback = feedbackMatch ? feedbackMatch[1].trim() : '';
 
+  // Extract missing/superfluous (Reflexion pattern)
+  const missingMatch = raw.match(/(?:missing|부족한\s*(?:점|요소|부분))[:\s]*([\s\S]+?)(?=##|\n\n\n|superfluous|불필요|$)/i);
+  const superfluousMatch = raw.match(/(?:superfluous|불필요한?\s*(?:점|요소|부분)|제거)[:\s]*([\s\S]+?)(?=##|\n\n\n|$)/i);
+
   // Calculate overall
   const scoreValues = Object.values(scores).filter(v => typeof v === 'number');
   const overallScore = scoreValues.length > 0
@@ -149,6 +161,9 @@ function parseEvaluationOutput(raw, passThreshold = 3.5) {
     overallScore: Math.round(overallScore * 10) / 10,
     passed: overallScore >= passThreshold,
     feedback,
+    missing: missingMatch ? missingMatch[1].trim() : '',
+    superfluous: superfluousMatch ? superfluousMatch[1].trim() : '',
+    searchQueries: [],
     rewriteRequired: overallScore < passThreshold,
     // Keep partial scores + raw for RL (even 2/6 dimensions are useful signal)
     raw: scoreValues.length < 6 ? raw : undefined,
@@ -193,25 +208,44 @@ function buildEvaluationPrompt(episodeText, outlinePlan, options = {}) {
     '{',
     '  "scores": { "relevance": N, "coherence": N, "empathy": N, "surprise": N, "creativity": N, "complexity": N },',
     '  "overallScore": N.N,',
+    '  "missing": "What important elements are absent? (plot threads, character depth, sensory details, etc.)",',
+    '  "superfluous": "What should be removed or condensed? (redundant descriptions, filler dialogue, etc.)",',
     '  "feedback": "Specific, actionable improvement suggestions with quotes from the text",',
     '  "strengths": ["what worked well"],',
-    '  "weaknesses": ["what needs improvement"]',
+    '  "weaknesses": ["what needs improvement"],',
+    '  "searchQueries": ["1-3 search queries for CGB graph to find style/knowledge references that could improve this chapter"]',
     '}',
     '```',
   ];
 
-  if (options.language === 'ko') {
-    parts.push(
-      '',
-      '## 한국어 품질 추가 기준',
+  const lang = options.language || 'ko';
+  const EVAL_LANG = {
+    ko: [
+      '', '## 한국어 품질 추가 기준',
       '- 자연스러운 한국어 문체인가? (번역체 X, 설명문 X)',
       '- 대화가 한국어 구어체로 자연스러운가?',
       '- 중국어(汉字)/일본어가 섞여 있지 않은가?',
-      '- 한국 문화/배경에 맞는 설정인가?',
-      '',
+      '- 한국 문화/배경에 맞는 설정인가?', '',
       '한국어로 평가를 작성하세요.',
-    );
-  }
+    ],
+    en: [
+      '', '## English Quality Additional Criteria',
+      '- Natural flowing English prose (not translated-sounding)?',
+      '- Dialogue reads like authentic spoken English?',
+      '- No Korean/Chinese/Japanese characters mixed in?',
+      '- Setting and culture consistent with English-speaking context?', '',
+      'Write the evaluation in English.',
+    ],
+    ja: [
+      '', '## 日本語品質追加基準',
+      '- 自然な日本語文体か？（翻訳調ではない）',
+      '- 会話が日本語の話し言葉として自然か？',
+      '- 韓国語が混ざっていないか？',
+      '- 日本の文化・背景に合った設定か？', '',
+      '日本語で評価を書いてください。',
+    ],
+  };
+  parts.push(...(EVAL_LANG[lang] || EVAL_LANG.ko));
 
   return parts.join('\n');
 }

@@ -131,9 +131,9 @@ function buildPlanningPrompt(outlineArtifact, options = {}) {
     '- Cliffhanger: [how it ends]',
   ];
 
-  if (options.language === 'ko') {
-    parts.push('', '한국어로 작성하세요.');
-  }
+  const lang = options.language || 'ko';
+  const LANG_INSTR = { ko: '한국어로 작성하세요.', en: 'Write in English.', ja: '日本語で書いてください。' };
+  parts.push('', LANG_INSTR[lang] || LANG_INSTR.ko);
 
   return parts.join('\n');
 }

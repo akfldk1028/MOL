@@ -71,10 +71,22 @@ function createOutlineHarness(options = {}) {
         }
         // Long enough output (>1000 chars) likely has enough structure even without exact pattern
         if (output.length < 1000) return { valid: true };
-        // Check for Chinese character contamination
-        const chineseChars = output.match(/[\u4E00-\u9FFF]/g);
-        if (chineseChars && chineseChars.length > 5) {
-          return { valid: false, reason: `Chinese characters detected (${chineseChars.length}) — must be pure Korean` };
+        // Language-specific contamination check
+        if (language === 'ko') {
+          const chineseChars = output.match(/[\u4E00-\u9FFF]/g);
+          if (chineseChars && chineseChars.length > 5) {
+            return { valid: false, reason: `Chinese characters detected (${chineseChars.length}) — must be pure Korean` };
+          }
+        } else if (language === 'en') {
+          const cjkChars = output.match(/[\uAC00-\uD7AF\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]/g);
+          if (cjkChars && cjkChars.length > 5) {
+            return { valid: false, reason: `CJK characters detected (${cjkChars.length}) — must be pure English` };
+          }
+        } else if (language === 'ja') {
+          const koreanChars = output.match(/[\uAC00-\uD7AF]/g);
+          if (koreanChars && koreanChars.length > 5) {
+            return { valid: false, reason: `Korean characters detected (${koreanChars.length}) — must be Japanese` };
+          }
         }
         return { valid: true };
       },
@@ -188,27 +200,36 @@ function buildOutlinePrompt(series, options = {}) {
     '- Event 11-12: Climax + Resolution (confrontation, confession, earned ending)',
   );
 
-  if (options.language === 'ko') {
-    parts.push(
-      '',
-      '## 언어 규칙 (절대 준수)',
-      '⛔ 중국어(汉字) 절대 금지 — 한자 한 글자도 사용하지 마세요.',
-      '⛔ 일본어(ひらがな/カタカナ) 절대 금지.',
+  const lang = options.language || 'ko';
+  const OUTLINE_LANG = {
+    ko: [
+      '', '## 언어 규칙 (절대 준수)',
+      '⛔ 중국어(汉字) 절대 금지.', '⛔ 일본어(ひらがな/カタカナ) 절대 금지.',
       '✅ 반드시 100% 한국어(한글)로만 작성.',
       '✅ 캐릭터 이름은 자연스러운 한국 이름 (예: 서연, 민준, 지현).',
-      '✅ 장소/배경도 한국 현실에 맞게 (서울, 부산, 강남, 홍대 등).',
-      '',
-      '## 캐릭터 시트 포맷 (반드시 포함)',
-      '각 주인공은 아래 정보를 반드시 포함:',
-      '- 이름 (한국 이름)',
-      '- 나이',
-      '- 직업',
-      '- 성격 결함 (flaws)',
-      '- 숨겨진 욕망 (hidden desire)',
-      '- 외형 특징 2-3가지',
-      '',
-    );
-  }
+      '✅ 장소/배경도 한국 현실에 맞게 (서울, 부산, 강남, 홍대 등).', '',
+      '## 캐릭터 시트 (반드시 포함)',
+      '- 이름 (한국 이름) / 나이 / 직업 / 성격 결함 / 숨겨진 욕망 / 외형 특징 2-3가지', '',
+    ],
+    en: [
+      '', '## Language Rules (MUST FOLLOW)',
+      '⛔ NO Korean (한글), Chinese (汉字), or Japanese characters.',
+      '✅ Write entirely in English.',
+      '✅ Use natural English character names.',
+      '✅ Settings can be any English-speaking country or fictional world.', '',
+      '## Character Sheet (MUST INCLUDE)',
+      '- Name / Age / Occupation / Flaws / Hidden desire / 2-3 physical traits', '',
+    ],
+    ja: [
+      '', '## 言語ルール（絶対遵守）',
+      '⛔ 韓国語（한글）絶対禁止。', '✅ 必ず日本語で執筆。',
+      '✅ キャラクター名は自然な日本名（例：さくら、はるき、美咲）。',
+      '✅ 舞台は日本または和風ファンタジー世界。', '',
+      '## キャラクターシート（必須）',
+      '- 名前（日本名）/ 年齢 / 職業 / 性格の欠点 / 隠れた欲望 / 外見特徴2-3', '',
+    ],
+  };
+  parts.push(...(OUTLINE_LANG[lang] || OUTLINE_LANG.ko));
 
   return parts.filter(Boolean).join('\n');
 }
