@@ -43,6 +43,7 @@ class AgentHarness {
     this._iteration = 0;
 
     let lastOutput = null;
+    let lastValidOutput = null; // Only set when validation passes
     let lastError = null;
 
     for (let i = 0; i < config.planning.maxIterations; i++) {
@@ -93,6 +94,9 @@ class AgentHarness {
             }
             return this._result(false, `Validation failed: ${validation.reason}`, startTime);
           }
+          lastValidOutput = output; // Mark as validated
+        } else {
+          lastValidOutput = output; // No validator = accept all
         }
 
         // 5. Control: check if should continue
@@ -120,12 +124,12 @@ class AgentHarness {
       }
     }
 
-    // Max iterations exhausted
+    // Max iterations exhausted — only success if at least one iter passed validation
     return this._result(
-      lastOutput !== null,
-      lastOutput || `Failed after ${this._iteration} iterations: ${lastError}`,
+      lastValidOutput !== null,
+      lastValidOutput || `Failed after ${this._iteration} iterations: ${lastError}`,
       startTime,
-      lastOutput ? await this._createHandoff(lastOutput) : null,
+      lastValidOutput ? await this._createHandoff(lastValidOutput) : null,
     );
   }
 
