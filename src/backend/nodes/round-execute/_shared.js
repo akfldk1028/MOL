@@ -30,10 +30,12 @@ async function generateAgentResponse({ agent, ctx, previousResponses, round }) {
   let rawContent;
 
   // ── Harness mode: IMPACT framework (validate + retry + trajectory) ──
-  if (ctx.workflowConfig?.useHarness) {
+  // Default: harness ON. Explicitly set useHarness:false in workflow.json to opt out.
+  const useHarness = ctx.workflowConfig?.useHarness !== false;
+  if (useHarness) {
     rawContent = await _harnessGenerate({ agent, ctx, previousResponses, round });
   } else {
-    // ── Legacy mode: direct LLM call ──
+    // ── Legacy mode: direct LLM call (deprecated) ──
     const result = await llmCallNode.execute(ctx, {
       agent,
       role: agent.role,

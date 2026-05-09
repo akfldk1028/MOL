@@ -53,6 +53,54 @@ const COLLECTIVE_SHOCK_PATTERNS = [
 // "~가 아니라 ~이다" 남발 패턴
 const NOT_BUT_PATTERN = /(?:이|가)\s*아니(?:라|었다)[^.。!?\n]{0,30}(?:이|였)다/g;
 
+// ─── Repetition detection helpers ───
+
+/**
+ * Normalize a Korean sentence for similarity comparison.
+ * Strips whitespace, punctuation, and quotation marks.
+ */
+function normalizeSentence(s) {
+  return (s || '')
+    .replace(/[\s"'""''「」『』.,!?…~\-—()[\]{}]/g, '')
+    .toLowerCase();
+}
+
+/**
+ * Dice coefficient on character bigrams (works well for Korean).
+ * Returns 0~1.
+ */
+function diceSimilarity(a, b) {
+  const na = normalizeSentence(a);
+  const nb = normalizeSentence(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  if (na.length < 2 || nb.length < 2) return na === nb ? 1 : 0;
+  const bigrams = (s) => {
+    const set = new Set();
+    for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+    return set;
+  };
+  const A = bigrams(na);
+  const B = bigrams(nb);
+  let inter = 0;
+  for (const g of A) if (B.has(g)) inter++;
+  return (2 * inter) / (A.size + B.size);
+}
+
+function splitSentences(content) {
+  return content
+    .split(/(?<=[.!?。…])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 5);
+}
+
+function splitParagraphs(content) {
+  return content
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+}
+
 /**
  * Validate chapter content with rule-based checks (no LLM).
  * @param {string} content
@@ -206,7 +254,89 @@ function validatePostWrite(content, genreProfile = {}) {
     });
   }
 
+  // 11. 문장 반복 (LLM 출력 폭주 차단) — ep77 "이건... 별의 힘이야" 6회 케이스
+  const sentenceCounts = new Map();
+  for (const s of sentences) {
+    if (s.length < 15) continue; // 짧은 단답형은 자연스러움 ("응", "왜?" 등)
+    const key = normalizeSentence(s);
+    if (key.length < 10) continue;
+    sentenceCounts.set(key, (sentenceCounts.get(key) || 0) + 1);
+  }
+  const repeatedSentences = [...sentenceCounts.entries()]
+    .filter(([, c]) => c >= 3)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  if (repeatedSentences.length > 0) {
+    const detail = repeatedSentences
+      .map(([k, c]) => `"${k.slice(0, 20)}..."x${c}`)
+      .join(', ');
+    violations.push({
+      rule: '문장반복',
+      severity: 'error',
+      description: `같은 문장이 3회 이상 등장 — LLM 출력 폭주 패턴: ${detail}`,
+      suggestion: '같은 의미를 다른 표현으로 교체. 캐릭터마다 다른 어휘를 쓰게 하세요.',
+    });
+  }
+
+  // 12. 마지막 단락 복붙 (Dice ≥ 0.85) — ep77 마지막 4문단 거의 동일 케이스
+  if (paragraphs.length >= 3) {
+    const tailWindow = paragraphs.slice(-Math.min(5, paragraphs.length));
+    let maxSim = 0;
+    let pair = null;
+    for (let i = 0; i < tailWindow.length; i++) {
+      for (let j = i + 1; j < tailWindow.length; j++) {
+        const a = tailWindow[i];
+        const b = tailWindow[j];
+        if (a.length < 30 || b.length < 30) continue;
+        const sim = diceSimilarity(a, b);
+        if (sim > maxSim) {
+          maxSim = sim;
+          pair = [a.slice(0, 40), b.slice(0, 40), sim];
+        }
+      }
+    }
+    if (maxSim >= 0.85) {
+      violations.push({
+        rule: '단락복붙',
+        severity: 'error',
+        description: `마지막 문단들이 거의 동일 (Dice=${maxSim.toFixed(2)}): "${pair[0]}…" ≈ "${pair[1]}…"`,
+        suggestion: '결말 단락을 다르게 다시 쓰세요. LLM 출력 끝부분 폭주 의심.',
+      });
+    }
+  }
+
+  // 13. 인접 3문단이 같은 단어로 시작 — 패턴 단조
+  if (paragraphs.length >= 3) {
+    const firstWord = (p) => {
+      const stripped = (p || '').replace(/^[\s"'""''「」『』\-—.,!?…()[\]{}]+/, '').trim();
+      return stripped.split(/[\s,.!?…\n]/)[0] || '';
+    };
+    for (let i = 0; i < paragraphs.length - 2; i++) {
+      const w1 = firstWord(paragraphs[i]);
+      const w2 = firstWord(paragraphs[i + 1]);
+      const w3 = firstWord(paragraphs[i + 2]);
+      if (w1 && w1.length >= 2 && w1 === w2 && w2 === w3) {
+        violations.push({
+          rule: '단락시작반복',
+          severity: 'warning',
+          description: `인접 3문단이 모두 "${w1}"(으)로 시작`,
+          suggestion: '문단 시작 단어를 다양하게. 시점/감각 전환으로 시작하세요.',
+        });
+        break;
+      }
+    }
+  }
+
   return violations;
 }
 
-module.exports = { validatePostWrite, SURPRISE_MARKERS, META_NARRATION_PATTERNS, REPORT_TERMS, SERMON_WORDS };
+module.exports = {
+  validatePostWrite,
+  SURPRISE_MARKERS,
+  META_NARRATION_PATTERNS,
+  REPORT_TERMS,
+  SERMON_WORDS,
+  // Test exports
+  diceSimilarity,
+  normalizeSentence,
+};

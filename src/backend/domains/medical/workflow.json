@@ -8,6 +8,7 @@
     "convergenceStrategy": "length-ratio",
     "synthesisFormat": "medical",
     "roundMode": "parallel-first",
-    "minRounds": 3
+    "minRounds": 3,
+    "useHarness": true
   }
 }

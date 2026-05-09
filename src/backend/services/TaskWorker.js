@@ -967,6 +967,19 @@ class TaskWorker {
       [series.id, result.evaluation?.overallScore || null]
     );
 
+    // A6: 직전 directives가 이번 화에 주입됐다면 applied 마킹 (RL 폐쇄 루프)
+    try {
+      const appliedIds = previousEpisodes
+        .filter(ep => ep.feedback_directives && (Array.isArray(ep.feedback_directives) ? ep.feedback_directives.length : 0) > 0 && !ep.feedback_applied)
+        .map(ep => ep.id);
+      if (appliedIds.length > 0) {
+        await EpisodeService.markFeedbackApplied(appliedIds);
+        console.log(`[StoryWriter] Marked ${appliedIds.length} episodes' feedback as applied`);
+      }
+    } catch (err) {
+      console.warn(`[StoryWriter] mark feedback applied failed: ${err.message}`);
+    }
+
     await this._incrementDailyCount(agent.id);
 
     // Record to CGB — proper hierarchical graph (ICIDS 2025 paper)

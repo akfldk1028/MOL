@@ -56,7 +56,18 @@ class ContextComposer {
 
   addCharacterSheet(characterSheet) {
     if (characterSheet) {
-      this._add('L1', 'truth/character_sheet', 'Character names and traits — MUST use exactly', `## Character Sheet (MUST USE)\n${characterSheet}`);
+      const enforced = [
+        '## Character Sheet — STRICT NAME LOCK',
+        '',
+        characterSheet,
+        '',
+        '⚠️ CRITICAL RULES:',
+        '- 위 명단에 있는 이름만 사용한다. 새로운 인물을 도입하지 않는다.',
+        '- 보조 인물이 필요하면 위 명단의 기존 인물을 활용한다.',
+        '- 단역(상점주인, 행인 등)은 이름 없이 역할로만 호칭한다.',
+        '- 위반 시 챕터는 거부되고 재생성된다.',
+      ].join('\n');
+      this._add('L1', 'truth/character_sheet', 'Character names and traits — MUST use exactly. NEVER introduce new characters.', enforced);
     }
   }
 
@@ -120,6 +131,29 @@ class ContextComposer {
       parts.push(`Episode ${ep.episode_number}: "${ep.title}" — ${(ep.script_content || '').slice(0, 300)}...`);
     }
     this._add('L3', 'episodes/history', 'Recent episode summaries for continuity', parts.join('\n'));
+  }
+
+  /**
+   * A6: 직전 에피소드들의 비평 distill directives를 다음 에피소드 시스템 프롬프트에 자동 주입.
+   * episode_feedback.directives 가 episodes 컬럼 feedback_directives 로 join 되어 있다고 가정.
+   * @param {Array<object>} episodes - previousEpisodes (가장 최근 화 마지막)
+   */
+  addFeedbackDirectives(episodes) {
+    if (!episodes || episodes.length === 0) return;
+    const recent = episodes.slice(-5);
+    const directives = [];
+    for (const ep of recent) {
+      const eps = ep.feedback_directives;
+      if (!eps) continue;
+      const arr = Array.isArray(eps) ? eps : (typeof eps === 'string' ? (() => { try { return JSON.parse(eps); } catch { return [eps]; } })() : []);
+      for (const d of arr) {
+        if (typeof d === 'string' && d.trim()) directives.push(d.trim());
+      }
+    }
+    if (directives.length === 0) return;
+    const dedup = [...new Set(directives)].slice(0, 8);
+    const text = '## 비평 피드백 — 이번 화에서 반드시 반영\n' + dedup.map((d, i) => `${i + 1}. ${d}`).join('\n');
+    this._add('L3', 'rl/feedback_directives', 'Distilled critic directives from previous episodes — must apply', text);
   }
 
   // ─── L4: Current Task ───

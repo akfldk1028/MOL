@@ -197,8 +197,24 @@ class StoryOrchestrator {
 
       // L1: Hard facts
       composer.addTruthFiles(truthFiles, 3000);
-      composer.addCharacterSheet(this._seriesContext?.characterSheet);
-      composer.addWorldSetting(this._seriesContext?.worldSetting);
+      // A4: character_sheet fallback chain — _seriesContext > truthFiles.characters > previousEpisodes 추출
+      let characterSheet = this._seriesContext?.characterSheet;
+      if (!characterSheet || characterSheet.trim().length < 10) {
+        // Fallback 1: truthFiles.characters (TruthManager가 ep1에서 자동 생성/적재)
+        if (truthFiles && truthFiles.characters) {
+          const chars = typeof truthFiles.characters === 'string'
+            ? truthFiles.characters
+            : Array.isArray(truthFiles.characters)
+              ? truthFiles.characters.map(c => `- ${c.name}: ${c.role || ''} ${c.personality || ''}`.trim()).join('\n')
+              : JSON.stringify(truthFiles.characters);
+          if (chars && chars.trim().length > 10) {
+            characterSheet = chars;
+            this._emit('character_sheet_fallback', { source: 'truthFiles' });
+          }
+        }
+      }
+      composer.addCharacterSheet(characterSheet);
+      composer.addWorldSetting(this._seriesContext?.worldSetting || truthFiles?.worldSetting);
 
       // L2: Author intent
       composer.addSynopsis(series.synopsis);
@@ -208,6 +224,7 @@ class StoryOrchestrator {
       // L3: Planning
       composer.addRLFeedback(evalHistory);
       composer.addPreviousEpisodes(previousEpisodes);
+      composer.addFeedbackDirectives(previousEpisodes); // A6: critic directives 자동 주입
 
       // L4: Current task
       composer.addStateTracker(this.stateTracker.getSummary());
@@ -322,7 +339,7 @@ class StoryOrchestrator {
       this._emit('stage_complete', { stage: 'writing', attempt: writeAttempt, wordCount: rawWordCount });
 
       // ─── Review Cycle Step 0: PostWrite Validation (rule-based, no LLM) ───
-      const postWriteViolations = validatePostWrite(chapterContent, genreProfile);
+      let postWriteViolations = validatePostWrite(chapterContent, genreProfile);
       if (postWriteViolations.length > 0) {
         const errors = postWriteViolations.filter(v => v.severity === 'error');
         this._emit('postwrite_violations', { total: postWriteViolations.length, errors: errors.length });
@@ -335,7 +352,23 @@ class StoryOrchestrator {
               this._emit('stage_complete', { stage: 'spotfix_postwrite', patches: fixResult.patchCount });
             }
           } catch (err) {
-            console.warn('[StoryOrchestrator] SpotFix postwrite error:', err.message);
+            this._emit('spotfix_postwrite_error', { error: err.message, attempt: writeAttempt });
+          }
+          // SpotFix 후 재검증 — errors 남아있으면 silent pass 금지. 다음 attempt로 full rewrite.
+          postWriteViolations = validatePostWrite(chapterContent, genreProfile);
+          const remainingErrors = postWriteViolations.filter(v => v.severity === 'error');
+          if (remainingErrors.length > 0) {
+            this._emit('postwrite_unresolved', {
+              attempt: writeAttempt,
+              errors: remainingErrors.map(v => ({ rule: v.rule, description: v.description })),
+            });
+            if (writeAttempt > this.maxEvalRetries) {
+              return this._fail('postwrite_unresolved', {
+                violations: remainingErrors,
+                message: `PostWrite errors unresolved after ${writeAttempt} attempts`,
+              }, startTime);
+            }
+            continue; // while loop 다음 writeAttempt로 — full rewrite
           }
         }
       }
@@ -358,6 +391,36 @@ class StoryOrchestrator {
             this._emit('stage_complete', { stage: 'length_normalize', before: currentWordCount, after: normResult.wordCount, mode: normResult.mode });
           }
           if (normResult.warning) this._emit('length_warning', { warning: normResult.warning });
+
+          // A5: 명백히 폭주(매우 짧거나 매우 길)할 때만 hard fail.
+          // 미미한 어긋남은 warning으로만 emit (LLM 응답 변동성 흡수).
+          const finalCount = countKoreanWords(chapterContent);
+          const severelyTooShort = finalCount < 100; // truncation/empty output
+          const severelyTooLong = finalCount > lengthSpec.hardMax * 2;
+          if (severelyTooShort || severelyTooLong) {
+            this._emit('length_hard_fail', {
+              attempt: writeAttempt,
+              finalCount,
+              hardRange: [lengthSpec.hardMin, lengthSpec.hardMax],
+              reason: severelyTooShort ? 'severely_short' : 'severely_long',
+            });
+            if (writeAttempt > this.maxEvalRetries) {
+              return this._fail('length_hard_fail', {
+                finalCount,
+                hardMin: lengthSpec.hardMin,
+                hardMax: lengthSpec.hardMax,
+                message: `Length severely outside range after ${writeAttempt} attempts: ${finalCount}`,
+              }, startTime);
+            }
+            continue;
+          } else if (finalCount < lengthSpec.hardMin || finalCount > lengthSpec.hardMax) {
+            // 살짝 어긋날 때는 warning만 emit하고 진행 (production evals가 따로 점검)
+            this._emit('length_warning_hardrange', {
+              attempt: writeAttempt,
+              finalCount,
+              hardRange: [lengthSpec.hardMin, lengthSpec.hardMax],
+            });
+          }
         } catch (err) {
           console.warn('[StoryOrchestrator] LengthNormalizer error:', err.message);
         }

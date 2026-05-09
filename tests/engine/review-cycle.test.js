@@ -328,10 +328,81 @@ describe('PostWriteValidator', () => {
   });
 
   test('clean text has no violations', () => {
-    const content = '서연은 카페에 앉아 커피를 마셨다. 창밖으로 비가 내렸다. 민준이 문을 열고 들어왔다. 그의 눈이 서연을 향했다. ' +
-      '미소가 번졌다. 서연의 심장이 빠르게 뛰었다. 자리에 앉으며 메뉴를 훑었다. '.repeat(5);
+    const content = [
+      '서연은 카페에 앉아 커피를 마셨다. 창밖으로 비가 내렸다.',
+      '민준이 문을 열고 들어왔다. 그의 눈이 서연을 향했다.',
+      '미소가 번졌다. 서연의 심장이 빠르게 뛰었다.',
+      '자리에 앉으며 메뉴를 훑었다. 바리스타가 다가왔다.',
+      '"뭐 드릴까요?" 그가 친절하게 물었다. 민준은 잠시 고민했다.',
+      '비는 더 세차게 쏟아졌고, 거리에는 우산을 펼친 사람들로 가득했다.',
+      '서연은 컵을 두 손으로 감쌌다. 따뜻한 온기가 손가락 끝까지 퍼졌다.',
+      '"오래 기다렸어?" 민준이 물었다. 그녀는 천천히 고개를 저었다.',
+    ].join('\n\n');
     const v = validatePostWrite(content);
     expect(v.length).toBe(0);
+  });
+
+  // ─── Repetition / structural defect rules (LLM output runaway guards) ───
+
+  test('rule 11: blocks any sentence repeated 3+ times in body', () => {
+    const filler = '인물 A가 거리를 걸었다. 바람이 차게 불었다. ';
+    const repeated = '"같은 의미의 긴 대사가 본문 안에서 자꾸 등장한다."';
+    const content = [filler, repeated, filler, repeated, filler, repeated, repeated].join('\n\n');
+    const v = validatePostWrite(content);
+    const rule = v.find(x => x.rule === '문장반복');
+    expect(rule).toBeDefined();
+    expect(rule.severity).toBe('error');
+  });
+
+  test('rule 11: short interjections ("응", "왜?") do NOT trigger', () => {
+    const content = [
+      '인물 A가 말했다. "오랜만이야."', '"응"',
+      '인물 B가 답했다. "잘 지냈어?"', '"응"',
+      '인물 A가 미소를 지었다. "여전하네."', '"응"',
+    ].join('\n\n');
+    const v = validatePostWrite(content);
+    expect(v.find(x => x.rule === '문장반복')).toBeUndefined();
+  });
+
+  test('rule 12: blocks near-duplicate trailing paragraphs (Dice >= 0.85)', () => {
+    const intro = '인물 A가 무엇인가를 만지작거렸다. 시선이 흔들렸다.\n\n' +
+      '인물 B가 옆에서 지켜보고 있었다. 무언가 말하려 했다.\n\n' +
+      '바람이 차게 불어왔다.\n\n';
+    const dupePara = '인물 B가 다시 한 번 이름을 불렀다. 인물 A는 고개를 돌리지 않고 손에 든 것만 바라보았다. 시야가 흐릿하게 반짝이고 있었다.';
+    const content = intro + dupePara + '\n\n' + dupePara + '!\n\n' + dupePara;
+    const v = validatePostWrite(content);
+    const rule = v.find(x => x.rule === '단락복붙');
+    expect(rule).toBeDefined();
+    expect(rule.severity).toBe('error');
+  });
+
+  test('rule 12: paraphrased paragraphs (similar idea, different words) do NOT trigger', () => {
+    const content = [
+      '햇살이 창을 통해 들어왔다. 인물 A는 눈을 뜨고 천장을 바라보았다.',
+      '아침이 밝자 인물 A는 침대에서 일어났다. 창밖으로 새가 날아갔다.',
+      '커튼 사이로 빛이 새어 들어왔다. 인물 A는 기지개를 켜며 하품했다.',
+    ].join('\n\n');
+    const v = validatePostWrite(content);
+    expect(v.find(x => x.rule === '단락복붙')).toBeUndefined();
+  });
+
+  test('rule 13: detects 3 adjacent paragraphs starting with same word', () => {
+    const content = [
+      '인물 A가 거리에 들어선 카페 문 앞에서 잠시 망설였다. 안에서 따뜻한 빛이 새어 나오고 있었다.',
+      '바리스타가 카운터 너머로 인사를 건넸다. 인물 A는 어색한 미소를 지으며 고개를 끄덕였다.',
+      '인물 A가 창가 자리로 다가갔다. 의자를 끌어당기는 소리가 작게 울렸다.',
+      '인물 A가 가방을 내려놓고 의자에 앉았다. 잠시 숨을 고르며 창밖을 바라보았다.',
+      '인물 A가 메뉴판을 펼쳐 천천히 훑어보았다. 글자 하나하나가 흐릿하게 눈에 들어왔다.',
+    ].join('\n\n');
+    const v = validatePostWrite(content);
+    expect(v.find(x => x.rule === '단락시작반복')).toBeDefined();
+  });
+
+  test('diceSimilarity returns 1 for identical, low for unrelated, high for paraphrase', () => {
+    const { diceSimilarity } = require('../../src/backend/engine/harness/agents/PostWriteValidator');
+    expect(diceSimilarity('인물 A가 손을 들었다', '인물 A가 손을 들었다')).toBe(1);
+    expect(diceSimilarity('도시의 한 카페', '바닷가의 절벽')).toBeLessThan(0.3);
+    expect(diceSimilarity('인물 A가 손을 들었다', '인물 A가 손을 올렸다')).toBeGreaterThan(0.6);
   });
 });
 

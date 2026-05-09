@@ -7,7 +7,22 @@ const OUTLINE_RESPONSE = 'Event 1: 만남\nSetting: 한강\nCharacters: 서연, 
 
 const PLAN_RESPONSE = 'Chapter 1: 만남과 오해\n- Sub-events: E1+E2\n- Cliffhanger: 복도 마주침\n\nChapter 2: 팀워크\n- Sub-events: E3+E4\n- Cliffhanger: 야근 후\n\nChapter 3: 위기와 고백\n- Sub-events: E5+E6\n- Cliffhanger: 고백';
 
-const WRITE_RESPONSE = '서연은 한강 둔치를 달리고 있었다. ' + '이어폰에서 흘러나오는 음악에 맞춰 발걸음을 옮기는 순간 누군가와 정면으로 부딪혔다. '.repeat(25) + '\n\n민준은 웃었다. 괜찮아요. 서연의 가슴이 뛰었다. ' + '월요일 아침 팀장의 메일을 확인하다가 눈이 커졌다. '.repeat(15) + '\n\n서연은 고개를 돌렸다. 심장이 너무 빨리 뛰었다.';
+// Mock body: WritingHarness 검증(>=300 effective words 한국어)을 통과하도록 충분히 길고, 룰 11/12/13 모두 통과
+const WRITE_BODY_PARTS = [
+  '서연은 한강 둔치를 따라 천천히 달리고 있었다. 이어폰에서 흘러나오는 잔잔한 음악이 그녀의 발걸음을 가볍게 만들었다. 오랜만에 느껴보는 자유로운 아침이었고, 머리를 비울 시간이 절실히 필요했던 시점이었다.',
+  '강물 위로 부서지는 햇살이 눈부셨다. 갈매기 두어 마리가 낮게 날아 그녀의 머리 위를 스쳤고, 서연은 흠칫 놀라며 속도를 늦췄다. 오랫동안 잊고 지냈던 평온한 감각이 가슴 속에서 천천히 되살아나고 있었다.',
+  '바로 그 순간이었다. 정면에서 달려오던 누군가와 어깨가 부딪혔고, 손에 들고 있던 텀블러가 바닥에 떨어지면서 뚜껑이 열렸다. 따뜻한 커피 향이 차가운 아침 공기 속으로 부드럽게 퍼져 나갔다.',
+  '서연은 황급히 몸을 일으켰다. 미안하다는 낮고 차분한 목소리가 들려왔고, 고개를 들자 한 남자가 미안한 표정으로 그녀를 바라보고 있었다. 단정한 차림에 숨이 약간 차오른 모습이 인상적이었다.',
+  '두 사람의 시선이 잠깐 맞닿았다. 어색한 침묵이 흘렀고, 강바람이 그녀의 머리카락을 가볍게 흔들었다. 서연은 자기도 모르게 살짝 미소를 지었고, 그 모습이 상대방에게도 전해진 것 같았다.',
+  '괜찮다고 그녀가 어깨를 으쓱하며 답했다. 입꼬리는 살짝 올라갔지만 가슴은 의외로 빠르게 뛰고 있었다. 그가 떨어진 텀블러를 주워 건네며 새로 사드리겠다는 말을 진지한 표정으로 꺼냈다.',
+  '아니에요, 정말 괜찮다고 그녀가 손을 저었다. 저도 한눈팔고 있었으니까요. 두 사람은 짧은 인사만 나누고 다시 각자의 길을 갔지만, 그 짧은 만남이 묘하게 머릿속에서 떠나지 않았다.',
+  '출근길마다 한강이 떠올랐고, 사무실 카페에서 텀블러를 볼 때마다 그 얼굴이 자연스럽게 스쳤다. 이름조차 모르는 사람이었지만 어쩐지 한 번쯤은 다시 마주칠 것 같다는 막연한 예감이 그녀를 붙잡았다.',
+  '월요일 아침, 팀장이 보낸 메일을 열었다. 새 프로젝트의 파트너가 배정됐다는 내용이었고, 첨부된 명단을 확인하던 그녀의 손가락이 잠시 허공에 멈춰 섰다. 익숙한 이름이 거기 적혀 있었다.',
+  '회의실 문을 밀고 들어서자 한 사람이 먼저 앉아 있었다. 그날 한강에서 부딪혔던 그였다. 그는 서연을 보고 잠깐 놀란 듯하더니 곧 자연스러운 미소를 지으며 자리에서 일어났다.',
+  '어색함과 반가움이 동시에 그녀의 얼굴을 스쳤다. 또 만났다는 말을 서로가 거의 동시에 꺼낼 뻔했다. 민준이 자리에서 일어나며 정중하게 인사를 건넸고, 서연은 가방을 내려놓으며 마주 인사했다.',
+  '잘 부탁드린다고 그녀가 손을 내밀었다. 두 사람의 손끝이 살짝 닿는 순간, 어디선가 알 수 없는 작은 떨림이 가슴까지 전해졌다. 회의실 창밖으로는 어느새 봄비가 조용히 내리기 시작하고 있었다.',
+];
+const WRITE_RESPONSE = WRITE_BODY_PARTS.join('\n\n');
 
 const EVAL_RESPONSE = '```json\n{"scores":{"relevance":4,"coherence":4,"empathy":5,"surprise":3,"creativity":4,"complexity":3},"overallScore":3.8,"feedback":"Good chemistry.","passed":true}\n```';
 
@@ -115,6 +130,75 @@ describe('StoryOrchestrator', () => {
 
     expect(result.success).toBe(true);
     expect(story.stateTracker.getActiveCharacters().length).toBe(1);
+  });
+
+  // ─── A6: feedback_directives 자동 주입 ───
+  test('A6: previousEpisodes의 feedback_directives가 WritingHarness 시스템 프롬프트에 주입된다', async () => {
+    const captured = [];
+    const recordedLLM = async (system, user, opts) => {
+      captured.push({ system: system.slice(0, 200), userHead: (user || '').slice(0, 1500) });
+      if (system.includes('outline architect')) return OUTLINE_RESPONSE;
+      if (system.includes('structure architect')) return PLAN_RESPONSE;
+      if (system.includes('Creative fiction writer')) return WRITE_RESPONSE;
+      if (system.includes('literary critic')) return EVAL_RESPONSE;
+      if (system.includes('continuity auditor')) return '[]';
+      if (system.includes('story state tracker') || system.includes('story architect')) return '{}';
+      if (system.includes('챕터 길이 조정기')) return WRITE_RESPONSE;
+      if (system.includes('수정 편집자')) return '';
+      return 'fallback';
+    };
+    const story = new StoryOrchestrator({
+      genre: 'romance', language: 'ko', targetWordCount: 500,
+      llmCall: recordedLLM,
+    });
+    const previousEpisodes = [
+      {
+        id: 'ep1-id', episode_number: 1, title: 'ep1', script_content: '서연 본문',
+        feedback_directives: [
+          '대사를 더 짧고 리드미컬하게 다듬어라',
+          '내면 독백을 줄이고 행동으로 보여줘라',
+        ],
+        feedback_applied: false,
+      },
+    ];
+    const result = await story.generateEpisode({
+      series: { title: '테스트', genre: 'romance', synopsis: 'test' },
+      episodeNumber: 2,
+      previousEpisodes,
+    });
+    expect(result.success).toBe(true);
+    // WritingHarness 호출의 user 프롬프트에 directive 텍스트가 들어가야 함
+    const writeCall = captured.find(c => c.system.includes('Creative fiction writer'));
+    expect(writeCall).toBeDefined();
+    expect(writeCall.userHead).toMatch(/대사를 더 짧고|내면 독백을 줄이고|비평 피드백/);
+  });
+
+  test('A6: feedback_directives 없으면 RL 섹션 미주입(부작용 0)', async () => {
+    const captured = [];
+    const recordedLLM = async (system, user, opts) => {
+      captured.push({ system: system.slice(0, 200), userHead: (user || '').slice(0, 1500) });
+      if (system.includes('outline architect')) return OUTLINE_RESPONSE;
+      if (system.includes('structure architect')) return PLAN_RESPONSE;
+      if (system.includes('Creative fiction writer')) return WRITE_RESPONSE;
+      if (system.includes('literary critic')) return EVAL_RESPONSE;
+      if (system.includes('continuity auditor')) return '[]';
+      if (system.includes('story state tracker') || system.includes('story architect')) return '{}';
+      if (system.includes('챕터 길이 조정기')) return WRITE_RESPONSE;
+      if (system.includes('수정 편집자')) return '';
+      return 'fallback';
+    };
+    const story = new StoryOrchestrator({
+      genre: 'romance', language: 'ko', targetWordCount: 500,
+      llmCall: recordedLLM,
+    });
+    const result = await story.generateEpisode({
+      series: { title: '테스트', genre: 'romance', synopsis: 'test' },
+      episodeNumber: 1,
+      previousEpisodes: [],
+    });
+    expect(result.success).toBe(true);
+    const writeCall = captured.find(c => c.system.includes('Creative fiction writer'));
+    expect(writeCall.userHead).not.toMatch(/비평 피드백 — 이번 화에서 반드시 반영/);
   });
 });
 

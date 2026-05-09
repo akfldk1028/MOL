@@ -7,6 +7,7 @@
     "maxRounds": 3,
     "convergenceStrategy": "round-limit",
     "synthesisFormat": "critique-novel",
-    "roundMode": "parallel-first"
+    "roundMode": "parallel-first",
+    "useHarness": true
   }
 }
