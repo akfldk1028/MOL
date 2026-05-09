@@ -95,6 +95,20 @@ function createEvaluationHarness(options = {}) {
  * Parse LLM evaluation output into structured scores.
  * HANNA dimensions: Relevance, Coherence, Empathy, Surprise, Creativity, Complexity
  */
+/**
+ * B5: novelty metric — surprise + creativity + complexity 평균.
+ * 라이브 evals 평균 1.9~2.4로 매우 낮음. 3.0 미만이면 "지루한 본문" 판정.
+ * @param {object} scores
+ * @returns {number|null} 점수 평균 또는 측정 불가 시 null
+ */
+function computeNoveltyMetric(scores) {
+  if (!scores || typeof scores !== 'object') return null;
+  const keys = ['surprise', 'creativity', 'complexity'];
+  const vals = keys.map(k => parseFloat(scores[k])).filter(v => !isNaN(v) && v > 0);
+  if (vals.length === 0) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
 function parseEvaluationOutput(raw, passThreshold = 3.5) {
   const dimensions = ['relevance', 'coherence', 'empathy', 'surprise', 'creativity', 'complexity'];
   const scores = {};
@@ -113,12 +127,20 @@ function parseEvaluationOutput(raw, passThreshold = 3.5) {
         const scoreVals = Object.values(parsed.scores).filter(v => typeof v === 'number');
         const overall = parsed.overallScore || (scoreVals.length > 0
           ? scoreVals.reduce((a, b) => a + b, 0) / scoreVals.length : 0);
-        const passed = overall >= passThreshold;
+        // B5: surprise + creativity + complexity 평균 (novelty metric) ≥ 3.0 강제.
+        // 라이브 evals 결과 surprise 1.91, complexity 2.37 — 단순 overall ≥ 3.5만으로는
+        // "지루하지만 통과" 본문이 빠져나감. AND 조건으로 막음.
+        const noveltyMetric = computeNoveltyMetric(parsed.scores);
+        const overallPass = overall >= passThreshold;
+        const noveltyPass = noveltyMetric === null || noveltyMetric >= 3.0;
+        const passed = overallPass && noveltyPass;
         return {
           ...parsed,
           overallScore: Math.round(overall * 10) / 10,
+          noveltyMetric: noveltyMetric !== null ? Math.round(noveltyMetric * 10) / 10 : null,
           passed,
           rewriteRequired: !passed,
+          failReason: !overallPass ? 'overall_below_threshold' : !noveltyPass ? 'novelty_below_3' : null,
           missing: parsed.missing || '',
           superfluous: parsed.superfluous || '',
           searchQueries: Array.isArray(parsed.searchQueries) ? parsed.searchQueries.slice(0, 3) : [],
@@ -156,15 +178,24 @@ function parseEvaluationOutput(raw, passThreshold = 3.5) {
     ? scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length
     : 0;
 
+  // B5: novelty metric (surprise + creativity + complexity) ≥ 3.0 AND 조건
+  const noveltyMetric = computeNoveltyMetric(scores);
+  const overallPass = overallScore >= passThreshold;
+  const noveltyPass = noveltyMetric === null || noveltyMetric >= 3.0;
+  const passedFinal = overallPass && noveltyPass;
+
   return {
     scores,
     overallScore: Math.round(overallScore * 10) / 10,
-    passed: overallScore >= passThreshold,
+    noveltyMetric: noveltyMetric !== null ? Math.round(noveltyMetric * 10) / 10 : null,
+    passed: passedFinal,
     feedback,
     missing: missingMatch ? missingMatch[1].trim() : '',
     superfluous: superfluousMatch ? superfluousMatch[1].trim() : '',
     searchQueries: [],
-    rewriteRequired: overallScore < passThreshold,
+    rewriteRequired: !passedFinal,
+    failReason: !overallPass ? 'overall_below_threshold' : !noveltyPass ? 'novelty_below_3' : null,
+    _legacyPassed: overallScore >= passThreshold, // backward compat
     // Keep partial scores + raw for RL (even 2/6 dimensions are useful signal)
     raw: scoreValues.length < 6 ? raw : undefined,
     strengths: [],
@@ -250,4 +281,4 @@ function buildEvaluationPrompt(episodeText, outlinePlan, options = {}) {
   return parts.join('\n');
 }
 
-module.exports = { createEvaluationHarness, parseEvaluationOutput, buildEvaluationPrompt };
+module.exports = { createEvaluationHarness, parseEvaluationOutput, buildEvaluationPrompt, computeNoveltyMetric };

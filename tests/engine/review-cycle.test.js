@@ -404,6 +404,79 @@ describe('PostWriteValidator', () => {
     expect(diceSimilarity('도시의 한 카페', '바닷가의 절벽')).toBeLessThan(0.3);
     expect(diceSimilarity('인물 A가 손을 들었다', '인물 A가 손을 올렸다')).toBeGreaterThan(0.6);
   });
+
+  // ─── B4: Rule 14 Cliffhanger 부족 (Phase B) ───
+  test('rule 14: 마지막 단락에 cliffhanger 부호 없으면 warning', () => {
+    const content = [
+      '인물 A는 카페에 앉아 천천히 커피를 마셨다. 창밖은 평온했고 햇살이 따뜻하게 들어왔다.',
+      '인물 B가 들어와 미소를 지었다. "오랜만이야." 그가 인사를 건넸다.',
+      '두 사람은 이야기를 나누었다. 시간은 천천히 흘렀고 모든 것이 안정되었다.',
+      '하루는 그렇게 평화롭게 마쳤다. 둘은 서로의 안부를 묻고 약속을 잡았다.',
+    ].join('\n\n');
+    const v = validatePostWrite(content);
+    const rule = v.find(x => x.rule === 'cliffhanger부족');
+    expect(rule).toBeDefined();
+    expect(rule.severity).toBe('warning');
+  });
+
+  test('rule 14: 마지막 단락에 ? 있으면 통과', () => {
+    const content = [
+      '인물 A는 어둠 속에서 발걸음을 옮겼다. 안개가 짙게 깔려 있었고 시야는 흐릿했다.',
+      '저 멀리서 누군가의 그림자가 다가왔다. 그는 숨을 죽이고 그림자를 응시했다.',
+      '"누구냐." 그가 낮은 목소리로 물었다. 그림자는 멈춰 섰지만 답하지 않았다.',
+      '심장이 빠르게 뛰었다. 도대체 저 그림자의 정체는 무엇일까?',
+    ].join('\n\n');
+    const v = validatePostWrite(content);
+    expect(v.find(x => x.rule === 'cliffhanger부족')).toBeUndefined();
+  });
+
+  test('rule 14: 마지막 단락에 "다음 순간" 전환어 있으면 통과', () => {
+    const content = [
+      '인물 A는 천천히 문을 열었다. 어둠이 가득한 방 안에서 무언가가 움직이는 소리가 들렸다.',
+      '한 발을 내디뎠다. 발끝에 닿은 차가운 감촉이 등줄기를 타고 올랐다.',
+      '그가 손을 뻗어 벽을 더듬었다. 스위치를 찾아야 했다. 다음 순간 모든 것이 바뀌었다.',
+    ].join('\n\n');
+    const v = validatePostWrite(content);
+    expect(v.find(x => x.rule === 'cliffhanger부족')).toBeUndefined();
+  });
+});
+
+// ─── B5: EvaluationHarness novelty metric ───
+const { parseEvaluationOutput, computeNoveltyMetric } = require('../../src/backend/engine/harness/agents/EvaluationHarness');
+
+describe('EvaluationHarness — B5 novelty metric', () => {
+  test('computeNoveltyMetric: surprise+creativity+complexity 평균', () => {
+    expect(computeNoveltyMetric({ surprise: 3, creativity: 3, complexity: 3 })).toBe(3);
+    expect(computeNoveltyMetric({ surprise: 2, creativity: 4, complexity: 3 })).toBe(3);
+    expect(computeNoveltyMetric({ surprise: 1, creativity: 2, complexity: 1 })).toBeCloseTo(1.33, 1);
+    expect(computeNoveltyMetric(null)).toBe(null);
+    expect(computeNoveltyMetric({})).toBe(null);
+  });
+
+  test('overall ≥ 3.5 이지만 novelty < 3.0 이면 fail (B5 신규 차단)', () => {
+    // 라이브 평균 패턴: 칭찬은 받지만 surprise/creativity 낮음 → "지루하지만 통과" 케이스
+    const raw = '```json\n{"scores":{"relevance":4.5,"coherence":4,"empathy":4,"surprise":1.5,"creativity":2,"complexity":2.5},"overallScore":3.6,"feedback":"OK","passed":true}\n```';
+    const result = parseEvaluationOutput(raw, 3.5);
+    expect(result.passed).toBe(false);
+    expect(result.failReason).toBe('novelty_below_3');
+    expect(result.noveltyMetric).toBe(2);
+    expect(result._legacyPassed === undefined || result._legacyPassed).toBeTruthy(); // overall은 통과
+  });
+
+  test('overall ≥ 3.5 + novelty ≥ 3.0 이면 pass', () => {
+    const raw = '```json\n{"scores":{"relevance":4,"coherence":4,"empathy":4,"surprise":3.5,"creativity":3.5,"complexity":3},"overallScore":3.7,"feedback":"Good"}\n```';
+    const result = parseEvaluationOutput(raw, 3.5);
+    expect(result.passed).toBe(true);
+    expect(result.failReason).toBeFalsy();
+    expect(result.noveltyMetric).toBeCloseTo(3.3, 1);
+  });
+
+  test('overall < 3.5 이면 novelty 무관 fail', () => {
+    const raw = '```json\n{"scores":{"relevance":3,"coherence":3,"empathy":3,"surprise":3.5,"creativity":3.5,"complexity":3.5},"overallScore":3.25,"feedback":""}\n```';
+    const result = parseEvaluationOutput(raw, 3.5);
+    expect(result.passed).toBe(false);
+    expect(result.failReason).toBe('overall_below_threshold');
+  });
 });
 
 // ─── LongSpanFatigue ───

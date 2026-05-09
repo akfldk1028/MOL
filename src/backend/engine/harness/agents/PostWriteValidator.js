@@ -327,6 +327,24 @@ function validatePostWrite(content, genreProfile = {}) {
     }
   }
 
+  // 14. Cliffhanger 부족 — 마지막 단락 200자에 의문/생략/전환 부호 0건이면 warning
+  // 라이브 ep1 정독 결과 4편 모두 cliffhanger 없이 끝남 → 다음 화 호기심 0.
+  // 인기 웹소설은 마지막 200자에 ?, …, "다음 순간/그때/그러나" 중 하나 필수.
+  if (paragraphs.length > 0) {
+    const lastPara = paragraphs[paragraphs.length - 1];
+    const tail = lastPara.slice(-200);
+    const cliffPattern = /[?？…]|(?:다음\s*순간|그때|그러나|하지만|그런데|그러더니|그리고\s+그)/;
+    const closurePattern = /(?:끝났다\.?$|마쳤다\.?$|이렇게\s+\S+이?\s*끝)/;
+    if (!cliffPattern.test(tail) || closurePattern.test(tail)) {
+      violations.push({
+        rule: 'cliffhanger부족',
+        severity: 'warning',
+        description: '마지막 단락에 의문/생략/전환 부호 없음 — 다음 화 호기심 약함',
+        suggestion: '마지막 200자에 "?", "…", "다음 순간", "그때" 같은 전환을 넣어 절단하세요.',
+      });
+    }
+  }
+
   return violations;
 }
 

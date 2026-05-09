@@ -220,6 +220,7 @@ class StoryOrchestrator {
       composer.addSynopsis(series.synopsis);
       composer.addHookAgenda(hookAgendaPrompt);
       composer.addPacingRule(genreProfile.pacingRule);
+      composer.addClicheBlacklist(); // B1: 진부한 클리셰 차단
 
       // L3: Planning
       composer.addRLFeedback(evalHistory);

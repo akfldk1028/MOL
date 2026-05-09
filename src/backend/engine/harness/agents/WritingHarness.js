@@ -213,6 +213,7 @@ function extractTitle(text) {
  */
 function buildWritingPrompt(chapterPlan, previousChapters = [], options = {}) {
   const parts = [];
+  const chapterNumber = options.chapterNumber || 1;
 
   // Long-term memory: series premise + character sheet (anchors)
   if (options.premise) {
@@ -380,6 +381,54 @@ function buildWritingPrompt(chapterPlan, previousChapters = [], options = {}) {
   parts.push(...block.titleInstr);
   parts.push(...block.wordRule);
   if (options.outline) parts.push(...block.charRule);
+
+  // B3: 1화 도입부 후크 강제 (R1 + R2 + R5)
+  // 라이브 ep1 4편 정독 결과 모두 클리셰 + 정보 과다 + cliffhanger 부재로 예심 통과 어려움.
+  // chapterNumber === 1일 때만 활성화.
+  if (chapterNumber === 1) {
+    if (lang === 'ko') {
+      parts.push(
+        '## 🔥 1화 오프닝 (절대 준수)',
+        '',
+        '**R1 — 첫 50자 후크**',
+        '- 첫 문장: 갈등 / 의문 / 위험 셋 중 하나로 시작하라.',
+        '- ⛔ 금지: 날씨/풍경 묘사, 자기소개("내 이름은~"), 평온한 일상.',
+        '- ✅ 예시: "검을 휘두르는 순간, 나는 내 몸이 아님을 깨달았다."',
+        '',
+        '**R2 — 첫 200자 정보 ≤ 3 요소**',
+        '- 인물 1~2명 + 사건 1개만. 세계관/배경/마법체계 일괄 노출 금지.',
+        '- 정보는 2화 이후 점진 공개. 1화는 호기심 증폭이 목적.',
+        '',
+        '**R5 — 마지막 200자 cliffhanger**',
+        '- 의문문(?), 생략(…), 전환어("다음 순간 / 그때 / 그러나") 중 하나로 끝내라.',
+        '- ⛔ 금지: "이렇게 하루가 끝났다", "그는 결심했다" 같은 종료/요약형.',
+        '',
+        '**진부한 클리셰 금지**',
+        '- 갑자기 변한 몸 / 잃어버린 후계자 / 의문의 노인 / 검은 나무 / 트럭에 치여 회귀',
+        '- 위 패턴 사용 시 차별화된 변주 필수.',
+        '',
+      );
+    } else if (lang === 'en') {
+      parts.push(
+        '## 🔥 Chapter 1 Opening (MANDATORY)',
+        '',
+        '**R1 — First 50 chars hook**: Open with conflict / mystery / danger. NO weather descriptions, self-introductions, or peaceful daily life.',
+        '**R2 — First 200 chars info ≤ 3 elements**: 1-2 characters + 1 event. NO worldbuilding dump.',
+        '**R5 — Last 200 chars cliffhanger**: End with question (?), ellipsis (...), or transition ("Then..." / "But...").',
+        '**No tropes**: avoid "suddenly transformed body", "lost heir", "mysterious old man".',
+        '',
+      );
+    } else if (lang === 'ja') {
+      parts.push(
+        '## 🔥 第1話オープニング（厳守）',
+        '',
+        '**R1**: 最初の50字は対立・謎・危険から始める。天候描写・自己紹介・平穏な日常は禁止。',
+        '**R2**: 最初の200字は人物1～2名＋事件1つのみ。世界観の一括説明禁止。',
+        '**R5**: 最後の200字は疑問符（？）・省略（…）・転換語（「次の瞬間」「だが」）で終わる。',
+        '',
+      );
+    }
+  }
 
   return parts.join('\n');
 }
