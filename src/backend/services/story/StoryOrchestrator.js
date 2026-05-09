@@ -389,6 +389,41 @@ class StoryOrchestrator {
           if (normResult.applied) {
             chapterContent = normResult.content;
             this._emit('stage_complete', { stage: 'length_normalize', before: currentWordCount, after: normResult.wordCount, mode: normResult.mode });
+
+            // A7: LengthNormalizer 후 PostWriteValidator 재검증
+            // expand 모드에서 LLM이 같은 문장을 N회 반복해 분량만 늘리는 폭주 차단.
+            // (라이브 별을 삼킨 자 ep30: 14K자에서 같은 문장 28회 반복, 토끼의 꿈 ep23: 45회 — 라이브에서 직접 관측됨)
+            const postLengthViolations = validatePostWrite(chapterContent, genreProfile);
+            const postLengthErrors = postLengthViolations.filter(v => v.severity === 'error');
+            if (postLengthErrors.length > 0) {
+              this._emit('postlength_violations', {
+                attempt: writeAttempt,
+                errors: postLengthErrors.map(v => ({ rule: v.rule, description: v.description })),
+              });
+              // SpotFix 한 번 시도
+              try {
+                const fixResult = await spotFixRevise({ content: chapterContent, issues: postLengthErrors, llmCall: this.llmCall, genre });
+                if (fixResult.applied) {
+                  chapterContent = fixResult.content;
+                  this._emit('stage_complete', { stage: 'spotfix_postlength', patches: fixResult.patchCount });
+                }
+              } catch (err) {
+                this._emit('spotfix_postlength_error', { error: err.message, attempt: writeAttempt });
+              }
+              // 재검증 후에도 errors 남아있으면 다음 attempt로 rewrite
+              const reCheck = validatePostWrite(chapterContent, genreProfile);
+              const reErrors = reCheck.filter(v => v.severity === 'error');
+              if (reErrors.length > 0) {
+                this._emit('postlength_unresolved', { attempt: writeAttempt, errors: reErrors.map(v => v.rule) });
+                if (writeAttempt > this.maxEvalRetries) {
+                  return this._fail('postlength_unresolved', {
+                    violations: reErrors,
+                    message: `Length-induced repetition unresolved after ${writeAttempt} attempts`,
+                  }, startTime);
+                }
+                continue; // while loop 다음 writeAttempt로
+              }
+            }
           }
           if (normResult.warning) this._emit('length_warning', { warning: normResult.warning });
 

@@ -173,6 +173,45 @@ describe('StoryOrchestrator', () => {
     expect(writeCall.userHead).toMatch(/대사를 더 짧고|내면 독백을 줄이고|비평 피드백/);
   });
 
+  // A7: LengthNormalizer 후 PostWriteValidator 재검증 — expand 폭주 차단
+  // 라이브 ep30 (별을 삼킨 자) 14K자 본문에서 같은 문장 28회 반복, ep23 (토끼의 꿈) 45회 — 직접 관측됨.
+  // 챕터 길이 조정기가 expand mode에서 같은 문장을 N회 반복해 분량만 늘리는 폭주 차단.
+  test('A7: LengthNormalizer expand 후 PostWriteValidator 재검증 (라이브 폭주 케이스 시뮬)', async () => {
+    // WRITE_RESPONSE는 정상 통과 (1500자), 챕터 길이 조정기가 같은 문장 8번 복붙으로 expand 폭주 시뮬
+    const RUNAWAY_SENTENCE = '그는 자신의 손을 바라보며 천천히 호흡을 가다듬었지만 그 모든 것이 무의미하게 느껴졌다';
+    const RUNAWAY_EXPAND = WRITE_RESPONSE + '\n\n' +
+      Array(8).fill(RUNAWAY_SENTENCE + '. ' + RUNAWAY_SENTENCE + '.').join('\n\n');
+
+    const events = [];
+    const runawayLLM = async (system, user, opts) => {
+      if (system.includes('outline architect')) return OUTLINE_RESPONSE;
+      if (system.includes('structure architect')) return PLAN_RESPONSE;
+      if (system.includes('Creative fiction writer')) return WRITE_RESPONSE;
+      if (system.includes('literary critic')) return EVAL_RESPONSE;
+      if (system.includes('continuity auditor')) return '[]';
+      if (system.includes('story state tracker') || system.includes('story architect')) return '{}';
+      if (system.includes('챕터 길이 조정기')) return RUNAWAY_EXPAND; // ★ expand 폭주
+      if (system.includes('수정 편집자')) return ''; // SpotFix patch 없음
+      return 'fallback';
+    };
+
+    // genre=romance, targetWordCount 작게 — A6 테스트와 동일 환경 (WritingHarness 통과)
+    // WRITE_RESPONSE 1292 chars / 390 words 가 romance softMin(1800) 미달이므로 expand 트리거
+    const story = new StoryOrchestrator({
+      genre: 'romance', language: 'ko', targetWordCount: 500,
+      llmCall: runawayLLM,
+      onProgress: (e) => events.push(e.type),
+      maxEvalRetries: 1,
+    });
+    await story.generateEpisode({
+      series: { title: '테스트', genre: 'romance', synopsis: 'test' },
+      episodeNumber: 1,
+    });
+    // postlength_violations 또는 postlength_unresolved 이벤트 발생 필수
+    const hasA7Detection = events.some(e => e.startsWith('postlength_'));
+    expect(hasA7Detection).toBe(true);
+  });
+
   test('A6: feedback_directives 없으면 RL 섹션 미주입(부작용 0)', async () => {
     const captured = [];
     const recordedLLM = async (system, user, opts) => {
